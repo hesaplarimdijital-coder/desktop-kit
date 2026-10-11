@@ -35,7 +35,10 @@ android {
             isIncludeAndroidResources = true
             all {
                 it.maxHeapSize = "2g"
-                it.systemProperty("desktopkit.screenshotDir", layout.buildDirectory.dir("outputs/screenshots").get().asFile.path)
+                val screenshots = layout.buildDirectory.dir("outputs/screenshots")
+                it.systemProperty("desktopkit.screenshotDir", screenshots.get().asFile.path)
+                // declared so a test result restored from the build cache brings the screenshots along
+                it.outputs.dir(screenshots).withPropertyName("screenshots")
                 it.testLogging {
                     events("failed")
                     exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
