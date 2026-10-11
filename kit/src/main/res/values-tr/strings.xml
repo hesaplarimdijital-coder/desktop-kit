@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Kabuk -->
+    <string name="dk_main_navigation">Ana gezinme</string>
+    <string name="dk_sidebar">Kenar çubuğu</string>
+    <string name="dk_sidebar_collapse">Kenar çubuğunu daralt</string>
+    <string name="dk_sidebar_expand">Kenar çubuğunu genişlet</string>
+    <string name="dk_more">Daha fazla</string>
+    <string name="dk_search">Ara veya komut çalıştır</string>
+    <string name="dk_search_hint">Ara ya da komut yaz</string>
+    <string name="dk_settings">Ayarlar</string>
+
+    <!-- Klavye -->
+    <string name="dk_key_space">Boşluk</string>
+    <string name="dk_menu_view">Görünüm</string>
+    <string name="dk_menu_help">Yardım</string>
+    <string name="dk_toggle_sidebar">Kenar çubuğunu göster veya gizle</string>
+    <string name="dk_shortcut_list">Klavye kısayolları</string>
+
+    <!-- Ayar bölümleri -->
+    <string name="dk_settings_appearance">Görünüm</string>
+    <string name="dk_settings_theme">Tema</string>
+    <string name="dk_theme_system">Sistem</string>
+    <string name="dk_theme_light">Açık</string>
+    <string name="dk_theme_dark">Koyu</string>
+    <string name="dk_theme_oled">OLED siyah</string>
+    <string name="dk_settings_accent">Vurgu rengi</string>
+    <string name="dk_accent_blue">Mavi</string>
+    <string name="dk_accent_amber">Kehribar</string>
+    <string name="dk_accent_green">Yeşil</string>
+    <string name="dk_accent_coral">Mercan</string>
+    <string name="dk_settings_input">Giriş</string>
+    <string name="dk_settings_density">Arayüz yoğunluğu</string>
+    <string name="dk_density_auto">Otomatik (fare ya da dokunmaya göre)</string>
+    <string name="dk_density_touch">Dokunmatik</string>
+    <string name="dk_density_pointer">Fare ve klavye</string>
+</resources>

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Shell -->
+    <string name="dk_main_navigation">Main navigation</string>
+    <string name="dk_sidebar">Sidebar</string>
+    <string name="dk_sidebar_collapse">Collapse sidebar</string>
+    <string name="dk_sidebar_expand">Expand sidebar</string>
+    <string name="dk_more">More</string>
+    <string name="dk_search">Search or run a command</string>
+    <string name="dk_search_hint">Search or type a command</string>
+    <string name="dk_settings">Settings</string>
+
+    <!-- Keyboard -->
+    <string name="dk_key_space">Space</string>
+    <string name="dk_menu_view">View</string>
+    <string name="dk_menu_help">Help</string>
+    <string name="dk_toggle_sidebar">Show or hide the sidebar</string>
+    <string name="dk_shortcut_list">Keyboard shortcuts</string>
+
+    <!-- Settings sections -->
+    <string name="dk_settings_appearance">Appearance</string>
+    <string name="dk_settings_theme">Theme</string>
+    <string name="dk_theme_system">System</string>
+    <string name="dk_theme_light">Light</string>
+    <string name="dk_theme_dark">Dark</string>
+    <string name="dk_theme_oled">OLED black</string>
+    <string name="dk_settings_accent">Accent colour</string>
+    <string name="dk_accent_blue">Blue</string>
+    <string name="dk_accent_amber">Amber</string>
+    <string name="dk_accent_green">Green</string>
+    <string name="dk_accent_coral">Coral</string>
+    <string name="dk_settings_input">Input</string>
+    <string name="dk_settings_density">Interface density</string>
+    <string name="dk_density_auto">Automatic (follows mouse or touch)</string>
+    <string name="dk_density_touch">Touch</string>
+    <string name="dk_density_pointer">Mouse and keyboard</string>
+</resources>

@@ -1,0 +1,78 @@
+# Builds the kit and the sample app, runs the unit tests (including the Robolectric screenshot
+# tests) and compares the screenshots with kit/src/test/screenshots. On main the screenshots are
+# pushed to the ci/screenshots branch for review. Build errors and failed tests are reported as
+# annotations on the commit.
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['*']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build and test
+        run: |
+          ./gradlew :kit:testDebugUnitTest :kit:publishToMavenLocal :sample:assembleDebug \
+            --continue --console=plain 2>&1 | tee build.log
+          exit ${PIPESTATUS[0]}
+
+      - name: Annotate errors
+        if: failure()
+        run: |
+          python3 tools/annotate_gradle_errors.py build.log
+          python3 tools/annotate_test_failures.py kit/build/test-results
+
+      - name: Compare screenshots
+        if: always()
+        run: |
+          pip install --quiet pillow
+          python3 tools/screenshot_report.py kit/build/outputs/screenshots kit/src/test/screenshots kit/build/outputs/screenshots/diff
+
+      - name: Push screenshots to ci/screenshots
+        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          src=kit/build/outputs/screenshots
+          [ -d "$src" ] || exit 0
+          out="$RUNNER_TEMP/screenshots"
+          rm -rf "$out" && cp -r "$src" "$out"
+          cd "$out"
+          git init -q && git checkout -q --orphan ci/screenshots
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com add -A
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -q -m "Screenshots for ${GITHUB_SHA::7}"
+          git push -q --force "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/ci/screenshots
+
+      - name: Sample APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sample-debug-apk
+          path: sample/build/outputs/apk/debug/*.apk
+
+      - name: Test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: kit/build/reports/tests
