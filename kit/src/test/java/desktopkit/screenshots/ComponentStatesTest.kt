@@ -143,7 +143,7 @@ class ComponentStatesTest {
                         TableColumn("Boyut", ColumnWidth.Fixed(100.dp), alignEnd = true, mono = true) { it.size },
                     ),
                     rows = sampleFiles.take(2),
-                    key = { it.title },
+                    key = { it.name },
                     onRowClick = { _, _ -> },
                     sort = TableSort(0, ascending = true),
                     onSortChange = {},
