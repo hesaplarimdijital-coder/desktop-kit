@@ -14,7 +14,12 @@ import desktopkit.R
  * The default is IBM Plex (SIL OFL 1.1, bundled); pass your own families to change the look.
  */
 @Immutable
-data class DeskFonts(val sans: FontFamily, val mono: FontFamily) {
+data class DeskFonts(
+    val sans: FontFamily,
+    val mono: FontFamily,
+    /** Display, headline and title styles; the same as [sans] unless an app wants, say, a serif for headings. */
+    val heading: FontFamily = sans,
+) {
     companion object {
         val Plex = DeskFonts(
             sans = FontFamily(
@@ -61,17 +66,17 @@ data class DeskType(
 
         private fun build(fonts: DeskFonts, display: Number, headline: Number, title: Number, body: Number, label: Number,
                           labelSmall: Number, caption: Number, mono: Number): DeskType {
-            fun sans(size: Number, weight: FontWeight, lineHeight: Float) = TextStyle(
-                fontFamily = fonts.sans,
+            fun sans(size: Number, weight: FontWeight, lineHeight: Float, family: FontFamily = fonts.sans) = TextStyle(
+                fontFamily = family,
                 fontWeight = weight,
                 fontSize = size.toFloat().sp,
                 lineHeight = lineHeight.sp,
                 letterSpacing = TextUnit.Unspecified,
             )
             return DeskType(
-                display = sans(display, FontWeight.SemiBold, lineHeight = display.toFloat() * 1.25f),
-                headline = sans(headline, FontWeight.SemiBold, lineHeight = headline.toFloat() * 1.3f),
-                title = sans(title, FontWeight.SemiBold, lineHeight = title.toFloat() * 1.35f),
+                display = sans(display, FontWeight.SemiBold, lineHeight = display.toFloat() * 1.25f, family = fonts.heading),
+                headline = sans(headline, FontWeight.SemiBold, lineHeight = headline.toFloat() * 1.3f, family = fonts.heading),
+                title = sans(title, FontWeight.SemiBold, lineHeight = title.toFloat() * 1.35f, family = fonts.heading),
                 body = sans(body, FontWeight.Normal, lineHeight = body.toFloat() * 1.4f),
                 bodyStrong = sans(body, FontWeight.Medium, lineHeight = body.toFloat() * 1.4f),
                 label = sans(label, FontWeight.Medium, lineHeight = label.toFloat() * 1.3f),

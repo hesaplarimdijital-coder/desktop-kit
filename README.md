@@ -40,7 +40,7 @@ Uygulama modülünün `build.gradle.kts` dosyası:
 
 ```kotlin
 dependencies {
-    implementation("com.github.hesaplarimdijital-coder:desktop-kit:0.1.0")
+    implementation("com.github.hesaplarimdijital-coder:desktop-kit:0.1.1")
     implementation("androidx.activity:activity-compose:1.9.3")
 }
 ```

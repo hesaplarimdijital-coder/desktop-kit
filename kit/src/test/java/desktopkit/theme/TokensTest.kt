@@ -42,4 +42,19 @@ class TokensTest {
         assertTrue(system.body.fontSize == DeskType.Pointer.body.fontSize)
         assertTrue(system.body.fontFamily == DeskFonts.System.sans)
     }
+
+    @Test
+    fun headingsUseTheHeadingFamily() {
+        val plex = DeskType.pointer(DeskFonts.Plex)
+        assertTrue(plex.title.fontFamily == DeskFonts.Plex.sans) // unchanged unless asked
+        val serif = DeskFonts.Plex.copy(heading = androidx.compose.ui.text.font.FontFamily.Serif)
+        for (type in listOf(DeskType.pointer(serif), DeskType.touch(serif))) {
+            assertTrue(type.display.fontFamily == androidx.compose.ui.text.font.FontFamily.Serif)
+            assertTrue(type.headline.fontFamily == androidx.compose.ui.text.font.FontFamily.Serif)
+            assertTrue(type.title.fontFamily == androidx.compose.ui.text.font.FontFamily.Serif)
+            assertTrue(type.body.fontFamily == DeskFonts.Plex.sans)
+            assertTrue(type.label.fontFamily == DeskFonts.Plex.sans)
+            assertTrue(type.mono.fontFamily == DeskFonts.Plex.mono)
+        }
+    }
 }

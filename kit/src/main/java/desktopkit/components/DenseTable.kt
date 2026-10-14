@@ -31,6 +31,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -51,6 +52,8 @@ class TableColumn<T>(
     /** Monospace for durations, formats and sizes. */
     val mono: Boolean = false,
     val sortable: Boolean = true,
+    /** The cells' text style, when neither [mono] nor the default (strong first column, body after) fits: a serif title column, say. */
+    val textStyle: TextStyle? = null,
     val value: (T) -> String,
 )
 
@@ -168,7 +171,7 @@ private fun <T> TableRow(columns: List<TableColumn<T>>, item: T, selected: Boole
             Box(Modifier.cell(this, column.width).padding(horizontal = 8.dp), contentAlignment = if (column.alignEnd) Alignment.CenterEnd else Alignment.CenterStart) {
                 Text(
                     text = column.value(item),
-                    style = if (column.mono) DeskTheme.type.mono else if (index == 0) DeskTheme.type.bodyStrong else DeskTheme.type.body,
+                    style = column.textStyle ?: if (column.mono) DeskTheme.type.mono else if (index == 0) DeskTheme.type.bodyStrong else DeskTheme.type.body,
                     color = when {
                         selected -> colors.onSelection
                         index == 0 -> colors.text

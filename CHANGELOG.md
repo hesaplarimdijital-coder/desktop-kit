@@ -1,5 +1,11 @@
 # Değişiklikler
 
+## 0.1.1
+
+- `DeskFonts` başlıklar için ayrı bir aile alır: `DeskFonts(sans, mono, heading = sans)`. `display`, `headline` ve `title` bu aileyi kullanır; varsayılan değişmedi.
+- `TableColumn.textStyle`: bir sütunun hücre yazı stili seçilebilir (örneğin kitap adı için serif).
+- Geriye uyumlu: 0.1.0 ile yazılmış kod değişmeden derlenir.
+
 ## 0.1.0
 
 İlk sürüm. Arayüz Nağmedar'dan çıkarılıp genel hâle getirildi.
