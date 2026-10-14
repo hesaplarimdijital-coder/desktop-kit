@@ -40,7 +40,7 @@ Uygulama modülünün `build.gradle.kts` dosyası:
 
 ```kotlin
 dependencies {
-    implementation("com.github.hesaplarimdijital-coder:desktop-kit:0.1.1")
+    implementation("com.github.hesaplarimdijital-coder:desktop-kit:0.1.2")
     implementation("androidx.activity:activity-compose:1.9.3")
 }
 ```
@@ -135,6 +135,7 @@ val shortcuts = ShortcutRegistry(
 | Yazı tipi | `DesktopKitRoot(prefs, fonts = DeskFonts.System)` ya da `DeskFonts(sans = …, mono = …)` |
 | Renk ince ayarı | `DesktopKitRoot(prefs, colors = { it.copy(danger = Color(…)) })` |
 | Boyutlar ve köşeler | `DesktopKitRoot(prefs, dimens = { it.copy(radiusCard = 4.dp, sidebarWidth = 260.dp) })` |
+| Yazı boyutları | `DesktopKitRoot(prefs, type = { mode, fonts -> DeskType.forMode(mode, fonts, pointerStep = 1f) })`: fare ve klavyede her yazı 1 sp büyür, dokunmatik değişmez. `pointerStep`/`touchStep` her stile (display'den mono'ya) o kadar sp ekler, satır yüksekliği oranını korur. Tek tek ayar için `{ mode, fonts -> DeskType.forMode(mode, fonts).copy(body = …) }`. Yüksekliği yazıya göre büyüyen bileşenler (tablo satırı, düğme, menü, üst çubuk) kırpılmaz. |
 | Logo | `DesktopShell(brand = { m -> Image(painterResource(R.drawable.logo), null, m) })` |
 | Yeni simge | `DeskIcons.build("Bulut", DeskIcons.stroke("M4 11a3 3 0 0 1 …"))`. 16×16 ızgara, kitin çizgi stiliyle aynı. |
 | Kitin metinleri | Uygulamanın `res/values*/strings.xml` dosyasında aynı adla (`dk_more`, `dk_search_hint`, …) tanımla; uygulamanınki kazanır. |
@@ -148,13 +149,43 @@ Değerlere doğrudan erişim için `DeskTheme.colors.text`, `DeskTheme.type.body
 | `DeskButton`, `DeskIconButton` | `primary`, `selected`, `enabled` |
 | `SegmentedChoice`, `SwatchChoice`, `SettingRow` | Ayar ekranları için |
 | `DeskSlider` | 0..1 değer; sürükleme, tıklama, fare tekerleği, ok/Home/End, TalkBack |
-| `DenseTable` | Sabit başlık, sıralama, seçili satır, `rowMenu` ile satır başına sağ tık menüsü |
+| `DenseTable` | Sabit başlık, sıralama, seçili satır, `rowMenu` ile satır başına sağ tık menüsü. Çoklu seçim için aşağıya bak. |
 | `HorizontalSplitPane`, `TwoPane` | Sürüklenebilir ve klavyeyle taşınabilir ayırıcı |
 | `ContextMenuArea`, `Modifier.contextMenuGesture` | Sağ tık, uzun basma, Menu tuşu, Shift+F10 |
 | `MenuPopup`, `MenuBarMenus`, `MenuEntry` | Kenarda taşmayan menüler |
 | `TooltipArea` | Yalnızca fareyle görünür, kısayolu da gösterir |
 | `PageHeader`, `MessageScreen`, `OverflowScreen` | Hazır ekran parçaları |
 | `AppearanceSection`, `InputSection`, `ShortcutListSection`, `SettingsSection` | Hazır ayar bölümleri |
+
+### Tabloda çoklu seçim
+
+```kotlin
+var secili by remember { mutableStateOf<Set<Any>>(emptySet()) }
+var secimModu by remember { mutableStateOf(false) } // dokunmatikte "Seç" düğmesi
+DenseTable(
+    columns = sutunlar, rows = kitaplar, key = { it.id },
+    onRowClick = { kitap, _ -> ayrintiyiAc(kitap) },   // yalnızca düz tıklamada çağrılır
+    selectedKeys = secili,
+    onSelectionChange = { secili = it },
+    toggleOnClick = secimModu,
+    rowMenu = { kitap, _ -> menu(secili) },            // menü açılırken seçim güncellenmiş olur
+)
+```
+
+- Tıklama yalnızca o satırı seçer; Ctrl (veya Meta) + tıklama satırı ekler/çıkarır; Shift + tıklama son
+  tıklanan satırdan bu satıra kadar seçer (Ctrl+Shift ekler).
+- Odak tablodayken Ctrl+A hepsini seçer, Shift+↑/↓ seçimi genişletir.
+- `toggleOnClick = true` iken her dokunuş satırı ekler/çıkarır; `onRowClick` çağrılmaz.
+- Sağ tık / uzun basma seçili bir satırdaysa seçim korunur, başka satırdaysa yalnızca o satır seçilir.
+  `rowMenu` uygulamanın `secili` durumunu okuyarak "3 kitabı sil" gibi menü kurar.
+- `onSelectionChange` verilmezse tablo eskisi gibi tek seçimlidir (`selectedKey`).
+
+### Ekran klavyesi
+
+`DesktopKitRoot` uygulamanın tamamına `WindowInsets.safeDrawing` boşluğu verir (klavye dâhil).
+`enableEdgeToEdge()` ve `android:windowSoftInputMode="adjustResize"` ile içerik klavyenin hemen
+üstünde biter; ekranlarda ayrıca `imePadding()` gerekmez. Telefonda klavye açıkken alt gezinme
+çubuğu gizlenir, kapanınca geri gelir (`DesktopShell(hideNavigationWithKeyboard = false)` ile kapatılır).
 
 ## Geliştirme
 

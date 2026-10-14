@@ -40,7 +40,9 @@ object DeskTheme {
  * Adjust the look of one app without forking the kit:
  * - [accent]: a preset or `Accent.custom("Brand", Color(0xFF…))`;
  * - [fonts]: `DeskFonts.System` or your own families;
- * - [colors] / [dimens]: transform the computed tokens, e.g. `{ it.copy(radiusCard = 4.dp) }`.
+ * - [colors] / [dimens]: transform the computed tokens, e.g. `{ it.copy(radiusCard = 4.dp) }`;
+ * - [type]: builds the text styles for an input mode and the fonts, e.g. one sp larger with a
+ *   pointer only: `{ mode, fonts -> DeskType.forMode(mode, fonts, pointerStep = 1f) }`.
  */
 @Composable
 fun DesktopKitTheme(
@@ -50,11 +52,12 @@ fun DesktopKitTheme(
     fonts: DeskFonts = DeskFonts.Plex,
     colors: (DeskColors) -> DeskColors = { it },
     dimens: (DeskDimens) -> DeskDimens = { it },
+    type: (InputMode, DeskFonts) -> DeskType = { mode, fonts -> DeskType.forMode(mode, fonts) },
     content: @Composable () -> Unit,
 ) {
     val systemDark = isSystemInDarkTheme()
     val palette = colors(remember(themeMode, systemDark, accent) { DeskPalette.colors(themeMode, systemDark, accent) })
-    val type = remember(inputMode, fonts) { DeskType.forMode(inputMode, fonts) }
+    val styles = remember(inputMode, fonts, type) { type(inputMode, fonts) }
     val sizes = dimens(DeskDimens.forMode(inputMode))
     val scheme = remember(palette) { palette.toMaterialScheme() }
     val selection = remember(palette) {
@@ -62,11 +65,11 @@ fun DesktopKitTheme(
     }
     CompositionLocalProvider(
         LocalDeskColors provides palette,
-        LocalDeskType provides type,
+        LocalDeskType provides styles,
         LocalDeskDimens provides sizes,
         LocalInputMode provides inputMode,
     ) {
-        MaterialTheme(colorScheme = scheme, typography = type.toMaterialTypography()) {
+        MaterialTheme(colorScheme = scheme, typography = styles.toMaterialTypography()) {
             CompositionLocalProvider(
                 LocalContentColor provides palette.text,
                 LocalTextSelectionColors provides selection,

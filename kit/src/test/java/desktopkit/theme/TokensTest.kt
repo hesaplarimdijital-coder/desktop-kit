@@ -2,6 +2,7 @@ package desktopkit.theme
 
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -56,5 +57,23 @@ class TokensTest {
             assertTrue(type.label.fontFamily == DeskFonts.Plex.sans)
             assertTrue(type.mono.fontFamily == DeskFonts.Plex.mono)
         }
+    }
+
+    @Test
+    fun stepEnlargesEveryPointerStyleOnly() {
+        val base = DeskType.forMode(InputMode.Pointer)
+        val larger = DeskType.forMode(InputMode.Pointer, pointerStep = 1f)
+        for ((pair, bigger) in base.styles().zip(larger.styles())) {
+            val (name, style) = pair
+            val grown = bigger.second
+            assertEquals("pointer $name size", style.fontSize.value + 1f, grown.fontSize.value, 0.001f)
+            // the line height keeps its ratio to the size
+            assertEquals("pointer $name line height", style.lineHeight.value / style.fontSize.value,
+                grown.lineHeight.value / grown.fontSize.value, 0.001f)
+            assertTrue("pointer $name line height grows", grown.lineHeight.value > style.lineHeight.value)
+        }
+        assertEquals(DeskType.Touch, DeskType.forMode(InputMode.Touch, pointerStep = 1f))
+        assertEquals(DeskType.touch(step = 2f), DeskType.forMode(InputMode.Touch, touchStep = 2f))
+        assertEquals(DeskType.Pointer, DeskType.pointer(step = 0f))
     }
 }

@@ -317,7 +317,7 @@ fun PageTopBar(title: String, onSearch: (() -> Unit)?, modifier: Modifier = Modi
     val dimens = DeskTheme.dimens
     Column(modifier.fillMaxWidth().background(colors.background)) {
         Row(
-            modifier = Modifier.fillMaxWidth().height(dimens.topBarHeight).padding(start = dimens.pagePadding, end = dimens.gapS),
+            modifier = Modifier.fillMaxWidth().heightIn(min = dimens.topBarHeight).padding(start = dimens.pagePadding, end = dimens.gapS),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(title, style = DeskTheme.type.headline, color = colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -340,7 +340,7 @@ fun MenuBarChrome(
     val dimens = DeskTheme.dimens
     Column(modifier.fillMaxWidth().background(colors.chrome)) {
         Row(
-            modifier = Modifier.fillMaxWidth().height(dimens.menuBarHeight).padding(start = 14.dp, end = 10.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(min = dimens.menuBarHeight).padding(start = 14.dp, end = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (brand != null) {
@@ -366,7 +366,7 @@ fun SearchField(onClick: () -> Unit, shortcut: String?, modifier: Modifier = Mod
     val shape = RoundedCornerShape(7.dp)
     Row(
         modifier = modifier
-            .height(dimens.controlHeight.coerceAtLeast(dimens.minTarget))
+            .heightIn(min = dimens.controlHeight.coerceAtLeast(dimens.minTarget))
             .focusRing(state, shape)
             .background(if (state.hovered) colors.hover else colors.surface, shape)
             .deskClickable(interaction, onClick, onClickLabel = stringResource(R.string.dk_search))

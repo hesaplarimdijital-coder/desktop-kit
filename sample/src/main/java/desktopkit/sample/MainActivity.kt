@@ -9,11 +9,16 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -64,6 +69,7 @@ import desktopkit.shell.ShellNavigator
 import desktopkit.shell.ShellSpec
 import desktopkit.theme.Accent
 import desktopkit.theme.DeskTheme
+import desktopkit.theme.DeskType
 
 // ------------------------------------------------------------------ 1. keyboard shortcuts
 
@@ -105,7 +111,8 @@ class MainActivity : ComponentActivity() {
                 true
             }
 
-            DesktopKitRoot(prefs) { widthClass ->
+            // every text one sp larger with a mouse or touchpad; touch sizes stay as they are
+            DesktopKitRoot(prefs, type = { mode, fonts -> DeskType.forMode(mode, fonts, pointerStep = 1f) }) { widthClass ->
                 DesktopShell(
                     spec = spec(),
                     widthClass = widthClass,
@@ -213,15 +220,56 @@ private fun GalleryScreen() {
     }
 }
 
+/**
+ * Multi-selection (click, Ctrl+click, Shift+click, Ctrl+A, Shift+arrows; "Select" toggles rows
+ * with each tap) and a filter field: on a phone the bottom bar steps aside while the keyboard is open.
+ */
 @Composable
 private fun FilesScreen() {
+    var filter by remember { mutableStateOf("") }
+    var selected by remember { mutableStateOf<Set<Any>>(emptySet()) }
+    var selectMode by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize()) {
-        PageHeader("Files", subtitle = "${sampleFiles.size} items") {
+        val subtitle = if (selected.isEmpty()) "${sampleFiles.size} items" else "${selected.size} of ${sampleFiles.size} selected"
+        PageHeader("Files", subtitle = subtitle) {
+            DeskButton(if (selectMode) "Done" else "Select", { selectMode = !selectMode })
             DeskIconButton(DeskIcons.Grid, "Grid", {})
             DeskIconButton(DeskIcons.ListView, "List", {}, selected = true)
         }
-        FilesTable()
+        FilterField(filter, { filter = it }, Modifier.padding(horizontal = DeskTheme.dimens.pagePadding).fillMaxWidth())
+        FilesTable(
+            filter = filter,
+            selectedKeys = selected,
+            onSelectionChange = { selected = it },
+            toggleOnClick = selectMode,
+        )
     }
+}
+
+@Composable
+private fun FilterField(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier) {
+    val colors = DeskTheme.colors
+    val shape = RoundedCornerShape(DeskTheme.dimens.radiusControl)
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = true,
+        textStyle = DeskTheme.type.body.copy(color = colors.text),
+        cursorBrush = SolidColor(colors.accent),
+        modifier = modifier.padding(bottom = DeskTheme.dimens.gapS),
+        decorationBox = { field ->
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .background(colors.surface, shape)
+                    .border(1.dp, colors.borderStrong, shape)
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+            ) {
+                if (value.isEmpty()) Text("Filter files", style = DeskTheme.type.body, color = colors.textTertiary)
+                field()
+            }
+        },
+    )
 }
 
 private data class SampleFile(val name: String, val kind: String, val size: String)
@@ -235,16 +283,22 @@ private val sampleFiles = listOf(
     SampleFile("Backup.zip", "Archive", "640 MB"),
 )
 
+/** Single selection unless [onSelectionChange] is given. */
 @Composable
-private fun FilesTable() {
+private fun FilesTable(
+    filter: String = "",
+    selectedKeys: Set<Any>? = null,
+    onSelectionChange: ((Set<Any>) -> Unit)? = null,
+    toggleOnClick: Boolean = false,
+) {
     var selected by remember { mutableStateOf<String?>(null) }
     var sort by remember { mutableStateOf(TableSort(0, true)) }
-    val rows = remember(sort) {
+    val rows = remember(sort, filter) {
         val sorted = when (sort.column) {
             1 -> sampleFiles.sortedBy { it.kind }
             2 -> sampleFiles.sortedBy { it.size }
             else -> sampleFiles.sortedBy { it.name }
-        }
+        }.filter { filter.isBlank() || it.name.contains(filter.trim(), ignoreCase = true) }
         if (sort.ascending) sorted else sorted.reversed()
     }
     DenseTable(
@@ -255,16 +309,22 @@ private fun FilesTable() {
         ),
         rows = rows,
         key = { it.name },
-        selectedKey = selected,
+        selectedKey = if (onSelectionChange == null) selected else null,
+        selectedKeys = selectedKeys,
+        onSelectionChange = onSelectionChange,
+        toggleOnClick = toggleOnClick,
         sort = sort,
         onSortChange = { sort = it },
         onRowClick = { file, _ -> selected = file.name },
         rowMenu = { file, _ ->
+            // the table has already selected the row (or kept a selection that contains it)
+            val count = selectedKeys?.size?.coerceAtLeast(1) ?: 1
             listOf(
                 MenuEntry.Item("Open", { selected = file.name }, shortcut = "Enter", icon = DeskIcons.OpenWindow),
-                MenuEntry.Item("Rename", {}, shortcut = "F2"),
+                MenuEntry.Item("Rename", {}, shortcut = "F2", enabled = count == 1),
                 MenuEntry.Separator,
-                MenuEntry.Item("Delete", {}, shortcut = "Del", icon = DeskIcons.Delete, destructive = true),
+                MenuEntry.Item(if (count > 1) "Delete $count items" else "Delete", {}, shortcut = "Del", icon = DeskIcons.Delete,
+                    destructive = true),
             )
         },
         rowMenuLabel = "More actions",

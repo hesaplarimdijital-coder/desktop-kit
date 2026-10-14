@@ -16,12 +16,17 @@ import desktopkit.theme.DeskColors
 import desktopkit.theme.DeskDimens
 import desktopkit.theme.DeskFonts
 import desktopkit.theme.DeskTheme
+import desktopkit.theme.DeskType
+import desktopkit.theme.InputMode
 import desktopkit.theme.DesktopKitTheme
 
 /**
  * Everything around an app's content in one call: the theme from [prefs], touch/pointer
  * density from the last input device (or the user's override), safe-area insets and the
- * window's [WidthClass]. Typical use in `setContent { }`:
+ * window's [WidthClass]. The insets are `WindowInsets.safeDrawing`, the on-screen keyboard
+ * included: with `enableEdgeToEdge()` and `adjustResize` the content ends just above the
+ * keyboard. The insets are consumed here, so an `imePadding()` further down adds nothing.
+ * [fonts], [colors], [dimens] and [type] are passed to [DesktopKitTheme]. Typical use in `setContent { }`:
  *
  * ```
  * val prefs = rememberDeskPreferences()
@@ -38,6 +43,7 @@ fun DesktopKitRoot(
     fonts: DeskFonts = DeskFonts.Plex,
     colors: (DeskColors) -> DeskColors = { it },
     dimens: (DeskDimens) -> DeskDimens = { it },
+    type: (InputMode, DeskFonts) -> DeskType = { mode, fonts -> DeskType.forMode(mode, fonts) },
     content: @Composable (WidthClass) -> Unit,
 ) {
     val inputMode = rememberInputModeState()
@@ -48,6 +54,7 @@ fun DesktopKitRoot(
         fonts = fonts,
         colors = colors,
         dimens = dimens,
+        type = type,
     ) {
         BoxWithConstraints(
             modifier

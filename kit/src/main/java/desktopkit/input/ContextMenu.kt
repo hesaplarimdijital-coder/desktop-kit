@@ -81,6 +81,9 @@ private suspend fun androidx.compose.ui.input.pointer.AwaitPointerEventScope.con
  * Wraps [content] with a context menu built by [entries] when it opens. Besides the pointer
  * gestures, the Menu key or Shift+F10 opens it for the focused element, and TalkBack gets a
  * custom action with the same label.
+ *
+ * [onOpen] runs just before the menu opens, whichever way it is opened, and before [entries] is
+ * called: a list uses it to select the row under the pointer.
  */
 @Composable
 fun ContextMenuArea(
@@ -88,24 +91,30 @@ fun ContextMenuArea(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     accessibilityLabel: String? = null,
+    onOpen: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     val menu = rememberMenuState()
     val currentEntries by rememberUpdatedState(entries)
+    val currentOnOpen by rememberUpdatedState(onOpen)
     var height by remember { mutableIntStateOf(0) }
+    val open = { at: IntOffset ->
+        currentOnOpen?.invoke()
+        menu.open(at)
+    }
     Box(
         modifier = modifier
             .onSizeChanged { height = it.height }
-            .contextMenuGesture(enabled) { position -> menu.open(IntOffset(position.x.roundToInt(), position.y.roundToInt())) }
+            .contextMenuGesture(enabled) { position -> open(IntOffset(position.x.roundToInt(), position.y.roundToInt())) }
             .onKeyEvent { event ->
                 val opens = event.type == KeyEventType.KeyDown &&
                     (event.key == Key.Menu || (event.key == Key.F10 && event.isShiftPressed))
-                if (opens && enabled) menu.open(IntOffset(0, height))
+                if (opens && enabled) open(IntOffset(0, height))
                 opens && enabled
             }
             .semantics {
                 if (enabled && accessibilityLabel != null) {
-                    customActions = listOf(CustomAccessibilityAction(accessibilityLabel) { menu.open(IntOffset(0, height)); true })
+                    customActions = listOf(CustomAccessibilityAction(accessibilityLabel) { open(IntOffset(0, height)); true })
                 }
             },
     ) {

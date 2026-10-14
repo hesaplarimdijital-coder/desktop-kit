@@ -4,7 +4,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -51,11 +54,18 @@ class ShellNavigator(private val navController: NavHostController) {
  * monitors). The navigation graph lives in one slot of [ShellLayout], so resizing a window
  * across width classes keeps back stacks, scroll positions and text fields.
  *
+ * The bottom navigation bar (compact windows) is hidden while the on-screen keyboard is open, so
+ * it does not ride up on top of the keyboard; the content then reaches down to the keyboard. The
+ * content ends above the keyboard because [desktopkit.DesktopKitRoot] pads the whole app with
+ * `WindowInsets.safeDrawing` (IME included); a shell used without it needs the same padding around it.
+ *
  * @param bottomBar optional strip under the content (a player, a status bar); it receives the current [NavKind].
+ * @param hideNavigationWithKeyboard false keeps the bottom navigation bar above the open keyboard.
  * @param menus menu bar menus, shown in the sidebar layout; [desktopkit.input.ShortcutRegistry.menus] builds them.
  * @param onSearch shows a search field (sidebar layout) or a search button (smaller windows) when set.
  * @param content the screen for a route of [spec]. The "More" route is handled by the shell.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DesktopShell(
     spec: ShellSpec,
@@ -71,6 +81,7 @@ fun DesktopShell(
     searchHint: String? = null,
     searchShortcut: String? = "Ctrl+K",
     bottomBar: @Composable (NavKind) -> Unit = {},
+    hideNavigationWithKeyboard: Boolean = true,
     content: @Composable (route: String, navigator: ShellNavigator) -> Unit,
 ) {
     val navigator = remember(navController) { ShellNavigator(navController) }
@@ -78,6 +89,8 @@ fun DesktopShell(
     val currentRoute = entry?.destination?.route ?: spec.startRoute
     val navKind = NavKind.forWidth(widthClass)
     val more = moreItem()
+    // not laid out at all while the keyboard is up; the root's safeDrawing padding already ends the content above it
+    val showBottomNav = !(hideNavigationWithKeyboard && WindowInsets.isImeVisible)
     // The graph builder below must not capture changing values, or NavHost would rebuild the graph.
     val currentContent by rememberUpdatedState(content)
     val currentSpec by rememberUpdatedState(spec)
@@ -108,7 +121,7 @@ fun DesktopShell(
         },
         navigation = {
             when (navKind) {
-                NavKind.BottomBar -> BottomNavBar(spec, currentRoute, navigator::navigate)
+                NavKind.BottomBar -> if (showBottomNav) BottomNavBar(spec, currentRoute, navigator::navigate)
                 NavKind.Rail -> NavRail(spec, currentRoute, navigator::navigate, brand = brand)
                 NavKind.Sidebar -> Sidebar(
                     spec = spec,
