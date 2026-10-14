@@ -6,6 +6,7 @@ import android.view.KeyboardShortcutGroup
 import android.view.Menu
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
@@ -62,11 +63,15 @@ import desktopkit.settings.AppearanceSection
 import desktopkit.settings.InputSection
 import desktopkit.settings.ShortcutListSection
 import desktopkit.settings.rememberDeskPreferences
+import desktopkit.shell.CompactTopBar
 import desktopkit.shell.DesktopShell
 import desktopkit.shell.NavItem
 import desktopkit.shell.NavSection
 import desktopkit.shell.ShellNavigator
 import desktopkit.shell.ShellSpec
+import desktopkit.shell.TopBarAction
+import desktopkit.shell.WidthClass
+import desktopkit.shell.currentWidthClass
 import desktopkit.theme.Accent
 import desktopkit.theme.DeskTheme
 import desktopkit.theme.DeskType
@@ -223,12 +228,20 @@ private fun GalleryScreen() {
 /**
  * Multi-selection (click, Ctrl+click, Shift+click, Ctrl+A, Shift+arrows; "Select" toggles rows
  * with each tap) and a filter field: on a phone the bottom bar steps aside while the keyboard is open.
+ * "Open" (a tap on a phone) shows a file's details.
  */
 @Composable
 private fun FilesScreen() {
     var filter by remember { mutableStateOf("") }
     var selected by remember { mutableStateOf<Set<Any>>(emptySet()) }
     var selectMode by remember { mutableStateOf(false) }
+    var opened by remember { mutableStateOf<String?>(null) }
+    val compact = currentWidthClass() == WidthClass.Compact
+    val file = sampleFiles.firstOrNull { it.name == opened }
+    if (file != null) {
+        FileDetails(file, onClose = { opened = null })
+        return
+    }
     Column(Modifier.fillMaxSize()) {
         val subtitle = if (selected.isEmpty()) "${sampleFiles.size} items" else "${selected.size} of ${sampleFiles.size} selected"
         PageHeader("Files", subtitle = subtitle) {
@@ -242,7 +255,42 @@ private fun FilesScreen() {
             selectedKeys = selected,
             onSelectionChange = { selected = it },
             toggleOnClick = selectMode,
+            onOpen = { opened = it.name },
+            openOnClick = compact,
         )
+    }
+}
+
+/**
+ * On a phone the file name, a back arrow and the actions move into the top bar (CompactTopBar);
+ * the system Back gesture closes the details too. Wider windows keep their own header.
+ */
+@Composable
+private fun FileDetails(file: SampleFile, onClose: () -> Unit) {
+    val context = LocalContext.current
+    val toast = { text: String -> Toast.makeText(context, text, Toast.LENGTH_SHORT).show() }
+    // on a phone CompactTopBar already sends the Back gesture to onClose
+    if (currentWidthClass() != WidthClass.Compact) BackHandler(onBack = onClose)
+    CompactTopBar(
+        title = file.name,
+        onBack = onClose,
+        actions = listOf(
+            TopBarAction(DeskIcons.OpenWindow, "Open", { toast("Open") }, primary = true),
+            TopBarAction(DeskIcons.PlaylistAdd, "Add to list", { toast("Add to list") }),
+            TopBarAction(DeskIcons.Info, "Properties", { toast("Properties") }),
+            TopBarAction(DeskIcons.Delete, "Delete", { toast("Delete") }),
+        ),
+    )
+    Column(Modifier.fillMaxSize()) {
+        PageHeader(file.name, subtitle = "${file.kind} · ${file.size}") {
+            if (currentWidthClass() != WidthClass.Compact) DeskButton("Back", onClose, icon = DeskIcons.ArrowLeft)
+        }
+        listOf("Kind" to file.kind, "Size" to file.size, "Location" to "Files").forEach { (label, value) ->
+            Row(Modifier.fillMaxWidth().padding(horizontal = DeskTheme.dimens.pagePadding, vertical = 10.dp)) {
+                Text(label, style = DeskTheme.type.body, color = DeskTheme.colors.textSecondary, modifier = Modifier.width(120.dp))
+                Text(value, style = DeskTheme.type.body, color = DeskTheme.colors.text)
+            }
+        }
     }
 }
 
@@ -290,6 +338,8 @@ private fun FilesTable(
     selectedKeys: Set<Any>? = null,
     onSelectionChange: ((Set<Any>) -> Unit)? = null,
     toggleOnClick: Boolean = false,
+    onOpen: (SampleFile) -> Unit = {},
+    openOnClick: Boolean = false,
 ) {
     var selected by remember { mutableStateOf<String?>(null) }
     var sort by remember { mutableStateOf(TableSort(0, true)) }
@@ -315,12 +365,15 @@ private fun FilesTable(
         toggleOnClick = toggleOnClick,
         sort = sort,
         onSortChange = { sort = it },
-        onRowClick = { file, _ -> selected = file.name },
+        onRowClick = { file, _ ->
+            selected = file.name
+            if (openOnClick) onOpen(file)
+        },
         rowMenu = { file, _ ->
             // the table has already selected the row (or kept a selection that contains it)
             val count = selectedKeys?.size?.coerceAtLeast(1) ?: 1
             listOf(
-                MenuEntry.Item("Open", { selected = file.name }, shortcut = "Enter", icon = DeskIcons.OpenWindow),
+                MenuEntry.Item("Open", { onOpen(file) }, shortcut = "Enter", icon = DeskIcons.OpenWindow),
                 MenuEntry.Item("Rename", {}, shortcut = "F2", enabled = count == 1),
                 MenuEntry.Separator,
                 MenuEntry.Item(if (count > 1) "Delete $count items" else "Delete", {}, shortcut = "Del", icon = DeskIcons.Delete,

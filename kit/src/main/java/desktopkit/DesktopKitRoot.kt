@@ -7,10 +7,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import desktopkit.input.rememberInputModeState
 import desktopkit.input.trackInputMode
 import desktopkit.settings.DeskPreferences
+import desktopkit.shell.LocalWidthClass
 import desktopkit.shell.WidthClass
 import desktopkit.theme.DeskColors
 import desktopkit.theme.DeskDimens
@@ -23,7 +25,7 @@ import desktopkit.theme.DesktopKitTheme
 /**
  * Everything around an app's content in one call: the theme from [prefs], touch/pointer
  * density from the last input device (or the user's override), safe-area insets and the
- * window's [WidthClass]. The insets are `WindowInsets.safeDrawing`, the on-screen keyboard
+ * window's [WidthClass] (also provided as [LocalWidthClass]). The insets are `WindowInsets.safeDrawing`, the on-screen keyboard
  * included: with `enableEdgeToEdge()` and `adjustResize` the content ends just above the
  * keyboard. The insets are consumed here, so an `imePadding()` further down adds nothing.
  * [fonts], [colors], [dimens] and [type] are passed to [DesktopKitTheme]. Typical use in `setContent { }`:
@@ -63,7 +65,8 @@ fun DesktopKitRoot(
                 .trackInputMode(inputMode)
                 .windowInsetsPadding(WindowInsets.safeDrawing),
         ) {
-            content(WidthClass.fromWidth(maxWidth.value))
+            val widthClass = WidthClass.fromWidth(maxWidth.value)
+            CompositionLocalProvider(LocalWidthClass provides widthClass) { content(widthClass) }
         }
     }
 }

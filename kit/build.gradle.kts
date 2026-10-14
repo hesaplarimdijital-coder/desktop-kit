@@ -62,6 +62,8 @@ dependencies {
     api(libs.compose.material3)
     api(libs.navigation.compose)
     implementation(libs.compose.ui.tooling.preview)
+    // BackHandler for CompactTopBar; navigation-compose already brings it in
+    implementation(libs.activity.compose)
     implementation(libs.coroutines.android)
 
     testImplementation(libs.junit)

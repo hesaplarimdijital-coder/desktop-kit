@@ -84,7 +84,7 @@ fun TooltipArea(
 }
 
 @Composable
-private fun TooltipBubble(text: String, shortcut: String?) {
+internal fun TooltipBubble(text: String, shortcut: String?) {
     val colors = DeskTheme.colors
     val shape = RoundedCornerShape(6.dp)
     Row(
@@ -103,7 +103,7 @@ private fun TooltipBubble(text: String, shortcut: String?) {
 }
 
 /** Centred under the anchor with a small gap; above it when there is no room below. */
-private class BelowAnchorPositionProvider : PopupPositionProvider {
+internal class BelowAnchorPositionProvider : PopupPositionProvider {
     override fun calculatePosition(
         anchorBounds: IntRect,
         windowSize: IntSize,

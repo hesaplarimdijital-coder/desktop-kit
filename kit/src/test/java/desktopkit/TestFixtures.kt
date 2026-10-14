@@ -35,6 +35,9 @@ import desktopkit.shell.NavKind
 import desktopkit.shell.NavSection
 import desktopkit.shell.ShellNavigator
 import desktopkit.shell.ShellSpec
+import desktopkit.shell.ShellTransitions
+import desktopkit.shell.CompactTopBar
+import desktopkit.shell.TopBarAction
 import desktopkit.shell.WidthClass
 import desktopkit.theme.DeskTheme
 
@@ -82,12 +85,13 @@ val sampleFiles = listOf(
     SampleFile("Yedek.zip", "Arşiv", "640 MB"),
 )
 
-/** The real shell with sample screens and a sample status bar. */
+/** The real shell with sample screens and a sample status bar; no screen transitions unless asked for. */
 @Composable
 fun TestShell(
     widthClass: WidthClass,
     startRoute: String = "home",
     sidebarCollapsed: Boolean = false,
+    transitions: ShellTransitions = ShellTransitions.None,
     content: @Composable (String, ShellNavigator) -> Unit = { route, _ -> SampleScreen(route) },
 ) {
     val navController = rememberNavController()
@@ -105,6 +109,7 @@ fun TestShell(
         },
         onSearch = {},
         bottomBar = { kind -> SampleStatusBar(kind) },
+        transitions = transitions,
         content = content,
     )
 }
@@ -170,6 +175,29 @@ fun SampleStatusBar(kind: NavKind) {
             Text("Kopyalanıyor: Yedek.zip", style = DeskTheme.type.labelSmall, color = colors.textSecondary, modifier = Modifier.weight(1f))
             DeskSlider(value = 0.42f, onValueChange = {}, modifier = Modifier.width(160.dp))
             DeskIconButton(DeskIcons.Close, "İptal", {})
+        }
+    }
+}
+
+/** Four actions: the primary one and the next stay in the compact top bar, two go to its "more" menu. */
+fun sampleTopBarActions(onAction: (String) -> Unit = {}) = listOf(
+    TopBarAction(DeskIcons.OpenWindow, "Aç", { onAction("open") }, primary = true),
+    TopBarAction(DeskIcons.PlaylistAdd, "Listeye ekle", { onAction("add") }),
+    TopBarAction(DeskIcons.Info, "Özellikler", { onAction("info") }),
+    TopBarAction(DeskIcons.Delete, "Sil", { onAction("delete") }),
+)
+
+/** A detail screen: on a phone its title, a back button and its actions move into the top bar. */
+@Composable
+fun SampleDetailScreen(onBack: () -> Unit = {}, onAction: (String) -> Unit = {}) {
+    CompactTopBar(title = "Sunum taslağı.odp", onBack = onBack, actions = sampleTopBarActions(onAction))
+    Column(Modifier.fillMaxSize()) {
+        PageHeader(title = "Sunum taslağı.odp", subtitle = "Sunum · 3,4 MB")
+        listOf("Tür" to "Sunum", "Boyut" to "3,4 MB", "Konum" to "Belgeler / İş", "Değiştirilme" to "14.10.2026 18:22").forEach { (label, value) ->
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
+                Text(label, style = DeskTheme.type.body, color = DeskTheme.colors.textSecondary, modifier = Modifier.width(120.dp))
+                Text(value, style = DeskTheme.type.body, color = DeskTheme.colors.text)
+            }
         }
     }
 }

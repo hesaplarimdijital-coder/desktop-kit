@@ -9,6 +9,9 @@
     <string name="dk_search">Search or run a command</string>
     <string name="dk_search_hint">Search or type a command</string>
     <string name="dk_settings">Settings</string>
+    <string name="dk_back">Back</string>
+    <string name="dk_close">Close</string>
+    <string name="dk_more_options">More options</string>
 
     <!-- Keyboard -->
     <string name="dk_key_space">Space</string>

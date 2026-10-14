@@ -6,6 +6,8 @@ arayüzünden çıkarıldı. Klavye, fare, sağ tık ve dokunmatik aynı uygulam
 - **Uyarlanabilir kabuk:** dar pencerede alt çubuk, orta genişlikte yan ray, DeX ve büyük
   ekranda menü çubuğu ile daraltılabilir kenar çubuğu. Pencere boyutu değişince açık ekran, geri
   yığını ve kaydırma konumu korunur. Sığmayan ekranlar otomatik bir **"Daha fazla"** ekranında listelenir.
+  Ekran geçişleri canlandırılır (telefonda fade-through, geniş pencerede kısa geçiş); telefonun üst
+  çubuğunu ekran kendisi değiştirebilir (`CompactTopBar`).
 - **İki yoğunluk:** fare veya touchpad kullanılınca sıkı düzen (24 dp hedef), parmakla
   dokununca geniş düzen (48 dp). Geçiş otomatiktir; kullanıcı ayarlardan sabitleyebilir.
 - **Tema:** açık, koyu ve OLED siyah. Dört hazır vurgu rengi var; istediğin markanın rengini de
@@ -40,7 +42,7 @@ Uygulama modülünün `build.gradle.kts` dosyası:
 
 ```kotlin
 dependencies {
-    implementation("com.github.hesaplarimdijital-coder:desktop-kit:0.1.2")
+    implementation("com.github.hesaplarimdijital-coder:desktop-kit:0.1.3")
     implementation("androidx.activity:activity-compose:1.9.3")
 }
 ```
@@ -154,7 +156,8 @@ Değerlere doğrudan erişim için `DeskTheme.colors.text`, `DeskTheme.type.body
 | `ContextMenuArea`, `Modifier.contextMenuGesture` | Sağ tık, uzun basma, Menu tuşu, Shift+F10 |
 | `MenuPopup`, `MenuBarMenus`, `MenuEntry` | Kenarda taşmayan menüler |
 | `TooltipArea` | Yalnızca fareyle görünür, kısayolu da gösterir |
-| `PageHeader`, `MessageScreen`, `OverflowScreen` | Hazır ekran parçaları |
+| `PageHeader`, `MessageScreen`, `OverflowScreen` | Hazır ekran parçaları. `PageHeader` başlığı yalnızca kenar çubuklu düzende gösterir (aşağıya bak). |
+| `CompactTopBar`, `TopBarAction` | Telefonda üst çubuğun başlığı, geri düğmesi ve simgeleri (aşağıya bak) |
 | `AppearanceSection`, `InputSection`, `ShortcutListSection`, `SettingsSection` | Hazır ayar bölümleri |
 
 ### Tabloda çoklu seçim
@@ -186,6 +189,53 @@ DenseTable(
 `enableEdgeToEdge()` ve `android:windowSoftInputMode="adjustResize"` ile içerik klavyenin hemen
 üstünde biter; ekranlarda ayrıca `imePadding()` gerekmez. Telefonda klavye açıkken alt gezinme
 çubuğu gizlenir, kapanınca geri gelir (`DesktopShell(hideNavigationWithKeyboard = false)` ile kapatılır).
+
+### Ekran geçişleri
+
+`DesktopShell(transitions = ShellTransitions.Default)` (varsayılan): telefonda (alt çubuklu düzen)
+ekranlar arasında fade-through: eski ekran 90 ms'de solar, yenisi 210 ms'de belirirken %98'den tam
+boyuta büyür. Ray ve kenar çubuklu düzende (tablet, DeX) hareketsiz, 150 ms'lik kısa bir geçiş.
+Geri dönüş aynı biçimde. Süreler sistemin animasyon ölçeğine uyar ("Animasyonları kaldır" açıksa
+geçiş olmaz). Alt çubuk, ray ve kenar çubuğundaki seçim rengi 150 ms'de yumuşakça değişir.
+`ShellTransitions.None` geçişi kapatır (ekran görüntüsü testleri için).
+
+### Telefonda üst çubuk: `CompactTopBar`
+
+Bir ayrıntı ya da düzenleme ekranı telefondaki üst çubuğu kendisi kurar:
+
+```kotlin
+CompactTopBar(
+    title = kitap.ad,                         // null: rotanın adı kalır
+    onBack = { ayrinti = null },              // geri oku; sistemin Geri hareketi de bunu çağırır
+    backIcon = TopBarBackIcon.Back,           // ya da TopBarBackIcon.Close (×)
+    actions = listOf(
+        TopBarAction(DeskIcons.Check, "Kaydet", ::kaydet, primary = true),  // vurgu renginde
+        TopBarAction(DeskIcons.Delete, "Sil", ::sil),
+    ),
+    showSearch = false,                       // arama simgesini gizler
+)
+```
+
+- Yalnızca telefon düzeninde (`WidthClass.Compact`) etkilidir. Orta ve daha geniş pencerede (ray,
+  kenar çubuğu, DeX) hiçbir şey değişmez ve Geri hareketi de yakalanmaz; bu düzenlerde ekran kendi
+  başlığını ve düğmelerini (`PageHeader`) gösterir.
+- Ekranda (kompozisyonda) durduğu sürece geçerlidir; ekrandan çıkınca varsayılan başlık geri gelir.
+  Birden çok çağrı varsa en son eklenen kazanır, o çıkınca bir öncekine dönülür.
+- Geri düğmesi 48 dp; başlık tek satır, sığmazsa "…" ile biter ve değişince yumuşakça geçer.
+- En çok üç simge görünür: dört ya da daha fazla eylemde ilk ikisi (önce `primary` olanlar) kalır,
+  gerisi "⋮" menüsüne gider. `label` hem erişilebilirlik adı hem ipucudur (fareyle üzerine gelince
+  ya da uzun basınca görünür).
+- Sistemin Geri hareketi `onBack`'i çağırır; uygulamanın ayrıca `BackHandler` yazması gerekmez.
+- Ekranın hangi düzende olduğu: `currentWidthClass()` ya da `LocalWidthClass.current`
+  (`DesktopShell` ve `DesktopKitRoot` sağlar).
+
+### Sayfa başlığı: `PageHeader`
+
+- Kenar çubuklu düzende (büyük pencere, DeX) başlığı büyük yazar, yanında alt başlık ve eylemler.
+- Ray ve telefon düzeninde başlık zaten üst çubukta olduğu için **tekrar yazılmaz**; yalnızca alt
+  başlık (küçük) ve eylemler kalır.
+- Telefonda alt başlığı ve eylemi olmayan bir `PageHeader` hiç yer kaplamaz (önceden boş bir şerit
+  bırakıyordu). Ekranın kendi başlığını telefonda göstermek için `CompactTopBar(title = …)` kullan.
 
 ## Geliştirme
 

@@ -9,7 +9,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.compose.runtime.Composable
+import desktopkit.SampleDetailScreen
+import desktopkit.SampleScreen
 import desktopkit.TestShell
+import desktopkit.shell.ShellNavigator
 
 import desktopkit.shell.WidthClass
 import desktopkit.theme.InputMode
@@ -39,13 +43,20 @@ class ShellScreenshotTest {
     @get:Rule
     val compose = createAndroidComposeRule<ComponentActivity>()
 
-    private fun capture(name: String, widthClass: WidthClass, theme: ThemeMode, input: InputMode, start: String = "documents") {
+    private fun capture(
+        name: String,
+        widthClass: WidthClass,
+        theme: ThemeMode,
+        input: InputMode,
+        start: String = "documents",
+        content: @Composable (String, ShellNavigator) -> Unit = { route, _ -> SampleScreen(route) },
+    ) {
         // the test activity's theme has an action bar; the app's theme has none
         compose.runOnUiThread { compose.activity.actionBar?.hide() }
         compose.setContent {
             DesktopKitTheme(themeMode = theme, inputMode = input) {
                 Box(Modifier.fillMaxSize().background(DeskTheme.colors.background)) {
-                    TestShell(widthClass, startRoute = start)
+                    TestShell(widthClass, startRoute = start, content = content)
                 }
             }
         }
@@ -91,6 +102,20 @@ class ShellScreenshotTest {
 
     @Test @Config(qualifiers = "tr-w1280dp-h800dp-mdpi")
     fun placeholderLarge() = capture("large-dark-placeholder", WidthClass.Large, ThemeMode.Dark, InputMode.Pointer, "network")
+
+    /** A detail screen calling CompactTopBar: back, title, two actions and "more" on a phone. */
+    @Test @Config(qualifiers = "tr-w411dp-h891dp-hdpi")
+    fun compactTopBarDark() = capture("compact-topbar-dark", WidthClass.Compact, ThemeMode.Dark, InputMode.Touch) { _, _ -> SampleDetailScreen() }
+
+    @Test @Config(qualifiers = "tr-w411dp-h891dp-hdpi")
+    fun compactTopBarLight() = capture("compact-topbar-light", WidthClass.Compact, ThemeMode.Light, InputMode.Touch) { _, _ -> SampleDetailScreen() }
+
+    /** The same screen on a wider window: the top bar and the rail look as without CompactTopBar. */
+    @Test @Config(qualifiers = "tr-w1000dp-h800dp-mdpi")
+    fun expandedTopBarUnchanged() = capture("expanded-topbar-dark", WidthClass.Expanded, ThemeMode.Dark, InputMode.Touch) { _, _ -> SampleDetailScreen() }
+
+    @Test @Config(qualifiers = "tr-w1280dp-h800dp-mdpi")
+    fun largeTopBarUnchanged() = capture("large-topbar-dark", WidthClass.Large, ThemeMode.Dark, InputMode.Pointer) { _, _ -> SampleDetailScreen() }
 
     companion object {
         private val dir = File(System.getProperty("desktopkit.screenshotDir") ?: "build/outputs/screenshots")

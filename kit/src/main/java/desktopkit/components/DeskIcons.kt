@@ -32,6 +32,7 @@ object DeskIcons {
     val ChevronUp: ImageVector by lazy { icon("ChevronUp", stroke("m4 10 4-4 4 4")) }
     val ChevronLeft: ImageVector by lazy { icon("ChevronLeft", stroke("m10 4-4 4 4 4")) }
     val ChevronRight: ImageVector by lazy { icon("ChevronRight", stroke("m6 4 4 4-4 4")) }
+    val ArrowLeft: ImageVector by lazy { icon("ArrowLeft", stroke("M13 8H3.5M7.5 4 3.5 8l4 4")) }
     val Check: ImageVector by lazy { icon("Check", stroke("m3.5 8.5 3 3 6-7")) }
     val Play: ImageVector by lazy { icon("Play", fill("M5 3.2v9.6L13 8z")) }
     val Resume: ImageVector by lazy { icon("Resume", stroke("M3 8a5 5 0 1 0 1.6-3.7M3 2.5v2.8h2.8")) }

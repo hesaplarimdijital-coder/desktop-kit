@@ -1,5 +1,11 @@
 package desktopkit.shell
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -22,9 +28,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -84,6 +94,9 @@ private fun RowScope.BottomBarItem(item: NavItem, selected: Boolean, onClick: ()
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
     val pill = RoundedCornerShape(dimens.radiusPill)
+    val indicator by animateNavColor(stateBackground(state, selected))
+    val iconTint by animateNavColor(if (selected) colors.onSelection else colors.textSecondary)
+    val labelColor by animateNavColor(if (selected) colors.text else colors.textSecondary)
     Column(
         modifier = Modifier
             .weight(1f)
@@ -98,17 +111,16 @@ private fun RowScope.BottomBarItem(item: NavItem, selected: Boolean, onClick: ()
                 .width(56.dp)
                 .height(30.dp)
                 .focusRing(state, pill)
-                .background(stateBackground(state, selected), pill),
+                .background(indicator, pill),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(item.icon, contentDescription = null, tint = if (selected) colors.onSelection else colors.textSecondary,
-                modifier = Modifier.size(dimens.icon))
+            Icon(item.icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(dimens.icon))
         }
         Spacer(Modifier.height(4.dp))
         Text(
             text = item.shortLabel,
             style = DeskTheme.type.caption,
-            color = if (selected) colors.text else colors.textSecondary,
+            color = labelColor,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -161,6 +173,9 @@ private fun RailItem(item: NavItem, selected: Boolean, onClick: () -> Unit) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
     val pill = RoundedCornerShape(dimens.radiusPill)
+    val indicator by animateNavColor(stateBackground(state, selected))
+    val iconTint by animateNavColor(if (selected) colors.onSelection else colors.textSecondary)
+    val labelColor by animateNavColor(if (selected) colors.text else colors.textSecondary)
     Column(
         modifier = Modifier
             .width(dimens.railWidth)
@@ -176,17 +191,16 @@ private fun RailItem(item: NavItem, selected: Boolean, onClick: () -> Unit) {
                 .width(48.dp)
                 .height(28.dp)
                 .focusRing(state, pill)
-                .background(stateBackground(state, selected), pill),
+                .background(indicator, pill),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(item.icon, contentDescription = null, tint = if (selected) colors.onSelection else colors.textSecondary,
-                modifier = Modifier.size(dimens.icon))
+            Icon(item.icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(dimens.icon))
         }
         Spacer(Modifier.height(2.dp))
         Text(
             text = item.shortLabel,
             style = DeskTheme.type.caption,
-            color = if (selected) colors.text else colors.textSecondary,
+            color = labelColor,
             textAlign = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -275,13 +289,16 @@ private fun SidebarItem(item: NavItem, selected: Boolean, collapsed: Boolean, ba
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
     val shape = RoundedCornerShape(dimens.radiusControl)
+    val indicator by animateNavColor(stateBackground(state, selected))
+    val iconTint by animateNavColor(if (selected) colors.accentText else colors.textSecondary)
+    val labelColor by animateNavColor(if (selected) colors.onSelection else colors.text)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = dimens.navItemHeight.coerceAtLeast(dimens.minTarget))
             .padding(vertical = 1.dp)
             .focusRing(state, shape)
-            .background(stateBackground(state, selected), shape)
+            .background(indicator, shape)
             .semantics {
                 this.selected = selected
                 if (collapsed) contentDescription = item.label
@@ -291,14 +308,13 @@ private fun SidebarItem(item: NavItem, selected: Boolean, collapsed: Boolean, ba
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = if (collapsed) Arrangement.Center else Arrangement.Start,
     ) {
-        Icon(item.icon, contentDescription = null, tint = if (selected) colors.accentText else colors.textSecondary,
-            modifier = Modifier.size(dimens.icon))
+        Icon(item.icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(dimens.icon))
         if (!collapsed) {
             Spacer(Modifier.width(10.dp))
             Text(
                 text = item.label,
                 style = if (selected) DeskTheme.type.bodyStrong else DeskTheme.type.body,
-                color = if (selected) colors.onSelection else colors.text,
+                color = labelColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
@@ -310,22 +326,73 @@ private fun SidebarItem(item: NavItem, selected: Boolean, collapsed: Boolean, ba
 
 // ---------------------------------------------------------------- top bars
 
-/** Compact and medium top bar: page title and, when [onSearch] is set, a search button. */
+/**
+ * Compact and medium top bar: page title and, when [onSearch] is set, a search button. On compact
+ * windows the shell passes what the current screen asked for with [CompactTopBar]: [onBack] adds a
+ * back or close button before the title and [actions] add icon buttons before the search button
+ * (more than three: two icons and a "more" menu). The title cross-fades when it changes.
+ */
 @Composable
-fun PageTopBar(title: String, onSearch: (() -> Unit)?, modifier: Modifier = Modifier) {
+fun PageTopBar(
+    title: String,
+    onSearch: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+    onBack: (() -> Unit)? = null,
+    backIcon: TopBarBackIcon = TopBarBackIcon.Back,
+    actions: List<TopBarAction> = emptyList(),
+) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
+    val latestOnBack by rememberUpdatedState(onBack)
+    val (shown, overflow) = remember(actions) { splitTopBarActions(actions) }
     Column(modifier.fillMaxWidth().background(colors.background)) {
         Row(
-            modifier = Modifier.fillMaxWidth().heightIn(min = dimens.topBarHeight).padding(start = dimens.pagePadding, end = dimens.gapS),
+            modifier = Modifier.fillMaxWidth().heightIn(min = dimens.topBarHeight).padding(end = dimens.gapS),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(title, style = DeskTheme.type.headline, color = colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f))
+            AnimatedContent(
+                targetState = TopBarHeading(title, if (onBack != null) backIcon else null),
+                transitionSpec = { fadeIn(tween(TOP_BAR_FADE_MS)) togetherWith fadeOut(tween(TOP_BAR_FADE_MS)) },
+                contentAlignment = Alignment.CenterStart,
+                label = "topBarHeading",
+                modifier = Modifier.weight(1f),
+            ) { heading ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(start = if (heading.back != null) dimens.gapXs else dimens.pagePadding),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (heading.back != null) {
+                        TopBarIconButton(
+                            icon = if (heading.back == TopBarBackIcon.Close) DeskIcons.Close else DeskIcons.ArrowLeft,
+                            label = stringResource(if (heading.back == TopBarBackIcon.Close) R.string.dk_close else R.string.dk_back),
+                            onClick = { latestOnBack?.invoke() },
+                            size = 48.dp,
+                        )
+                        Spacer(Modifier.width(dimens.gapXs))
+                    }
+                    Text(heading.title, style = DeskTheme.type.headline, color = colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f))
+                }
+            }
+            shown.forEach { action ->
+                TopBarIconButton(action.icon, action.label, action.onClick, enabled = action.enabled, primary = action.primary)
+            }
+            if (overflow.isNotEmpty()) TopBarOverflow(overflow)
             if (onSearch != null) DeskIconButton(DeskIcons.Search, stringResource(R.string.dk_search), onSearch)
         }
     }
 }
+
+@Immutable
+private data class TopBarHeading(val title: String, val back: TopBarBackIcon?)
+
+private const val TOP_BAR_FADE_MS = 150
+
+/** Colour changes of navigation items (selection, hover, press) ease over [NAV_COLOR_MS]. */
+private const val NAV_COLOR_MS = 150
+
+@Composable
+private fun animateNavColor(target: Color) = animateColorAsState(target, tween(NAV_COLOR_MS), label = "navColor")
 
 /** Large and extra-large: brand, application menus and an optional search/command field. */
 @Composable

@@ -27,10 +27,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import desktopkit.components.DeskButton
 import desktopkit.components.collectState
@@ -43,8 +45,11 @@ import desktopkit.shell.NavKind
 import desktopkit.theme.DeskTheme
 
 /**
- * Title row of a screen. In the sidebar layout the menu bar carries no page title, so the
- * screen shows it here; on smaller windows the top bar already shows it and only [actions] remain.
+ * Title row of a screen. In the sidebar layout (large windows, DeX) the menu bar carries no page
+ * title, so the screen shows it here. On smaller windows the top bar already shows a title, so
+ * [title] is not repeated: only [subtitle] (small) and [actions] remain. On compact windows
+ * (phones) a header with neither of them takes no space at all; to show this screen's title in
+ * the phone's top bar instead of the route's label, call [desktopkit.shell.CompactTopBar].
  */
 @Composable
 fun PageHeader(
@@ -54,11 +59,18 @@ fun PageHeader(
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     val dimens = DeskTheme.dimens
-    val showTitle = LocalNavKind.current == NavKind.Sidebar
+    val navKind = LocalNavKind.current
+    val showTitle = navKind == NavKind.Sidebar
+    val vertical = if (navKind == NavKind.BottomBar && subtitle == null) {
+        Modifier.verticalPaddingUnlessEmpty(dimens.gapS)
+    } else {
+        Modifier.padding(top = if (showTitle) dimens.gapL else dimens.gapS, bottom = dimens.gapS)
+    }
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(start = dimens.pagePadding, end = dimens.pagePadding, top = if (showTitle) dimens.gapL else dimens.gapS, bottom = dimens.gapS),
+            .padding(start = dimens.pagePadding, end = dimens.pagePadding)
+            .then(vertical),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (showTitle) {
@@ -74,6 +86,18 @@ fun PageHeader(
         Spacer(Modifier.weight(1f))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(dimens.gapXs), content = actions)
     }
+}
+
+/** [padding] above and below, or no height at all when the content has none (a header without actions). */
+private fun Modifier.verticalPaddingUnlessEmpty(padding: Dp): Modifier = layout { measurable, constraints ->
+    val pad = padding.roundToPx()
+    val inner = constraints.copy(
+        minHeight = (constraints.minHeight - 2 * pad).coerceAtLeast(0),
+        maxHeight = if (constraints.hasBoundedHeight) (constraints.maxHeight - 2 * pad).coerceAtLeast(0) else constraints.maxHeight,
+    )
+    val placeable = measurable.measure(inner)
+    val height = if (placeable.height == 0) 0 else placeable.height + 2 * pad
+    layout(placeable.width, height.coerceIn(constraints.minHeight, constraints.maxHeight)) { placeable.place(0, pad) }
 }
 
 /**

@@ -9,6 +9,9 @@
     <string name="dk_search">Ara veya komut çalıştır</string>
     <string name="dk_search_hint">Ara ya da komut yaz</string>
     <string name="dk_settings">Ayarlar</string>
+    <string name="dk_back">Geri</string>
+    <string name="dk_close">Kapat</string>
+    <string name="dk_more_options">Diğer seçenekler</string>
 
     <!-- Klavye -->
     <string name="dk_key_space">Boşluk</string>
