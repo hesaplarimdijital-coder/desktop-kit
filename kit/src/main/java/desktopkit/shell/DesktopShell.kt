@@ -7,16 +7,19 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -89,8 +92,14 @@ fun DesktopShell(
     val currentRoute = entry?.destination?.route ?: spec.startRoute
     val navKind = NavKind.forWidth(widthClass)
     val more = moreItem()
-    // not laid out at all while the keyboard is up; the root's safeDrawing padding already ends the content above it
-    val showBottomNav = !(hideNavigationWithKeyboard && WindowInsets.isImeVisible)
+    // Not laid out at all while the keyboard is up; the root's safeDrawing padding already ends the
+    // content above it. isImeVisible alone is not enough: it reads true until the first insets arrive
+    // (and forever when the window never passes insets to Compose), so the keyboard must also take space.
+    val imeVisible = WindowInsets.isImeVisible
+    val ime = WindowInsets.ime
+    val density = LocalDensity.current
+    val imeTakesSpace by remember(ime, density) { derivedStateOf { ime.getBottom(density) > 0 } }
+    val showBottomNav = !(hideNavigationWithKeyboard && imeVisible && imeTakesSpace)
     // The graph builder below must not capture changing values, or NavHost would rebuild the graph.
     val currentContent by rememberUpdatedState(content)
     val currentSpec by rememberUpdatedState(spec)
