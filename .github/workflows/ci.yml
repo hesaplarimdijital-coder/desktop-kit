@@ -49,19 +49,21 @@ jobs:
           python3 tools/screenshot_report.py kit/build/outputs/screenshots kit/src/test/screenshots kit/build/outputs/screenshots/diff
 
       - name: Push screenshots to ci/screenshots
-        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        # main: ci/screenshots; a pull request from this repository: ci/screenshots-pr-<number>, for review
+        if: always() && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository))
         env:
           TOKEN: ${{ github.token }}
+          TARGET: ${{ github.event_name == 'pull_request' && format('ci/screenshots-pr-{0}', github.event.pull_request.number) || 'ci/screenshots' }}
         run: |
           src=kit/build/outputs/screenshots
           [ -d "$src" ] || exit 0
           out="$RUNNER_TEMP/screenshots"
           rm -rf "$out" && cp -r "$src" "$out"
           cd "$out"
-          git init -q && git checkout -q --orphan ci/screenshots
+          git init -q && git checkout -q --orphan "$TARGET"
           git -c user.name=ci -c user.email=ci@users.noreply.github.com add -A
           git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -q -m "Screenshots for ${GITHUB_SHA::7}"
-          git push -q --force "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/ci/screenshots
+          git push -q --force "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/$TARGET"
 
       - name: Screenshots
         if: always()
