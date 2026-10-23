@@ -98,3 +98,16 @@ data class DeskDimens(
         fun forMode(mode: InputMode) = if (mode == InputMode.Pointer) Pointer else Touch
     }
 }
+
+/**
+ * The sizes for a compact (phone) window: a 64 dp bottom bar (the height of Android's current
+ * navigation bar) and 52 dp touch rows, so more of a small screen goes to content. Targets stay
+ * at least 48 dp. Pointer sizes are already small and stay as they are. The shell applies this on
+ * compact windows only (`DesktopShell(compactSizes = true)`); tablet and DeX keep [DeskDimens.Touch]
+ * and [DeskDimens.Pointer].
+ */
+fun DeskDimens.forCompactWindow(): DeskDimens =
+    if (minTarget < 48.dp) this else copy(
+        bottomBarHeight = bottomBarHeight.coerceAtMost(64.dp),
+        rowHeight = rowHeight.coerceAtMost(52.dp).coerceAtLeast(minTarget),
+    )

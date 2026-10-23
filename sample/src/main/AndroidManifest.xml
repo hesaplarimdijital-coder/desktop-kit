@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- enableOnBackInvokedCallback: the predictive Back gesture (Android 14+) plays the kit's screen transitions -->
     <application
+        android:enableOnBackInvokedCallback="true"
         android:icon="@drawable/ic_sample"
         android:label="@string/app_name"
         android:supportsRtl="true"

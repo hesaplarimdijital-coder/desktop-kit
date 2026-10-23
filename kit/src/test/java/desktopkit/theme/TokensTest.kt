@@ -76,4 +76,29 @@ class TokensTest {
         assertEquals(DeskType.touch(step = 2f), DeskType.forMode(InputMode.Touch, touchStep = 2f))
         assertEquals(DeskType.Pointer, DeskType.pointer(step = 0f))
     }
+
+    @Test
+    fun growAddsToEveryStyleAndKeepsLineHeightRatio() {
+        val base = DeskType.Touch
+        val grown = base.grow(1f)
+        for ((pair, bigger) in base.styles().zip(grown.styles())) {
+            val (name, style) = pair
+            assertEquals("$name size", style.fontSize.value + 1f, bigger.second.fontSize.value, 0.001f)
+            assertEquals("$name ratio", style.lineHeight.value / style.fontSize.value,
+                bigger.second.lineHeight.value / bigger.second.fontSize.value, 0.001f)
+        }
+        assertEquals(base, base.grow(0f))
+        // the same as building the set one step larger
+        assertEquals(DeskType.touch(step = 1f).body.fontSize, grown.body.fontSize)
+    }
+
+    @Test
+    fun compactWindowSizesKeepTouchTargets() {
+        val compact = DeskDimens.Touch.forCompactWindow()
+        assertEquals(64.dp, compact.bottomBarHeight)
+        assertEquals(52.dp, compact.rowHeight)
+        assertTrue(compact.rowHeight >= compact.minTarget)
+        assertTrue(compact.minTarget >= 48.dp)
+        assertEquals(DeskDimens.Pointer, DeskDimens.Pointer.forCompactWindow())
+    }
 }

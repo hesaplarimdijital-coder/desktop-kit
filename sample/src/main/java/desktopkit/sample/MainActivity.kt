@@ -6,7 +6,6 @@ import android.view.KeyboardShortcutGroup
 import android.view.Menu
 import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
@@ -39,12 +38,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.rememberNavController
 import desktopkit.DesktopKitRoot
+import desktopkit.components.ChipOption
 import desktopkit.components.ColumnWidth
 import desktopkit.components.DenseTable
 import desktopkit.components.DeskButton
 import desktopkit.components.DeskIconButton
 import desktopkit.components.DeskIcons
 import desktopkit.components.DeskSlider
+import desktopkit.components.FilterChips
 import desktopkit.components.HorizontalSplitPane
 import desktopkit.components.MenuEntry
 import desktopkit.components.SegmentedChoice
@@ -64,6 +65,7 @@ import desktopkit.settings.InputSection
 import desktopkit.settings.ShortcutListSection
 import desktopkit.settings.rememberDeskPreferences
 import desktopkit.shell.CompactTopBar
+import desktopkit.shell.DetailTransition
 import desktopkit.shell.DesktopShell
 import desktopkit.shell.NavItem
 import desktopkit.shell.NavSection
@@ -74,7 +76,6 @@ import desktopkit.shell.WidthClass
 import desktopkit.shell.currentWidthClass
 import desktopkit.theme.Accent
 import desktopkit.theme.DeskTheme
-import desktopkit.theme.DeskType
 
 // ------------------------------------------------------------------ 1. keyboard shortcuts
 
@@ -116,8 +117,8 @@ class MainActivity : ComponentActivity() {
                 true
             }
 
-            // every text one sp larger with a mouse or touchpad; touch sizes stay as they are
-            DesktopKitRoot(prefs, type = { mode, fonts -> DeskType.forMode(mode, fonts, pointerStep = 1f) }) { widthClass ->
+            // the shell already sets text one sp larger on tablet and DeX windows (largeWindowTextStep = 1f)
+            DesktopKitRoot(prefs) { widthClass ->
                 DesktopShell(
                     spec = spec(),
                     widthClass = widthClass,
@@ -227,37 +228,52 @@ private fun GalleryScreen() {
 
 /**
  * Multi-selection (click, Ctrl+click, Shift+click, Ctrl+A, Shift+arrows; "Select" toggles rows
- * with each tap) and a filter field: on a phone the bottom bar steps aside while the keyboard is open.
- * "Open" (a tap on a phone) shows a file's details.
+ * with each tap), a filter field and filter chips: on a phone the chips stay on one line that
+ * scrolls sideways, and the bottom bar steps aside while the keyboard is open or the list scrolls.
+ * "Open" (a tap on a phone) slides a file's details in; Back (with the predictive gesture) slides them out.
  */
 @Composable
 private fun FilesScreen() {
     var filter by remember { mutableStateOf("") }
+    var kinds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var selected by remember { mutableStateOf<Set<Any>>(emptySet()) }
     var selectMode by remember { mutableStateOf(false) }
     var opened by remember { mutableStateOf<String?>(null) }
     val compact = currentWidthClass() == WidthClass.Compact
-    val file = sampleFiles.firstOrNull { it.name == opened }
-    if (file != null) {
+    DetailTransition(
+        detail = sampleFiles.firstOrNull { it.name == opened },
+        onBack = { opened = null },
+        detailKey = { it.name },
+        list = {
+            Column(Modifier.fillMaxSize()) {
+                val subtitle = if (selected.isEmpty()) "${sampleFiles.size} items" else "${selected.size} of ${sampleFiles.size} selected"
+                PageHeader("Files", subtitle = subtitle) {
+                    DeskButton(if (selectMode) "Done" else "Select", { selectMode = !selectMode })
+                    DeskIconButton(DeskIcons.Grid, "Grid", {})
+                    DeskIconButton(DeskIcons.ListView, "List", {}, selected = true)
+                }
+                FilterField(filter, { filter = it }, Modifier.padding(horizontal = DeskTheme.dimens.pagePadding).fillMaxWidth())
+                FilterChips(
+                    options = sampleFiles.map { it.kind }.distinct().map { kind ->
+                        ChipOption(kind, kind, count = sampleFiles.count { it.kind == kind }.toString())
+                    },
+                    selected = kinds,
+                    onToggle = { kind -> kinds = if (kind in kinds) kinds - kind else kinds + kind },
+                    modifier = Modifier.padding(bottom = DeskTheme.dimens.gapS),
+                )
+                FilesTable(
+                    filter = filter,
+                    kinds = kinds,
+                    selectedKeys = selected,
+                    onSelectionChange = { selected = it },
+                    toggleOnClick = selectMode,
+                    onOpen = { opened = it.name },
+                    openOnClick = compact,
+                )
+            }
+        },
+    ) { file ->
         FileDetails(file, onClose = { opened = null })
-        return
-    }
-    Column(Modifier.fillMaxSize()) {
-        val subtitle = if (selected.isEmpty()) "${sampleFiles.size} items" else "${selected.size} of ${sampleFiles.size} selected"
-        PageHeader("Files", subtitle = subtitle) {
-            DeskButton(if (selectMode) "Done" else "Select", { selectMode = !selectMode })
-            DeskIconButton(DeskIcons.Grid, "Grid", {})
-            DeskIconButton(DeskIcons.ListView, "List", {}, selected = true)
-        }
-        FilterField(filter, { filter = it }, Modifier.padding(horizontal = DeskTheme.dimens.pagePadding).fillMaxWidth())
-        FilesTable(
-            filter = filter,
-            selectedKeys = selected,
-            onSelectionChange = { selected = it },
-            toggleOnClick = selectMode,
-            onOpen = { opened = it.name },
-            openOnClick = compact,
-        )
     }
 }
 
@@ -269,8 +285,7 @@ private fun FilesScreen() {
 private fun FileDetails(file: SampleFile, onClose: () -> Unit) {
     val context = LocalContext.current
     val toast = { text: String -> Toast.makeText(context, text, Toast.LENGTH_SHORT).show() }
-    // on a phone CompactTopBar already sends the Back gesture to onClose
-    if (currentWidthClass() != WidthClass.Compact) BackHandler(onBack = onClose)
+    // DetailTransition takes the Back gesture (with its predictive animation) on every window size
     CompactTopBar(
         title = file.name,
         onBack = onClose,
@@ -335,6 +350,7 @@ private val sampleFiles = listOf(
 @Composable
 private fun FilesTable(
     filter: String = "",
+    kinds: Set<String> = emptySet(),
     selectedKeys: Set<Any>? = null,
     onSelectionChange: ((Set<Any>) -> Unit)? = null,
     toggleOnClick: Boolean = false,
@@ -343,18 +359,20 @@ private fun FilesTable(
 ) {
     var selected by remember { mutableStateOf<String?>(null) }
     var sort by remember { mutableStateOf(TableSort(0, true)) }
-    val rows = remember(sort, filter) {
+    val rows = remember(sort, filter, kinds) {
         val sorted = when (sort.column) {
             1 -> sampleFiles.sortedBy { it.kind }
             2 -> sampleFiles.sortedBy { it.size }
             else -> sampleFiles.sortedBy { it.name }
         }.filter { filter.isBlank() || it.name.contains(filter.trim(), ignoreCase = true) }
+            .filter { kinds.isEmpty() || it.kind in kinds }
         if (sort.ascending) sorted else sorted.reversed()
     }
     DenseTable(
         columns = listOf(
             TableColumn<SampleFile>("Name", ColumnWidth.Weight(1f)) { it.name },
-            TableColumn<SampleFile>("Kind", ColumnWidth.Fixed(120.dp)) { it.kind },
+            // phones show name and size; the kind returns from tablet width up
+            TableColumn<SampleFile>("Kind", ColumnWidth.Fixed(120.dp), hideBelow = WidthClass.Medium) { it.kind },
             TableColumn<SampleFile>("Size", ColumnWidth.Fixed(90.dp), alignEnd = true, mono = true) { it.size },
         ),
         rows = rows,

@@ -45,7 +45,13 @@ class SettingsScreenshotTest {
     val compose = createAndroidComposeRule<ComponentActivity>()
 
     @Test
-    fun settingsSections() {
+    fun settingsSections() = capture("settings-dark", ThemeMode.Dark, InputMode.Pointer)
+
+    /** On a phone the long segmented choices move under their labels instead of squeezing them. */
+    @Test @Config(qualifiers = "tr-w411dp-h891dp-hdpi")
+    fun settingsCompact() = capture("settings-compact-light", ThemeMode.Light, InputMode.Touch)
+
+    private fun capture(name: String, theme: ThemeMode, input: InputMode) {
         val brand = Accent.custom("Marka", Color(0xFF00897B))
         val prefs = DeskPreferences(
             compose.activity.getSharedPreferences("screenshot", Context.MODE_PRIVATE),
@@ -59,7 +65,7 @@ class SettingsScreenshotTest {
         )
         compose.runOnUiThread { compose.activity.actionBar?.hide() }
         compose.setContent {
-            DesktopKitTheme(themeMode = ThemeMode.Dark, accent = prefs.accent, inputMode = InputMode.Pointer) {
+            DesktopKitTheme(themeMode = theme, accent = prefs.accent, inputMode = input) {
                 LazyColumn(Modifier.fillMaxSize().background(DeskTheme.colors.background)) {
                     item { PageHeader("Ayarlar") }
                     item { AppearanceSection(prefs) }
@@ -72,6 +78,6 @@ class SettingsScreenshotTest {
         val window = compose.activity.window.decorView
         val bitmap = Bitmap.createBitmap(window.width, window.height, Bitmap.Config.ARGB_8888)
         compose.runOnIdle { window.draw(Canvas(bitmap)) }
-        ShellScreenshotTest.save("settings-dark", bitmap)
+        ShellScreenshotTest.save(name, bitmap)
     }
 }

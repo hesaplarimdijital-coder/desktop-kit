@@ -8,6 +8,12 @@ arayüzünden çıkarıldı. Klavye, fare, sağ tık ve dokunmatik aynı uygulam
   yığını ve kaydırma konumu korunur. Sığmayan ekranlar otomatik bir **"Daha fazla"** ekranında listelenir.
   Ekran geçişleri canlandırılır (telefonda fade-through, geniş pencerede kısa geçiş); telefonun üst
   çubuğunu ekran kendisi değiştirebilir (`CompactTopBar`).
+- **Telefona göre:** telefonda alt çubuk 64 dp, satırlar 52 dp; içerik kaydırılınca alt çubuk çekilir, yukarı
+  kaydırınca geri gelir. Chip filtreler tek satırda yana kayar, gereksiz tablo sütunları gizlenir, ayar
+  satırları sığmazsa alt alta dizilir. Tablet ve DeX'te yazılar bir punto büyük, düzen aynı.
+- **Android hareketleri:** fade-through ve paylaşılan eksen geçişleri, öngörülü geri hareketi
+  (`DetailTransition`), akıcı kenar çubuğu, köşeden açılan menüler, yaylanan gezinme göstergesi ve dokunma
+  geri bildirimi. Hepsi sistemin animasyon ölçeğine uyar.
 - **İki yoğunluk:** fare veya touchpad kullanılınca sıkı düzen (24 dp hedef), parmakla
   dokununca geniş düzen (48 dp). Geçiş otomatiktir; kullanıcı ayarlardan sabitleyebilir.
 - **Tema:** açık, koyu ve OLED siyah. Dört hazır vurgu rengi var; istediğin markanın rengini de
@@ -42,7 +48,7 @@ Uygulama modülünün `build.gradle.kts` dosyası:
 
 ```kotlin
 dependencies {
-    implementation("com.github.hesaplarimdijital-coder:desktop-kit:0.1.3")
+    implementation("com.github.hesaplarimdijital-coder:desktop-kit:0.2.0")
     implementation("androidx.activity:activity-compose:1.9.3")
 }
 ```
@@ -137,7 +143,7 @@ val shortcuts = ShortcutRegistry(
 | Yazı tipi | `DesktopKitRoot(prefs, fonts = DeskFonts.System)` ya da `DeskFonts(sans = …, mono = …)` |
 | Renk ince ayarı | `DesktopKitRoot(prefs, colors = { it.copy(danger = Color(…)) })` |
 | Boyutlar ve köşeler | `DesktopKitRoot(prefs, dimens = { it.copy(radiusCard = 4.dp, sidebarWidth = 260.dp) })` |
-| Yazı boyutları | `DesktopKitRoot(prefs, type = { mode, fonts -> DeskType.forMode(mode, fonts, pointerStep = 1f) })`: fare ve klavyede her yazı 1 sp büyür, dokunmatik değişmez. `pointerStep`/`touchStep` her stile (display'den mono'ya) o kadar sp ekler, satır yüksekliği oranını korur. Tek tek ayar için `{ mode, fonts -> DeskType.forMode(mode, fonts).copy(body = …) }`. Yüksekliği yazıya göre büyüyen bileşenler (tablo satırı, düğme, menü, üst çubuk) kırpılmaz. |
+| Yazı boyutları | Tablet ve DeX'te kabuk her yazıyı zaten 1 sp büyütür (`DesktopShell(largeWindowTextStep = 1f)`). Ayrıca `DesktopKitRoot(prefs, type = { mode, fonts -> DeskType.forMode(mode, fonts, pointerStep = 1f) })`: fare ve klavyede her yazı 1 sp daha büyür, dokunmatik değişmez. `pointerStep`/`touchStep` her stile (display'den mono'ya) o kadar sp ekler, satır yüksekliği oranını korur. Tek tek ayar için `{ mode, fonts -> DeskType.forMode(mode, fonts).copy(body = …) }`. Yüksekliği yazıya göre büyüyen bileşenler (tablo satırı, düğme, menü, üst çubuk) kırpılmaz. |
 | Logo | `DesktopShell(brand = { m -> Image(painterResource(R.drawable.logo), null, m) })` |
 | Yeni simge | `DeskIcons.build("Bulut", DeskIcons.stroke("M4 11a3 3 0 0 1 …"))`. 16×16 ızgara, kitin çizgi stiliyle aynı. |
 | Kitin metinleri | Uygulamanın `res/values*/strings.xml` dosyasında aynı adla (`dk_more`, `dk_search_hint`, …) tanımla; uygulamanınki kazanır. |
@@ -159,6 +165,49 @@ Değerlere doğrudan erişim için `DeskTheme.colors.text`, `DeskTheme.type.body
 | `PageHeader`, `MessageScreen`, `OverflowScreen` | Hazır ekran parçaları. `PageHeader` başlığı yalnızca kenar çubuklu düzende gösterir (aşağıya bak). |
 | `CompactTopBar`, `TopBarAction` | Telefonda üst çubuğun başlığı, geri düğmesi ve simgeleri (aşağıya bak) |
 | `AppearanceSection`, `InputSection`, `ShortcutListSection`, `SettingsSection` | Hazır ayar bölümleri |
+| `DeskChip`, `ChipRow`, `FilterChips` | Filtre chip'leri: telefonda tek satır yana kayar, genişte sarar (aşağıya bak) |
+| `DetailTransition` | Liste → ayrıntı geçişi ve öngörülü geri hareketi (aşağıya bak) |
+
+### Chip filtreler
+
+```kotlin
+var turler by remember { mutableStateOf(setOf<String>()) }
+FilterChips(
+    options = listOf(ChipOption("flac", "FLAC", count = "128"), ChipOption("mp3", "MP3"), ChipOption("wav", "WAV")),
+    selected = turler,
+    onToggle = { t -> turler = if (t in turler) turler - t else turler + t },
+)
+```
+
+- Telefonda (`WidthClass.Compact`) tek satırdır, yana kayar; kaydırılacak yer varken kenarlar solar. Böylece
+  filtreler ekranın iki üç satırını kaplamaz.
+- Tablet ve DeX'te alt satıra sarar. `wrap = true/false` ile zorlanabilir.
+- Kendi chip'lerin için `ChipRow { DeskChip(…); DeskChip(…) }`.
+
+### Tabloda sütun gizleme
+
+`TableColumn("Tür", ColumnWidth.Fixed(120.dp), hideBelow = WidthClass.Medium) { it.tur }` sütunu telefonda
+gizler; sıralama sütun numaraları değişmez.
+
+### Liste → ayrıntı geçişi ve öngörülü geri
+
+```kotlin
+var acik by remember { mutableStateOf<Kitap?>(null) }
+DetailTransition(
+    detail = acik,
+    onBack = { acik = null },
+    detailKey = { it.id },
+    list = { KitapListesi(onAc = { acik = it }) },
+) { kitap ->
+    CompactTopBar(title = kitap.ad, onBack = { acik = null })
+    KitapAyrintisi(kitap)
+}
+```
+
+- Açılırken ayrıntı kısa bir yoldan kayıp belirir, liste öbür yana çekilir; kapanırken tersi.
+- Android 14+ öngörülü geri hareketinde ayrıntı parmakla küçülür ve köşeleri yuvarlanır; bırakınca kapanır.
+  Manifestte `<application android:enableOnBackInvokedCallback="true">` gerekir. Eski sürümlerde Geri yine kapatır.
+- Geri hareketini `DetailTransition` üstlenir (`CompactTopBar` içindeyken de); ayrıca `BackHandler` gerekmez.
 
 ### Tabloda çoklu seçim
 
@@ -198,6 +247,18 @@ boyuta büyür. Ray ve kenar çubuklu düzende (tablet, DeX) hareketsiz, 150 ms'
 Geri dönüş aynı biçimde. Süreler sistemin animasyon ölçeğine uyar ("Animasyonları kaldır" açıksa
 geçiş olmaz). Alt çubuk, ray ve kenar çubuğundaki seçim rengi 150 ms'de yumuşakça değişir.
 `ShellTransitions.None` geçişi kapatır (ekran görüntüsü testleri için).
+
+0.2.0 ile telefon ve tablette (alt çubuk, ray) Android'in fade-through geçişi kullanılır: eski ekran 90 ms'de
+solar, yenisi 210 ms'de %96 (telefon) ya da %98'den (tablet) büyüyerek belirir. Kenar çubuklu düzende (DeX)
+150 ms'lik sade geçiş kalır. Manifestte `android:enableOnBackInvokedCallback="true"` varsa öngörülü geri
+hareketi geçişi parmakla oynatır.
+
+### Telefonda kaydırma ve boyutlar
+
+- `hideBarsOnScroll = true` (varsayılan): içerik aşağı kaydırılınca alt çubuk ve üstündeki şerit çekilir, yukarı
+  kaydırınca gelir; ekran değişince hep görünür başlar. Üst çubuk kaydırılmış içerikte çerçeve rengini alır.
+- `compactSizes = true` (varsayılan): alt çubuk 64 dp, dokunmatik satır 52 dp.
+- `largeWindowTextStep = 1f` (varsayılan): tablet ve DeX'te her yazı 1 sp büyük. `0f` eski boyutlar.
 
 ### Telefonda üst çubuk: `CompactTopBar`
 

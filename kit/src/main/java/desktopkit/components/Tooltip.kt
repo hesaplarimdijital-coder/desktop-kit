@@ -1,5 +1,10 @@
 package desktopkit.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -29,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import kotlinx.coroutines.delay
+import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
 
 /**
@@ -77,7 +83,15 @@ fun TooltipArea(
         content()
         if (visible) {
             Popup(popupPositionProvider = remember { BelowAnchorPositionProvider() }) {
-                TooltipBubble(text, shortcut)
+                val appear = remember { MutableTransitionState(false).apply { targetState = true } }
+                AnimatedVisibility(
+                    visibleState = appear,
+                    enter = fadeIn(tween(DeskMotion.SHORT_MS, easing = DeskMotion.StandardDecelerate)) +
+                        scaleIn(tween(DeskMotion.SHORT_MS + 50, easing = DeskMotion.EmphasizedDecelerate), initialScale = 0.94f),
+                    label = "tooltip",
+                ) {
+                    TooltipBubble(text, shortcut)
+                }
             }
         }
     }
