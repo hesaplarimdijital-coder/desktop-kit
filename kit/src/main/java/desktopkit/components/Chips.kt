@@ -38,11 +38,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
@@ -132,7 +129,8 @@ fun DeskChip(
  *   three lines of a small screen. The ends fade out while there is more to scroll to.
  *
  * [contentPadding] is the space before the first and after the last chip; in the scrolling line the
- * chips pass under it up to the edge of the screen, as in Android's own chip rows.
+ * chips pass under it up to the edge of the screen, as in Android's own chip rows. [fadeColor] is the
+ * surface the row sits on (the page background by default); the ends fade into it.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -141,6 +139,7 @@ fun ChipRow(
     wrap: Boolean = currentWidthClass() != WidthClass.Compact,
     contentPadding: Dp = DeskTheme.dimens.pagePadding,
     spacing: Dp = 8.dp,
+    fadeColor: Color = DeskTheme.colors.background,
     content: @Composable () -> Unit,
 ) {
     val touch = DeskTheme.inputMode == InputMode.Touch
@@ -156,7 +155,7 @@ fun ChipRow(
         Row(
             modifier = modifier
                 .fillMaxWidth()
-                .fadingEdges(scroll, contentPadding.coerceAtLeast(16.dp))
+                .fadingEdges(scroll, contentPadding.coerceAtLeast(16.dp), fadeColor)
                 .horizontalScroll(scroll)
                 .padding(horizontal = contentPadding),
             horizontalArrangement = Arrangement.spacedBy(spacing),
@@ -195,26 +194,27 @@ fun <T> FilterChips(
     }
 }
 
-/** Fades the start and end of a sideways-scrolling line out while it can scroll that way. */
-private fun Modifier.fadingEdges(scroll: ScrollState, length: Dp): Modifier = this
-    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+/**
+ * Fades the start and end of a sideways-scrolling line into [color] (the surface behind it) while it
+ * can scroll that way. Painting the surface colour over the edge needs no offscreen layer, so it
+ * looks the same on every renderer.
+ */
+private fun Modifier.fadingEdges(scroll: ScrollState, length: Dp, color: Color): Modifier = this
     .drawWithContent {
         drawContent()
         val fade = length.toPx().coerceAtMost(size.width / 3f)
         if (scroll.value > 0) {
             drawRect(
-                brush = Brush.horizontalGradient(listOf(Color.Transparent, Color.Black), startX = 0f, endX = fade),
+                brush = Brush.horizontalGradient(listOf(color, color.copy(alpha = 0f)), startX = 0f, endX = fade),
                 topLeft = Offset.Zero,
                 size = Size(fade, size.height),
-                blendMode = BlendMode.DstIn,
             )
         }
         if (scroll.value < scroll.maxValue) {
             drawRect(
-                brush = Brush.horizontalGradient(listOf(Color.Black, Color.Transparent), startX = size.width - fade, endX = size.width),
+                brush = Brush.horizontalGradient(listOf(color.copy(alpha = 0f), color), startX = size.width - fade, endX = size.width),
                 topLeft = Offset(size.width - fade, 0f),
                 size = Size(fade, size.height),
-                blendMode = BlendMode.DstIn,
             )
         }
     }

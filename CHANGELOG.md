@@ -1,6 +1,6 @@
 # Değişiklikler
 
-## 0.2.0 (taslak)
+## 0.2.0 (2026-10-23)
 
 Telefonda daha çok yer, tablette biraz daha büyük yazı, Android'in kendi hareket diliyle animasyonlar.
 Tablet ve DeX düzeni (yerleşim, boyutlar, renkler) değişmedi; yalnızca yazılar bir punto büyüdü.
