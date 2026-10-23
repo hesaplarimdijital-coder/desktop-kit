@@ -17,11 +17,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.rememberNavController
+import desktopkit.components.ChipOption
 import desktopkit.components.ColumnWidth
 import desktopkit.components.DenseTable
 import desktopkit.components.DeskIconButton
 import desktopkit.components.DeskIcons
 import desktopkit.components.DeskSlider
+import desktopkit.components.FilterChips
 import desktopkit.components.HorizontalRule
 import desktopkit.components.MenuEntry
 import desktopkit.components.MenuSpec
@@ -122,10 +124,17 @@ fun SampleScreen(route: String) {
                 DeskIconButton(DeskIcons.Grid, "Izgara görünümü", {})
                 DeskIconButton(DeskIcons.ListView, "Liste görünümü", {}, selected = true)
             }
+            // one sideways-scrolling line on the phone, wrapped lines from tablet width up
+            FilterChips(
+                options = sampleFiles.map { ChipOption(it.kind, it.kind) } + ChipOption("Görsel", "Görseller") + ChipOption("Çizim", "Çizimler"),
+                selected = setOf("Sunum"),
+                onToggle = {},
+                modifier = Modifier.padding(bottom = 4.dp),
+            )
             DenseTable(
                 columns = listOf(
                     TableColumn<SampleFile>("Ad", ColumnWidth.Weight(1f)) { it.name },
-                    TableColumn<SampleFile>("Tür", ColumnWidth.Fixed(120.dp)) { it.kind },
+                    TableColumn<SampleFile>("Tür", ColumnWidth.Fixed(120.dp), hideBelow = WidthClass.Medium) { it.kind },
                     TableColumn<SampleFile>("Boyut", ColumnWidth.Fixed(90.dp), alignEnd = true, mono = true) { it.size },
                 ),
                 rows = sampleFiles,

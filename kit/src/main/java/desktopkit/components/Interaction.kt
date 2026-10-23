@@ -1,5 +1,7 @@
 package desktopkit.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
@@ -9,15 +11,19 @@ import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
+import desktopkit.theme.InputMode
 
 /** Visual state of an interactive element: hover, press and keyboard focus. */
 data class InteractionState(val hovered: Boolean, val pressed: Boolean, val focused: Boolean)
@@ -68,3 +74,22 @@ fun Modifier.deskClickable(
 @Composable
 fun Modifier.focusRing(state: InteractionState, shape: Shape): Modifier =
     if (state.focused) this.border(2.dp, DeskTheme.colors.focusRing, shape) else this
+
+/** [stateBackground] that eases between states in 150 ms instead of jumping (hover, press, selection). */
+@Composable
+fun animatedStateBackground(state: InteractionState, selected: Boolean = false, rest: Color = Color.Transparent): State<Color> =
+    animateColorAsState(stateBackground(state, selected, rest), DeskMotion.color(), label = "stateBackground")
+
+/**
+ * Touch feedback in place of a ripple: the element shrinks slightly while a finger holds it and
+ * springs back on release. Only in touch mode; with a mouse (DeX) nothing moves, as on a desktop.
+ */
+@Composable
+fun Modifier.pressScale(pressed: Boolean, scale: Float = 0.96f): Modifier {
+    val touch = DeskTheme.inputMode == InputMode.Touch
+    val value by animateFloatAsState(if (pressed && touch) scale else 1f, DeskMotion.fastSpatial(), label = "pressScale")
+    return this.graphicsLayer {
+        scaleX = value
+        scaleY = value
+    }
+}

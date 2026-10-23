@@ -1,5 +1,6 @@
 package desktopkit.components
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -18,16 +19,20 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
+import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
 
 /** Row of mutually exclusive options (theme, density, view mode). */
@@ -49,11 +54,15 @@ fun <T> SegmentedChoice(options: List<Pair<T, String>>, selected: T, onSelect: (
             val state = interaction.collectState()
             val isSelected = value == selected
             val shape = RoundedCornerShape(dimens.radiusControl)
+            val background by animatedStateBackground(state, isSelected)
+            val labelColor by animateColorAsState(if (isSelected) colors.onSelection else colors.textSecondary, DeskMotion.color(),
+                label = "segmentLabel")
             Box(
                 modifier = Modifier
                     .heightIn(min = dimens.minTarget.coerceAtLeast(dimens.controlHeight))
+                    .pressScale(state.pressed)
                     .focusRing(state, shape)
-                    .background(stateBackground(state, isSelected), shape)
+                    .background(background, shape)
                     .pointerHoverIcon(PointerIcon.Hand)
                     .selectable(selected = isSelected, interactionSource = interaction, indication = null, role = Role.RadioButton) {
                         onSelect(value)
@@ -61,7 +70,7 @@ fun <T> SegmentedChoice(options: List<Pair<T, String>>, selected: T, onSelect: (
                     .padding(horizontal = dimens.gapM),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(label, style = DeskTheme.type.label, color = if (isSelected) colors.onSelection else colors.textSecondary, maxLines = 1)
+                Text(label, style = DeskTheme.type.label, color = labelColor, maxLines = 1)
             }
         }
     }
@@ -102,20 +111,50 @@ fun <T> SwatchChoice(options: List<Triple<T, Color, String>>, selected: T, onSel
     }
 }
 
-/** Label and control on one settings line. */
+/**
+ * Label and control on one settings line. When the control does not fit beside the label (a long
+ * segmented choice on a phone), the control moves under the label instead of squeezing it.
+ */
 @Composable
 fun SettingRow(title: String, modifier: Modifier = Modifier, subtitle: String? = null, control: @Composable () -> Unit) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
-    Row(
+    val gap = dimens.gapL
+    val stackGap = dimens.gapS
+    Layout(
         modifier = modifier.padding(vertical = dimens.gapS),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
-            Text(title, style = DeskTheme.type.bodyStrong, color = colors.text)
-            if (subtitle != null) Text(subtitle, style = DeskTheme.type.labelSmall, color = colors.textTertiary)
+        content = {
+            androidx.compose.foundation.layout.Column {
+                Text(title, style = DeskTheme.type.bodyStrong, color = colors.text)
+                if (subtitle != null) Text(subtitle, style = DeskTheme.type.labelSmall, color = colors.textTertiary)
+            }
+            Box { control() }
+        },
+    ) { measurables, constraints ->
+        val label = measurables[0]
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        val controlPlaceable = measurables[1].measure(loose)
+        val gapPx = gap.roundToPx()
+        val width = if (constraints.hasBoundedWidth) constraints.maxWidth else Int.MAX_VALUE
+        val minLabel = minOf(label.maxIntrinsicWidth(constraints.maxHeight), 120.dp.roundToPx())
+        val sideBySide = !constraints.hasBoundedWidth || controlPlaceable.width + gapPx + minLabel <= width
+        if (sideBySide) {
+            val labelMax = if (constraints.hasBoundedWidth) (width - controlPlaceable.width - gapPx).coerceAtLeast(0) else Constraints.Infinity
+            val labelPlaceable = label.measure(loose.copy(maxWidth = labelMax))
+            val rowWidth = if (constraints.hasBoundedWidth) width else labelPlaceable.width + gapPx + controlPlaceable.width
+            val height = maxOf(labelPlaceable.height, controlPlaceable.height).coerceIn(constraints.minHeight, constraints.maxHeight)
+            layout(rowWidth, height) {
+                labelPlaceable.placeRelative(0, (height - labelPlaceable.height) / 2)
+                controlPlaceable.placeRelative(rowWidth - controlPlaceable.width, (height - controlPlaceable.height) / 2)
+            }
+        } else {
+            val labelPlaceable = label.measure(loose.copy(maxWidth = width))
+            val between = stackGap.roundToPx()
+            val height = (labelPlaceable.height + between + controlPlaceable.height).coerceIn(constraints.minHeight, constraints.maxHeight)
+            layout(width, height) {
+                labelPlaceable.placeRelative(0, 0)
+                controlPlaceable.placeRelative(0, labelPlaceable.height + between)
+            }
         }
-        Spacer(Modifier.width(dimens.gapL))
-        control()
     }
 }

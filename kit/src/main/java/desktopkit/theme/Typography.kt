@@ -106,3 +106,29 @@ data class DeskType(
         }
     }
 }
+
+/**
+ * The same styles [step] sp larger (smaller when negative); line heights keep their ratio to the
+ * size. The shell uses it to set text one sp larger on tablet and DeX windows
+ * (`DesktopShell(largeWindowTextStep = 1f)`), whatever the theme's `type` hook built.
+ */
+fun DeskType.grow(step: Float): DeskType {
+    if (step == 0f) return this
+    fun TextStyle.grown(): TextStyle {
+        val size = fontSize.value
+        val ratio = if (lineHeight.isSp && size > 0f) lineHeight.value / size else Float.NaN
+        val next = size + step
+        return copy(fontSize = next.sp, lineHeight = if (ratio.isNaN()) lineHeight else (next * ratio).sp)
+    }
+    return DeskType(
+        display = display.grown(),
+        headline = headline.grown(),
+        title = title.grown(),
+        body = body.grown(),
+        bodyStrong = bodyStrong.grown(),
+        label = label.grown(),
+        labelSmall = labelSmall.grown(),
+        caption = caption.grown(),
+        mono = mono.grown(),
+    )
+}

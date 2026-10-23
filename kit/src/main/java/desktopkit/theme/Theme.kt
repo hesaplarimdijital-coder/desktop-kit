@@ -125,7 +125,7 @@ private fun DeskColors.toMaterialScheme(): ColorScheme = if (isDark) darkColorSc
     scrim = scrim,
 )
 
-private fun DeskType.toMaterialTypography() = Typography(
+internal fun DeskType.toMaterialTypography() = Typography(
     displaySmall = display,
     headlineSmall = headline,
     titleLarge = headline,

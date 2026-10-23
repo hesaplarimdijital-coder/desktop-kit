@@ -24,6 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,6 +53,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import desktopkit.input.ContextMenuArea
+import desktopkit.shell.WidthClass
+import desktopkit.shell.currentWidthClass
 import desktopkit.theme.DeskTheme
 import androidx.compose.ui.input.pointer.isCtrlPressed as pointerCtrl
 import androidx.compose.ui.input.pointer.isMetaPressed as pointerMeta
@@ -73,6 +76,11 @@ class TableColumn<T>(
     val sortable: Boolean = true,
     /** The cells' text style, when neither [mono] nor the default (strong first column, body after) fits: a serif title column, say. */
     val textStyle: TextStyle? = null,
+    /**
+     * Hides the column in windows narrower than this class, e.g. `WidthClass.Medium` keeps a "Kind"
+     * column off phones so the name gets the room. Null (the default) shows it everywhere.
+     */
+    val hideBelow: WidthClass? = null,
     val value: (T) -> String,
 )
 
@@ -117,6 +125,9 @@ fun <T> DenseTable(
     toggleOnClick: Boolean = false,
 ) {
     val dimens = DeskTheme.dimens
+    val widthClass = currentWidthClass()
+    // original indices are kept: sorting and the strong first column refer to them
+    val shownColumns = columns.withIndex().filter { (_, column) -> column.hideBelow == null || widthClass >= column.hideBelow }
     val multi = onSelectionChange != null
     val selection = selectedKeys ?: emptySet()
     val tracker = remember { SelectionTracker() }
@@ -179,7 +190,7 @@ fun <T> DenseTable(
                 .padding(horizontal = dimens.pagePadding - 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            columns.forEachIndexed { index, column ->
+            shownColumns.forEach { (index, column) ->
                 HeaderCell(column, index, sort, onSortChange)
             }
         }
@@ -201,7 +212,7 @@ fun <T> DenseTable(
                 }
                 val row = @Composable {
                     TableRow(
-                        columns = columns,
+                        columns = shownColumns,
                         item = item,
                         selected = itemKey in selection || (selectedKey != null && itemKey == selectedKey),
                         onClick = onClick,
@@ -308,25 +319,26 @@ private fun <T> RowScope.HeaderCell(column: TableColumn<T>, index: Int, sort: Ta
 }
 
 @Composable
-private fun <T> TableRow(columns: List<TableColumn<T>>, item: T, selected: Boolean, onClick: () -> Unit, modifier: Modifier) {
+private fun <T> TableRow(columns: List<IndexedValue<TableColumn<T>>>, item: T, selected: Boolean, onClick: () -> Unit, modifier: Modifier) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
     val interaction = remember { MutableInteractionSource() }
     val state = interaction.collectState()
     val shape = RoundedCornerShape(dimens.radiusControl)
+    val background by animatedStateBackground(state, selected)
     Row(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = dimens.pagePadding - 12.dp)
             .heightIn(min = dimens.rowHeight.coerceAtLeast(dimens.minTarget))
             .focusRing(state, shape)
-            .background(stateBackground(state, selected), shape)
+            .background(background, shape)
             .semantics { this.selected = selected }
             .deskClickable(interaction, onClick)
             .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        columns.forEachIndexed { index, column ->
+        columns.forEach { (index, column) ->
             Box(Modifier.cell(this, column.width).padding(horizontal = 8.dp), contentAlignment = if (column.alignEnd) Alignment.CenterEnd else Alignment.CenterStart) {
                 Text(
                     text = column.value(item),

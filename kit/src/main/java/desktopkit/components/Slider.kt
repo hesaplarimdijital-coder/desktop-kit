@@ -1,5 +1,7 @@
 package desktopkit.components
 
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.hoverable
@@ -23,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -38,6 +41,7 @@ import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.unit.dp
+import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
 
 /**
@@ -135,7 +139,17 @@ fun DeskSlider(
             },
         contentAlignment = Alignment.CenterStart,
     ) {
-        val trackHeight = if (emphasised) 5.dp else 3.dp
+        val trackHeight by animateDpAsState(if (emphasised) 5.dp else 3.dp, DeskMotion.fastSpatial(), label = "trackHeight")
+        // the thumb grows in on hover, focus or touch and swells a little while dragged
+        val thumbScale by animateFloatAsState(
+            when {
+                !emphasised || !enabled -> 0f
+                dragging -> 1.25f
+                else -> 1f
+            },
+            DeskMotion.fastSpatial(),
+            label = "thumbScale",
+        )
         val thumb = 12.dp
         Box(
             Modifier
@@ -150,11 +164,15 @@ fun DeskSlider(
                     .background(if (enabled) colors.accent else colors.textTertiary, RoundedCornerShape(50)),
             )
         }
-        if (emphasised && enabled) {
+        if (thumbScale > 0.01f) {
             Box(
                 Modifier
                     .offset(x = maxWidth * shown - thumb / 2)
                     .size(thumb)
+                    .graphicsLayer {
+                        scaleX = thumbScale
+                        scaleY = thumbScale
+                    }
                     .background(colors.text, CircleShape),
             )
         }

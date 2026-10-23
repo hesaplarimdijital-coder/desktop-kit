@@ -45,6 +45,7 @@ import desktopkit.components.MenuEntry
 import desktopkit.components.MenuItemRow
 import desktopkit.components.MenuTitle
 import desktopkit.components.DeskButton
+import desktopkit.components.DeskChip
 import desktopkit.components.DeskIconButton
 import desktopkit.components.DeskIcons
 import desktopkit.components.DeskSlider
@@ -104,6 +105,7 @@ class ComponentStatesTest {
         Sample("Düğme", { compose.onNodeWithTag("button") }),
         Sample("Birincil düğme", { compose.onNodeWithTag("button-primary") }),
         Sample("Segment seçimi", { compose.onNodeWithTag("segmented") }, { compose.onNodeWithText("Koyu") }),
+        Sample("Filtre çipi", { compose.onNodeWithTag("chip") }),
         Sample("Renk seçimi", { compose.onNodeWithTag("swatches") }, { compose.onNodeWithContentDescription("Kehribar") }),
         Sample("Menü başlığı", { compose.onNodeWithTag("menu-title") }),
         Sample("Menü öğesi", { compose.onNodeWithText("Yeni klasör…") }),
@@ -127,6 +129,7 @@ class ComponentStatesTest {
             DeskButton("Klasör seç", {}, Modifier.testTag("button"), icon = DeskIcons.Folder)
             DeskButton("Dönüştür", {}, Modifier.testTag("button-primary"), primary = true)
             SegmentedChoice(listOf(1 to "Açık", 2 to "Koyu", 3 to "OLED"), selected = 1, onSelect = {}, modifier = Modifier.testTag("segmented"))
+            DeskChip("Ses", selected = false, onClick = {}, modifier = Modifier.testTag("chip"), count = "12")
             SwatchChoice(
                 listOf(Triple(1, Accent.Blue.base, "Mavi"), Triple(2, Accent.Amber.base, "Kehribar"), Triple(3, Accent.Green.base, "Yeşil")),
                 selected = 1, onSelect = {}, modifier = Modifier.testTag("swatches"),

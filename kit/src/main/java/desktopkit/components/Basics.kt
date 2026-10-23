@@ -1,5 +1,6 @@
 package desktopkit.components
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -17,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,6 +29,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
 
 /** Square icon button with hover, press and focus states. Its size never drops below the touch or pointer target. */
@@ -45,11 +48,13 @@ fun DeskIconButton(
     val interaction = remember { MutableInteractionSource() }
     val state = interaction.collectState()
     val shape = RoundedCornerShape(DeskTheme.dimens.radiusControl)
+    val background by animatedStateBackground(state, selected)
     Box(
         modifier = modifier
             .size(size)
+            .pressScale(state.pressed, 0.92f)
             .focusRing(state, shape)
-            .background(stateBackground(state, selected), shape)
+            .background(background, shape)
             .deskClickable(interaction, onClick, enabled = enabled, onClickLabel = contentDescription),
         contentAlignment = Alignment.Center,
     ) {
@@ -77,17 +82,19 @@ fun DeskButton(
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
     val shape = RoundedCornerShape(dimens.radiusControl)
-    val background = when {
+    val target = when {
         // the accent moves toward its text colour: darker on the dark themes, lighter on the light one
         primary && state.pressed -> lerp(colors.accent, colors.onAccent, 0.24f)
         primary && state.hovered -> lerp(colors.accent, colors.onAccent, 0.12f)
         primary -> colors.accent
         else -> stateBackground(state, rest = colors.surfaceRaised)
     }
+    val background by animateColorAsState(target, DeskMotion.color(), label = "buttonBackground")
     val content = if (primary) colors.onAccent else colors.text
     Row(
         modifier = modifier
             .defaultMinSize(minHeight = dimens.minTarget.coerceAtLeast(dimens.controlHeight))
+            .pressScale(state.pressed)
             .focusRing(state, shape)
             .background(background, shape)
             .then(if (primary) Modifier else Modifier.border(1.dp, colors.borderStrong, shape))

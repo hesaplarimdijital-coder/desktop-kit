@@ -1,5 +1,12 @@
 package desktopkit.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -23,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -30,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.semantics.Role
@@ -43,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
 
 /** One line of a menu bar drop-down or a context menu. */
@@ -68,6 +78,9 @@ class MenuSpec(val title: String, val entries: () -> List<MenuEntry>)
  * Menu surface shared by the menu bar and context menus. It opens at [offset] from the
  * anchor's top-left corner and moves inside the window when it would overflow (flipping above
  * the anchor point near the bottom edge, like desktop menus).
+ *
+ * Like Android's own pop-up menus it grows in from its corner while fading in (150 ms) and fades
+ * out when closed (100 ms); with animations turned off in the system it simply appears.
  */
 @Composable
 fun MenuPopup(
@@ -77,7 +90,13 @@ fun MenuPopup(
     offset: IntOffset = IntOffset.Zero,
     minWidth: Dp = 220.dp,
 ) {
-    if (!visible || entries.isEmpty()) return
+    val target = visible && entries.isNotEmpty()
+    // the last entries stay on screen while the menu fades out; callers pass an empty list when closed
+    val shown = remember { EntriesHolder(entries) }
+    if (target) shown.value = entries
+    val transition = remember { MutableTransitionState(false) }
+    SideEffect { transition.targetState = target }
+    if (!target && !transition.currentState && !transition.targetState) return
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
     val shape = RoundedCornerShape(dimens.radiusCard.coerceAtMost(10.dp))
@@ -86,28 +105,42 @@ fun MenuPopup(
         onDismissRequest = onDismiss,
         properties = PopupProperties(focusable = true),
     ) {
-        Column(
-            modifier = Modifier
-                .widthIn(min = minWidth, max = 420.dp)
-                .width(IntrinsicSize.Max)
-                .shadow(12.dp, shape)
-                .background(colors.surfaceRaised, shape)
-                .border(1.dp, colors.borderStrong, shape)
-                .verticalScroll(rememberScrollState())
-                .padding(4.dp),
+        AnimatedVisibility(
+            visibleState = transition,
+            enter = fadeIn(tween(DeskMotion.SHORT_MS + 50, easing = DeskMotion.StandardDecelerate)) +
+                scaleIn(tween(DeskMotion.SHORT_MS + 50, easing = DeskMotion.EmphasizedDecelerate), initialScale = 0.92f,
+                    transformOrigin = TransformOrigin(0f, 0f)),
+            exit = fadeOut(tween(DeskMotion.SHORT_MS, easing = DeskMotion.StandardAccelerate)) +
+                scaleOut(tween(DeskMotion.SHORT_MS, easing = DeskMotion.EmphasizedAccelerate), targetScale = 0.96f,
+                    transformOrigin = TransformOrigin(0f, 0f)),
+            label = "menuPopup",
         ) {
-            entries.forEach { entry ->
-                when (entry) {
-                    is MenuEntry.Item -> MenuItemRow(entry) {
-                        onDismiss()
-                        entry.onClick()
+            Column(
+                modifier = Modifier
+                    .widthIn(min = minWidth, max = 420.dp)
+                    .width(IntrinsicSize.Max)
+                    .shadow(12.dp, shape)
+                    .background(colors.surfaceRaised, shape)
+                    .border(1.dp, colors.borderStrong, shape)
+                    .verticalScroll(rememberScrollState())
+                    .padding(4.dp),
+            ) {
+                shown.value.forEach { entry ->
+                    when (entry) {
+                        is MenuEntry.Item -> MenuItemRow(entry) {
+                            onDismiss()
+                            entry.onClick()
+                        }
+                        MenuEntry.Separator -> HorizontalRule(Modifier.padding(vertical = 4.dp))
                     }
-                    MenuEntry.Separator -> HorizontalRule(Modifier.padding(vertical = 4.dp))
                 }
             }
         }
     }
 }
+
+/** Plain holder for the entries shown while the menu animates out; not state, it never triggers a redraw. */
+private class EntriesHolder(var value: List<MenuEntry>)
 
 @Composable
 internal fun MenuItemRow(item: MenuEntry.Item, onClick: () -> Unit) {
@@ -126,7 +159,7 @@ internal fun MenuItemRow(item: MenuEntry.Item, onClick: () -> Unit) {
             .fillMaxWidth()
             .heightIn(min = dimens.rowHeight.coerceAtLeast(dimens.minTarget))
             .focusRing(state, shape)
-            .background(if (item.enabled) stateBackground(state) else colors.surfaceRaised, shape)
+            .background(if (item.enabled) animatedStateBackground(state).value else colors.surfaceRaised, shape)
             .deskClickable(interaction, onClick, enabled = item.enabled, role = if (item.checked != null) Role.Checkbox else Role.Button)
             .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,

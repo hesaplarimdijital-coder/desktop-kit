@@ -2,6 +2,8 @@ package desktopkit.shell
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -34,6 +36,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -41,9 +49,12 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.lerp
 import desktopkit.R
 import desktopkit.components.DeskIconButton
 import desktopkit.components.DeskIcons
@@ -53,7 +64,9 @@ import desktopkit.components.VerticalRule
 import desktopkit.components.collectState
 import desktopkit.components.deskClickable
 import desktopkit.components.focusRing
+import desktopkit.components.pressScale
 import desktopkit.components.stateBackground
+import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
 
 /** Item counts and badges shown next to sidebar entries ("4 812", "4 new"), by route. */
@@ -94,7 +107,6 @@ private fun RowScope.BottomBarItem(item: NavItem, selected: Boolean, onClick: ()
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
     val pill = RoundedCornerShape(dimens.radiusPill)
-    val indicator by animateNavColor(stateBackground(state, selected))
     val iconTint by animateNavColor(if (selected) colors.onSelection else colors.textSecondary)
     val labelColor by animateNavColor(if (selected) colors.text else colors.textSecondary)
     Column(
@@ -106,25 +118,55 @@ private fun RowScope.BottomBarItem(item: NavItem, selected: Boolean, onClick: ()
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Box(
-            modifier = Modifier
-                .width(56.dp)
-                .height(30.dp)
-                .focusRing(state, pill)
-                .background(indicator, pill),
-            contentAlignment = Alignment.Center,
-        ) {
+        NavIndicator(selected, state, pill, Modifier.width(56.dp).height(30.dp)) {
             Icon(item.icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(dimens.icon))
         }
         Spacer(Modifier.height(4.dp))
         Text(
             text = item.shortLabel,
-            style = DeskTheme.type.caption,
+            style = if (selected) DeskTheme.type.caption.copy(fontWeight = FontWeight.Medium) else DeskTheme.type.caption,
             color = labelColor,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
     }
+}
+
+/**
+ * The pill behind a navigation icon. Hover and press tint the whole pill; the selection pill grows
+ * out from the middle with a soft spring when the item becomes selected and shrinks back when it is
+ * left, as in Android's navigation bar and rail. A finger press also shrinks the icon slightly.
+ */
+@Composable
+private fun NavIndicator(
+    selected: Boolean,
+    state: desktopkit.components.InteractionState,
+    shape: RoundedCornerShape,
+    modifier: Modifier,
+    content: @Composable () -> Unit,
+) {
+    val colors = DeskTheme.colors
+    val fraction by animateFloatAsState(if (selected) 1f else 0f, DeskMotion.spatial(), label = "navIndicator")
+    val feedback by animateNavColor(if (state.pressed) colors.pressed else if (state.hovered && !selected) colors.hover else Color.Transparent)
+    val selection = colors.selection
+    Box(
+        modifier = modifier
+            .pressScale(state.pressed, 0.94f)
+            .focusRing(state, shape)
+            .drawBehind {
+                if (fraction > 0.001f) {
+                    val width = size.width * (0.4f + 0.6f * fraction)
+                    drawRoundRect(
+                        color = selection.copy(alpha = selection.alpha * fraction.coerceIn(0f, 1f)),
+                        topLeft = Offset((size.width - width) / 2f, 0f),
+                        size = Size(width, size.height),
+                        cornerRadius = CornerRadius(size.height / 2f),
+                    )
+                }
+            }
+            .background(feedback, shape),
+        contentAlignment = Alignment.Center,
+    ) { content() }
 }
 
 // ---------------------------------------------------------------- medium/expanded: rail
@@ -173,7 +215,6 @@ private fun RailItem(item: NavItem, selected: Boolean, onClick: () -> Unit) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
     val pill = RoundedCornerShape(dimens.radiusPill)
-    val indicator by animateNavColor(stateBackground(state, selected))
     val iconTint by animateNavColor(if (selected) colors.onSelection else colors.textSecondary)
     val labelColor by animateNavColor(if (selected) colors.text else colors.textSecondary)
     Column(
@@ -186,14 +227,7 @@ private fun RailItem(item: NavItem, selected: Boolean, onClick: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Box(
-            modifier = Modifier
-                .width(48.dp)
-                .height(28.dp)
-                .focusRing(state, pill)
-                .background(indicator, pill),
-            contentAlignment = Alignment.Center,
-        ) {
+        NavIndicator(selected, state, pill, Modifier.width(48.dp).height(28.dp)) {
             Icon(item.icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(dimens.icon))
         }
         Spacer(Modifier.height(2.dp))
@@ -224,13 +258,21 @@ fun Sidebar(
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
     val label = stringResource(R.string.dk_sidebar)
-    val width = if (collapsed) dimens.sidebarCollapsedWidth else dimens.sidebarWidth
+    // the panel slides open and shut on the emphasized curve; labels fade in once there is room for them
+    val width by animateDpAsState(
+        if (collapsed) dimens.sidebarCollapsedWidth else dimens.sidebarWidth,
+        tween(DeskMotion.LONG_MS, easing = DeskMotion.Emphasized),
+        label = "sidebarWidth",
+    )
+    val span = (dimens.sidebarWidth - dimens.sidebarCollapsedWidth).value
+    val open = if (span <= 0f) 1f else ((width - dimens.sidebarCollapsedWidth).value / span).coerceIn(0f, 1f)
     val footer = spec.footer
     Row(modifier.fillMaxHeight()) {
         Column(
             modifier = Modifier
                 .width(width)
                 .fillMaxHeight()
+                .clipToBounds()
                 .background(colors.chrome)
                 .semantics { paneTitle = label },
         ) {
@@ -238,19 +280,19 @@ fun Sidebar(
                 modifier = Modifier
                     .weight(1f)
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = if (collapsed) 6.dp else dimens.gapS, vertical = dimens.gapS)
+                    .padding(horizontal = lerp(6.dp, dimens.gapS, open), vertical = dimens.gapS)
                     .selectableGroup(),
             ) {
                 spec.sections.forEach { section ->
                     if (section.items.isEmpty()) return@forEach
                     val title = section.title
                     if (!collapsed && title != null) {
-                        SectionCaption(title, Modifier.padding(start = 10.dp, top = dimens.gapM, bottom = 4.dp))
+                        SectionCaption(title, Modifier.padding(start = 10.dp, top = dimens.gapM, bottom = 4.dp).alpha(labelAlpha(open)))
                     } else {
                         Spacer(Modifier.height(dimens.gapS))
                     }
                     section.items.forEach { item ->
-                        SidebarItem(item, item.route == currentRoute, collapsed, badges[item.route]) { onSelect(item.route) }
+                        SidebarItem(item, item.route == currentRoute, collapsed, badges[item.route], open) { onSelect(item.route) }
                     }
                 }
             }
@@ -262,7 +304,7 @@ fun Sidebar(
                 if (!collapsed) {
                     Box(Modifier.weight(1f)) {
                         if (footer != null) {
-                            SidebarItem(footer, currentRoute == footer.route, collapsed = false, badge = null) { onSelect(footer.route) }
+                            SidebarItem(footer, currentRoute == footer.route, collapsed = false, badge = null, open = open) { onSelect(footer.route) }
                         }
                     }
                 }
@@ -274,7 +316,7 @@ fun Sidebar(
             }
             if (collapsed && footer != null) {
                 Box(Modifier.padding(start = 6.dp, end = 6.dp, bottom = 6.dp)) {
-                    SidebarItem(footer, currentRoute == footer.route, collapsed = true, badge = null) { onSelect(footer.route) }
+                    SidebarItem(footer, currentRoute == footer.route, collapsed = true, badge = null, open = open) { onSelect(footer.route) }
                 }
             }
         }
@@ -282,8 +324,16 @@ fun Sidebar(
     }
 }
 
+/** Labels stay hidden in the first half of the opening, so they never show squeezed. */
+private fun labelAlpha(open: Float): Float = ((open - 0.5f) * 2f).coerceIn(0f, 1f)
+
+/**
+ * [open] runs from 0 (collapsed) to 1 (expanded) while the sidebar animates; the icon keeps its
+ * place in a collapsed item and moves smoothly to its expanded position.
+ */
 @Composable
-private fun SidebarItem(item: NavItem, selected: Boolean, collapsed: Boolean, badge: String?, onClick: () -> Unit) {
+private fun SidebarItem(item: NavItem, selected: Boolean, collapsed: Boolean, badge: String?, open: Float = if (collapsed) 0f else 1f,
+                        onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val state = interaction.collectState()
     val colors = DeskTheme.colors
@@ -292,6 +342,9 @@ private fun SidebarItem(item: NavItem, selected: Boolean, collapsed: Boolean, ba
     val indicator by animateNavColor(stateBackground(state, selected))
     val iconTint by animateNavColor(if (selected) colors.accentText else colors.textSecondary)
     val labelColor by animateNavColor(if (selected) colors.onSelection else colors.text)
+    // a collapsed item centres its icon; the same start padding keeps it still while the panel opens
+    val collapsedStart: Dp = ((dimens.sidebarCollapsedWidth - 12.dp - dimens.icon) / 2).coerceAtLeast(0.dp)
+    val showLabel = !collapsed && open > 0.5f
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -304,22 +357,24 @@ private fun SidebarItem(item: NavItem, selected: Boolean, collapsed: Boolean, ba
                 if (collapsed) contentDescription = item.label
             }
             .deskClickable(interaction, onClick, role = Role.Tab)
-            .padding(horizontal = if (collapsed) 0.dp else 10.dp),
+            .padding(start = lerp(collapsedStart, 10.dp, open), end = if (showLabel) 10.dp else 0.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = if (collapsed) Arrangement.Center else Arrangement.Start,
+        horizontalArrangement = Arrangement.Start,
     ) {
         Icon(item.icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(dimens.icon))
-        if (!collapsed) {
+        if (showLabel) {
             Spacer(Modifier.width(10.dp))
-            Text(
-                text = item.label,
-                style = if (selected) DeskTheme.type.bodyStrong else DeskTheme.type.body,
-                color = labelColor,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            if (badge != null) Text(badge, style = DeskTheme.type.caption, color = colors.textTertiary, maxLines = 1)
+            Row(Modifier.weight(1f).alpha(labelAlpha(open)), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = item.label,
+                    style = if (selected) DeskTheme.type.bodyStrong else DeskTheme.type.body,
+                    color = labelColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                if (badge != null) Text(badge, style = DeskTheme.type.caption, color = colors.textTertiary, maxLines = 1)
+            }
         }
     }
 }
@@ -340,12 +395,28 @@ fun PageTopBar(
     onBack: (() -> Unit)? = null,
     backIcon: TopBarBackIcon = TopBarBackIcon.Back,
     actions: List<TopBarAction> = emptyList(),
+    scrolled: Boolean = false,
 ) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
     val latestOnBack by rememberUpdatedState(onBack)
     val (shown, overflow) = remember(actions) { splitTopBarActions(actions) }
-    Column(modifier.fillMaxWidth().background(colors.background)) {
+    // content scrolled beneath: the bar takes the chrome colour and a rule fades in, as Android's top app bar does
+    val background by animateColorAsState(if (scrolled) colors.chrome else colors.background, tween(DeskMotion.MEDIUM_MS), label = "topBar")
+    val ruleAlpha by animateFloatAsState(if (scrolled) 1f else 0f, tween(DeskMotion.MEDIUM_MS), label = "topBarRule")
+    val rule = colors.border
+    Column(
+        modifier
+            .fillMaxWidth()
+            .background(background)
+            // drawn over the bottom edge, so the bar keeps its height whether or not the rule shows
+            .drawBehind {
+                if (ruleAlpha > 0f) {
+                    val line = 1.dp.toPx()
+                    drawRect(rule.copy(alpha = rule.alpha * ruleAlpha), topLeft = Offset(0f, size.height - line), size = Size(size.width, line))
+                }
+            },
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth().heightIn(min = dimens.topBarHeight).padding(end = dimens.gapS),
             verticalAlignment = Alignment.CenterVertically,
