@@ -20,8 +20,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeDown
+import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import desktopkit.SampleFile
@@ -101,15 +105,17 @@ class KitScreenshotTest {
                     glassMode = glassMode,
                     moreActions = sampleMoreActions,
                     bottomBar = { ExpandablePlayer(player, mini = { SampleMiniPlayer(1) }, full = { SampleFullPlayer(1) }) },
-                ) { _, _ ->
-                    val state = list ?: rememberLazyListState()
-                    // scrolled, so rows pass under the top bar and the bottom glass
-                    LaunchedEffect(Unit) { state.scrollToItem(3, 20) }
-                    SampleTrackList(state)
-                }
+                ) { _, _ -> SampleTrackList(list ?: rememberLazyListState()) }
             }
         }
         compose.waitForIdle()
+        if (!expanded) {
+            // scrolled by a finger, so rows pass under the glass top bar; a short pull back brings the bottom bars back
+            compose.onNodeWithTag("tracks").performTouchInput { swipeUp(startY = bottom - 100f, endY = top + 100f, durationMillis = 800) }
+            compose.waitForIdle()
+            compose.onNodeWithTag("tracks").performTouchInput { swipeDown(startY = centerY - 150f, endY = centerY + 150f, durationMillis = 800) }
+            compose.waitForIdle()
+        }
         after()
         window(name)
     }

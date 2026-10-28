@@ -234,7 +234,8 @@ fun ExpandablePlayer(
     if (host != null) {
         val open by remember(state) { derivedStateOf { state.progress > 0f || state.targetValue == PlayerValue.Expanded } }
         if (open) {
-            OverlayLayer(host) { PlayerSheet(state, miniHeight, mini, full) }
+            // the collapse runs in this scope: the Back handler's own one ends once the player is no longer expanded
+            OverlayLayer(host) { PlayerSheet(state, miniHeight, mini, full, collapse = { scope.launch { state.collapse() } }) }
         }
     }
 }
@@ -247,6 +248,7 @@ private fun PlayerSheet(
     miniHeight: Dp,
     mini: @Composable () -> Unit,
     full: @Composable () -> Unit,
+    collapse: () -> Unit,
 ) {
     val colors = DeskTheme.colors
     val scope = rememberCoroutineScope()
@@ -297,7 +299,7 @@ private fun PlayerSheet(
         try {
             events.collect { event -> backProgress.snapTo(event.progress) }
             scope.launch { backProgress.animateTo(0f, tween(DeskMotion.LONG_MS, easing = DeskMotion.Emphasized)) }
-            state.collapse()
+            collapse()
         } catch (e: CancellationException) {
             scope.launch { backProgress.animateTo(0f, DeskMotion.gesture()) }
             throw e
