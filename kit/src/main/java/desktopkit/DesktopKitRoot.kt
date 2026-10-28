@@ -14,6 +14,7 @@ import desktopkit.input.trackInputMode
 import desktopkit.settings.DeskPreferences
 import desktopkit.shell.LocalWidthClass
 import desktopkit.shell.WidthClass
+import desktopkit.theme.Accent
 import desktopkit.theme.DeskColors
 import desktopkit.theme.DeskDimens
 import desktopkit.theme.DeskMotion
@@ -32,7 +33,9 @@ import desktopkit.theme.DesktopKitTheme
  * [desktopkit.theme.LocalMotionTier]). The insets are `WindowInsets.safeDrawing`, the on-screen keyboard
  * included: with `enableEdgeToEdge()` and `adjustResize` the content ends just above the
  * keyboard. The insets are consumed here, so an `imePadding()` further down adds nothing.
- * [fonts], [colors], [dimens] and [type] are passed to [DesktopKitTheme]. Typical use in `setContent { }`:
+ * [fonts], [colors], [dimens] and [type] are passed to [DesktopKitTheme]. [accent] overrides the stored
+ * accent without saving it, e.g. a colour taken from the playing track's artwork
+ * (`Accent.custom("Artwork", color)`); changes cross-fade in 150 ms. Typical use in `setContent { }`:
  *
  * ```
  * val prefs = rememberDeskPreferences()
@@ -50,12 +53,13 @@ fun DesktopKitRoot(
     colors: (DeskColors) -> DeskColors = { it },
     dimens: (DeskDimens) -> DeskDimens = { it },
     type: (InputMode, DeskFonts) -> DeskType = { mode, fonts -> DeskType.forMode(mode, fonts) },
+    accent: Accent = prefs.accent,
     content: @Composable (WidthClass) -> Unit,
 ) {
     val inputMode = rememberInputModeState()
     DesktopKitTheme(
         themeMode = prefs.themeMode,
-        accent = prefs.accent,
+        accent = accent,
         inputMode = inputMode.effective(prefs.density),
         fonts = fonts,
         colors = colors,

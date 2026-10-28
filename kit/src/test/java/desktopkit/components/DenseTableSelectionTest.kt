@@ -15,6 +15,9 @@ import androidx.compose.ui.input.InputModeManager
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -28,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import desktopkit.SampleFile
 import desktopkit.sampleFiles
+import desktopkit.settings.DeskPreferences
 import desktopkit.screenshots.ShellScreenshotTest
 import desktopkit.theme.DeskTheme
 import desktopkit.theme.DeskType
@@ -151,6 +155,48 @@ class DenseTableSelectionTest {
         row(4).performMouseInput { rightClick(center) }
         compose.waitForIdle()
         assertEquals(setOf(names[4]), selection)
+    }
+
+    @Test
+    fun escapeClearsTheSelection() {
+        selection = setOf(names[0], names[1])
+        table()
+        focus(1)
+        row(1).performKeyInput { pressKey(Key.Escape) }
+        assertEquals(emptySet<Any>(), selection)
+    }
+
+    /** The header's context menu is the column chooser; the choice is stored in DeskPreferences. */
+    @Test
+    fun columnChooserHidesAColumnAndRemembersIt() {
+        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        val prefs = DeskPreferences(context.getSharedPreferences("columns-test", android.content.Context.MODE_PRIVATE))
+        compose.runOnUiThread { compose.activity.actionBar?.hide() }
+        compose.setContent {
+            DesktopKitTheme(themeMode = ThemeMode.Dark, inputMode = InputMode.Pointer) {
+                Box(Modifier.fillMaxSize().background(DeskTheme.colors.background)) {
+                    DenseTable(
+                        columns = listOf(
+                            TableColumn<SampleFile>("Ad", ColumnWidth.Weight(1f), id = "name") { it.name },
+                            TableColumn<SampleFile>("Tür", ColumnWidth.Fixed(140.dp), id = "kind") { it.kind },
+                            TableColumn<SampleFile>("Boyut", ColumnWidth.Fixed(100.dp), alignEnd = true, mono = true, id = "size") { it.size },
+                        ),
+                        rows = sampleFiles,
+                        key = { it.name },
+                        onRowClick = { _, _ -> },
+                        columnsState = rememberTableColumnsState("files", prefs),
+                    )
+                }
+            }
+        }
+        compose.waitForIdle()
+        compose.onNodeWithText("Klasör").assertExists() // a "Tür" cell
+        compose.onNodeWithText("Tür").performMouseInput { rightClick(center) }
+        compose.waitForIdle()
+        compose.onNode(hasText("Tür") and hasAnyAncestor(isPopup())).performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("Klasör").assertDoesNotExist()
+        assertEquals(listOf("name", "kind", "size") to setOf("kind"), prefs.tableColumns("files"))
     }
 
     @Test
