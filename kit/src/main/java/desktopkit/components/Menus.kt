@@ -52,8 +52,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import desktopkit.theme.DeskGlass
 import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
+import desktopkit.theme.GlassMode
+import desktopkit.theme.GlassThickness
+import desktopkit.theme.glass
 
 /** One line of a menu bar drop-down or a context menu. */
 @Immutable
@@ -80,7 +84,9 @@ class MenuSpec(val title: String, val entries: () -> List<MenuEntry>)
  * the anchor point near the bottom edge, like desktop menus).
  *
  * Like Android's own pop-up menus it grows in from its corner while fading in (150 ms) and fades
- * out when closed (100 ms); with animations turned off in the system it simply appears.
+ * out when closed (100 ms); with animations turned off in the system it simply appears. Inside
+ * [desktopkit.shell.DesktopShell] the menu is frosted glass over the screen
+ * ([desktopkit.theme.DeskGlass]); elsewhere a solid raised surface with a shadow.
  */
 @Composable
 fun MenuPopup(
@@ -100,6 +106,7 @@ fun MenuPopup(
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
     val shape = RoundedCornerShape(dimens.radiusCard.coerceAtMost(10.dp))
+    val glassy = DeskGlass.source != null && DeskGlass.mode != GlassMode.Solid
     Popup(
         popupPositionProvider = remember(offset) { ClampedOffsetPositionProvider(offset) },
         onDismissRequest = onDismiss,
@@ -119,8 +126,9 @@ fun MenuPopup(
                 modifier = Modifier
                     .widthIn(min = minWidth, max = 420.dp)
                     .width(IntrinsicSize.Max)
-                    .shadow(12.dp, shape)
-                    .background(colors.surfaceRaised, shape)
+                    // a shadow would show through glass; solid menus keep it
+                    .then(if (glassy) Modifier else Modifier.shadow(12.dp, shape))
+                    .glass(DeskGlass.raised(colors, GlassThickness.Regular), shape)
                     .border(1.dp, colors.borderStrong, shape)
                     .verticalScroll(rememberScrollState())
                     .padding(4.dp),
@@ -159,7 +167,7 @@ internal fun MenuItemRow(item: MenuEntry.Item, onClick: () -> Unit) {
             .fillMaxWidth()
             .heightIn(min = dimens.rowHeight.coerceAtLeast(dimens.minTarget))
             .focusRing(state, shape)
-            .background(if (item.enabled) animatedStateBackground(state).value else colors.surfaceRaised, shape)
+            .background(if (item.enabled) animatedStateBackground(state).value else androidx.compose.ui.graphics.Color.Transparent, shape)
             .deskClickable(interaction, onClick, enabled = item.enabled, role = if (item.checked != null) Role.Checkbox else Role.Button)
             .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,

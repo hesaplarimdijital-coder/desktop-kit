@@ -22,7 +22,11 @@ data class NavSection(val title: String?, val items: List<NavItem>)
  *
  * @param footer pinned at the bottom of the sidebar and the rail (usually Settings).
  * @param bottomBar routes shown in the compact bottom bar, at most 4 (a fifth "More" tab is added when needed).
+ *   Three routes and [MoreStyle.Sheet] give the phone layout of a media app: three tabs and "⋯".
  * @param rail routes shown in the medium/expanded rail; by default the first 7 items.
+ * @param moreStyle what the phone's "More" tab opens: the "More" screen ([MoreStyle.Screen], as
+ *   before) or a glass sheet ([MoreStyle.Sheet]) listing the other screens and the app's own actions
+ *   (`DesktopShell(moreActions = …)`). The rail keeps the "More" screen.
  */
 @Immutable
 class ShellSpec(
@@ -32,6 +36,7 @@ class ShellSpec(
     bottomBar: List<String>? = null,
     rail: List<String>? = null,
     startRoute: String? = null,
+    val moreStyle: MoreStyle = MoreStyle.Screen,
 ) {
     val items: List<NavItem> = sections.flatMap { it.items } + listOfNotNull(footer)
     val startRoute: String = startRoute ?: items.first().route
@@ -64,4 +69,13 @@ class ShellSpec(
     companion object {
         const val MORE_ROUTE = "dk_more"
     }
+}
+
+/** What the phone's "More" tab opens; see [ShellSpec]. */
+enum class MoreStyle {
+    /** The "More" screen listing the screens that do not fit (0.2.0). */
+    Screen,
+
+    /** A "⋯" tab opening a glass sheet: the other screens, then the app's actions. */
+    Sheet,
 }

@@ -24,12 +24,23 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isAltPressed
@@ -52,10 +63,17 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import desktopkit.R
 import desktopkit.input.ContextMenuArea
+import desktopkit.settings.DeskPreferences
 import desktopkit.shell.WidthClass
 import desktopkit.shell.currentWidthClass
+import desktopkit.theme.DeskGlass
 import desktopkit.theme.DeskTheme
+import desktopkit.theme.GlassThickness
+import desktopkit.theme.glass
+import desktopkit.theme.glassSource
+import dev.chrisbanes.haze.HazeState
 import androidx.compose.ui.input.pointer.isCtrlPressed as pointerCtrl
 import androidx.compose.ui.input.pointer.isMetaPressed as pointerMeta
 import androidx.compose.ui.input.pointer.isShiftPressed as pointerShift
@@ -81,6 +99,8 @@ class TableColumn<T>(
      * column off phones so the name gets the room. Null (the default) shows it everywhere.
      */
     val hideBelow: WidthClass? = null,
+    /** Stable name of the column for [TableColumnsState] (order and visibility are stored by it); the title by default. */
+    val id: String = title,
     val value: (T) -> String,
 )
 
@@ -92,6 +112,11 @@ data class TableSort(val column: Int, val ascending: Boolean)
  * pointer mode (taller in touch mode), hover and selection states, keyboard focus per row.
  * [rowMenu] gives every row a context menu (right click, long press, Menu key).
  *
+ * The rows scroll beneath the header, which turns to frosted glass once they do ([glassHeader]).
+ * With [columnsState] the header's context menu (right click, long press, Menu key on a title) is
+ * the column chooser: show or hide columns, move one left or right, reset; [rememberTableColumnsState]
+ * keeps the choice in [desktopkit.settings.DeskPreferences].
+ *
  * Single selection: the app keeps [selectedKey] and usually sets it in [onRowClick].
  *
  * Multi-selection is on when [onSelectionChange] is set; the app keeps [selectedKeys] (keys as
@@ -99,7 +124,7 @@ data class TableSort(val column: Int, val ascending: Boolean)
  * - click: selects only that row and calls [onRowClick];
  * - Ctrl+click (Meta+click): adds or removes the row;
  * - Shift+click: selects the rows from the last clicked row to this one (Ctrl+Shift adds them);
- * - Ctrl+A on a focused row: selects every row; Shift+Up/Down extends from the focused row;
+ * - Ctrl+A on a focused row: selects every row; Shift+Up/Down extends from the focused row; Esc clears;
  * - [toggleOnClick]: every click or tap adds or removes its row, for an app's touch "select" mode;
  * - opening a row's menu on a selected row keeps the selection, on any other row selects just that row.
  * [onRowClick] runs for plain clicks only (not for Ctrl, Shift or [toggleOnClick] clicks).
@@ -123,11 +148,28 @@ fun <T> DenseTable(
     selectedKeys: Set<Any>? = null,
     onSelectionChange: ((Set<Any>) -> Unit)? = null,
     toggleOnClick: Boolean = false,
+    columnsState: TableColumnsState? = null,
+    glassHeader: Boolean = true,
 ) {
     val dimens = DeskTheme.dimens
+    val colors = DeskTheme.colors
+    val density = LocalDensity.current
     val widthClass = currentWidthClass()
     // original indices are kept: sorting and the strong first column refer to them
-    val shownColumns = columns.withIndex().filter { (_, column) -> column.hideBelow == null || widthClass >= column.hideBelow }
+    val arranged = columnsState?.arrange(columns) ?: columns.withIndex().toList()
+    val shownColumns = arranged.filter { (_, column) -> column.hideBelow == null || widthClass >= column.hideBelow }
+    val glassMode = DeskGlass.mode
+    val rowsGlass = remember { HazeState() }
+    // the rows start under the header; its height is known after the first layout
+    val headerPx = remember { mutableIntStateOf(with(density) { (dimens.minTarget.coerceAtLeast(28.dp) + 1.dp).roundToPx() }) }
+    val padding = remember(contentPadding, density) { HeaderPadding(contentPadding, headerPx, density) }
+    val scrolled by remember(state) { derivedStateOf { state.firstVisibleItemIndex > 0 || state.firstVisibleItemScrollOffset > 0 } }
+    val chooserLabels = ColumnChooserLabels(
+        title = stringResource(R.string.dk_columns),
+        moveLeft = stringResource(R.string.dk_columns_move_left),
+        moveRight = stringResource(R.string.dk_columns_move_right),
+        reset = stringResource(R.string.dk_columns_reset),
+    )
     val multi = onSelectionChange != null
     val selection = selectedKeys ?: emptySet()
     val tracker = remember { SelectionTracker() }
@@ -137,7 +179,7 @@ fun <T> DenseTable(
         tracker.anchor = result.anchor
         if (result.selection != selection) onSelectionChange?.invoke(result.selection)
     }
-    Column(
+    Box(
         modifier
             .fillMaxSize()
             .then(
@@ -169,6 +211,10 @@ fun <T> DenseTable(
                                 update(TableSelection.all(keysInOrder(), tracker.anchor))
                                 true
                             }
+                            event.key == Key.Escape && !command && selection.isNotEmpty() -> {
+                                update(TableSelection.clear())
+                                true
+                            }
                             (event.key == Key.DirectionUp || event.key == Key.DirectionDown) && event.isShiftPressed && !command -> {
                                 val focused = tracker.focused ?: return@onKeyEvent false
                                 val down = event.key == Key.DirectionDown
@@ -183,19 +229,7 @@ fun <T> DenseTable(
                     },
             ),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = dimens.minTarget.coerceAtLeast(28.dp))
-                .padding(horizontal = dimens.pagePadding - 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            shownColumns.forEach { (index, column) ->
-                HeaderCell(column, index, sort, onSortChange)
-            }
-        }
-        HorizontalRule()
-        LazyColumn(state = state, modifier = Modifier.fillMaxSize(), contentPadding = contentPadding) {
+        LazyColumn(state = state, modifier = Modifier.fillMaxSize().glassSource(rowsGlass, glassMode), contentPadding = padding) {
             itemsIndexed(rows, key = { _, item -> key(item) }) { index, item ->
                 val itemKey = key(item)
                 val onClick = {
@@ -232,7 +266,49 @@ fun <T> DenseTable(
                 }
             }
         }
+        // sticky header over the rows: glass once rows pass beneath it
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .onSizeChanged { headerPx.intValue = it.height }
+                .glass(DeskGlass.chrome(colors, GlassThickness.Thin), source = rowsGlass, mode = glassMode, enabled = glassHeader && scrolled),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = dimens.minTarget.coerceAtLeast(28.dp))
+                    .padding(horizontal = dimens.pagePadding - 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                shownColumns.forEach { (index, column) ->
+                    if (columnsState != null) {
+                        ContextMenuArea(
+                            entries = { columnChooserEntries(columns, columnsState, column.id, chooserLabels) },
+                            modifier = Modifier.cell(this, column.width),
+                            accessibilityLabel = chooserLabels.title,
+                        ) {
+                            Row { HeaderCell(column, index, sort, onSortChange, Modifier.weight(1f)) }
+                        }
+                    } else {
+                        HeaderCell(column, index, sort, onSortChange, Modifier.cell(this, column.width))
+                    }
+                }
+            }
+            HorizontalRule()
+        }
     }
+}
+
+/** The caller's padding with the header's height added on top. */
+private class HeaderPadding(
+    private val base: PaddingValues,
+    private val headerPx: androidx.compose.runtime.MutableIntState,
+    private val density: androidx.compose.ui.unit.Density,
+) : PaddingValues {
+    override fun calculateTopPadding() = base.calculateTopPadding() + with(density) { headerPx.intValue.toDp() }
+    override fun calculateBottomPadding() = base.calculateBottomPadding()
+    override fun calculateLeftPadding(layoutDirection: androidx.compose.ui.unit.LayoutDirection) = base.calculateLeftPadding(layoutDirection)
+    override fun calculateRightPadding(layoutDirection: androidx.compose.ui.unit.LayoutDirection) = base.calculateRightPadding(layoutDirection)
 }
 
 /** Keys held at the last press, the anchor of Shift ranges and the focused row; not state, nothing redraws from it. */
@@ -261,6 +337,9 @@ internal object TableSelection {
         }
     }
 
+    /** Esc: nothing selected, no anchor. */
+    fun clear(): Result = Result(emptySet(), null)
+
     /** Ctrl+A: every row; keeps the anchor. */
     fun all(keys: List<Any>, anchor: Any?): Result = Result(keys.toCollection(LinkedHashSet()), anchor)
 
@@ -287,7 +366,7 @@ internal object TableSelection {
 }
 
 @Composable
-private fun <T> RowScope.HeaderCell(column: TableColumn<T>, index: Int, sort: TableSort?, onSortChange: ((TableSort) -> Unit)?) {
+private fun <T> HeaderCell(column: TableColumn<T>, index: Int, sort: TableSort?, onSortChange: ((TableSort) -> Unit)?, modifier: Modifier) {
     val colors = DeskTheme.colors
     val interaction = remember { MutableInteractionSource() }
     val state = interaction.collectState()
@@ -295,11 +374,10 @@ private fun <T> RowScope.HeaderCell(column: TableColumn<T>, index: Int, sort: Ta
     val clickable = onSortChange != null && column.sortable
     val shape = RoundedCornerShape(4.dp)
     Row(
-        modifier = Modifier
-            .cell(this, column.width)
+        modifier = modifier
             .heightIn(min = DeskTheme.dimens.minTarget)
             .focusRing(state, shape)
-            .background(if (clickable) stateBackground(state) else colors.background, shape)
+            .background(if (clickable) stateBackground(state) else Color.Transparent, shape)
             .then(
                 if (clickable) Modifier.deskClickable(interaction, {
                     onSortChange?.invoke(TableSort(index, if (active) !(sort?.ascending ?: true) else true))
@@ -362,5 +440,137 @@ private fun Modifier.cell(scope: RowScope, width: ColumnWidth): Modifier = with(
     when (width) {
         is ColumnWidth.Weight -> this@cell.weight(width.weight)
         is ColumnWidth.Fixed -> this@cell.width(width.width)
+    }
+}
+
+/** Texts of the column chooser menu. */
+internal class ColumnChooserLabels(val title: String, val moveLeft: String, val moveRight: String, val reset: String)
+
+/**
+ * The column chooser as menu entries: every column with a check mark (the last visible one cannot
+ * be hidden), then "move left/right" for [clickedId] and "reset".
+ */
+internal fun <T> columnChooserEntries(
+    columns: List<TableColumn<T>>,
+    state: TableColumnsState,
+    clickedId: String,
+    labels: ColumnChooserLabels,
+): List<MenuEntry> {
+    val ids = columns.map { it.id }
+    val (order, hidden) = TableColumnsLayout.normalize(ids, state.order, state.hidden)
+    val visibleCount = order.count { it !in hidden }
+    val byId = columns.associateBy { it.id }
+    val toggles = order.mapNotNull { id ->
+        val column = byId[id] ?: return@mapNotNull null
+        val visible = id !in hidden
+        MenuEntry.Item(column.title, { state.toggle(id, ids) }, checked = visible, enabled = !(visible && visibleCount <= 1))
+    }
+    val visibleOrder = order.filter { it !in hidden }
+    val position = visibleOrder.indexOf(clickedId)
+    return toggles + MenuEntry.Separator + listOf(
+        MenuEntry.Item(labels.moveLeft, { state.move(clickedId, -1, ids) }, icon = DeskIcons.ChevronLeft, enabled = position > 0),
+        MenuEntry.Item(labels.moveRight, { state.move(clickedId, 1, ids) }, icon = DeskIcons.ChevronRight,
+            enabled = position >= 0 && position < visibleOrder.size - 1),
+        MenuEntry.Separator,
+        MenuEntry.Item(labels.reset, { state.reset() }),
+    )
+}
+
+/**
+ * Which columns a [DenseTable] shows and in what order, by [TableColumn.id]. Columns the state
+ * does not know yet (added in a later app version) are appended visible; stored ids that no
+ * longer exist are ignored. At least one column always stays visible.
+ */
+@Stable
+class TableColumnsState(
+    initialOrder: List<String> = emptyList(),
+    initialHidden: Set<String> = emptySet(),
+    private val onChange: (order: List<String>, hidden: Set<String>) -> Unit = { _, _ -> },
+) {
+    var order: List<String> by mutableStateOf(initialOrder)
+        private set
+    var hidden: Set<String> by mutableStateOf(initialHidden)
+        private set
+
+    /** The shown columns of [columns] in the chosen order, with their original indices. */
+    fun <T> arrange(columns: List<TableColumn<T>>): List<IndexedValue<TableColumn<T>>> {
+        val ids = columns.map { it.id }
+        val (order, hidden) = TableColumnsLayout.normalize(ids, order, hidden)
+        return order.filter { it !in hidden }.map { id -> ids.indexOf(id).let { IndexedValue(it, columns[it]) } }
+    }
+
+    /** Shows or hides [id] among [ids] (the table's columns). */
+    fun toggle(id: String, ids: List<String>) {
+        val (order, hidden) = TableColumnsLayout.normalize(ids, order, hidden)
+        store(order, TableColumnsLayout.toggle(order, hidden, id))
+    }
+
+    /** Moves [id] [delta] places among the visible columns (negative: towards the start). */
+    fun move(id: String, delta: Int, ids: List<String>) {
+        val (order, hidden) = TableColumnsLayout.normalize(ids, order, hidden)
+        store(TableColumnsLayout.move(order, hidden, id, delta), hidden)
+    }
+
+    /** Back to the table's own order, every column visible. */
+    fun reset() = store(emptyList(), emptySet())
+
+    private fun store(order: List<String>, hidden: Set<String>) {
+        this.order = order
+        this.hidden = hidden
+        onChange(order, hidden)
+    }
+
+    companion object {
+        val Saver: Saver<TableColumnsState, List<String>> = Saver(
+            save = { listOf(it.order.joinToString("\u001F"), it.hidden.joinToString("\u001F")) },
+            restore = { TableColumnsState(it[0].split('\u001F').filter(String::isNotEmpty), it[1].split('\u001F').filter(String::isNotEmpty).toSet()) },
+        )
+    }
+}
+
+/**
+ * A [TableColumnsState] for the table [key], stored in [prefs] so the choice survives restarts;
+ * without [prefs] only in the saved instance state.
+ */
+@Composable
+fun rememberTableColumnsState(key: String, prefs: DeskPreferences? = null): TableColumnsState {
+    if (prefs != null) {
+        return remember(prefs, key) {
+            val stored = prefs.tableColumns(key)
+            TableColumnsState(stored?.first.orEmpty(), stored?.second.orEmpty()) { order, hidden -> prefs.updateTableColumns(key, order, hidden) }
+        }
+    }
+    return rememberSaveable(key, saver = TableColumnsState.Saver) { TableColumnsState() }
+}
+
+/** The column chooser's rules, free of Compose so they can be tested on their own. */
+internal object TableColumnsLayout {
+
+    /** Stored [order] limited to [ids], new ids appended; [hidden] limited to [ids], never every column. */
+    fun normalize(ids: List<String>, order: List<String>, hidden: Set<String>): Pair<List<String>, Set<String>> {
+        val known = order.filter { it in ids }.distinct()
+        val full = known + ids.filter { it !in known }
+        val hide = hidden.filter { it in ids }.toSet()
+        return full to if (full.all { it in hide }) hide - full.first() else hide
+    }
+
+    /** Hides a visible [id] (unless it is the last visible one) or shows a hidden one. */
+    fun toggle(order: List<String>, hidden: Set<String>, id: String): Set<String> = when {
+        id in hidden -> hidden - id
+        order.count { it !in hidden } <= 1 -> hidden
+        else -> hidden + id
+    }
+
+    /** Swaps [id] with its [delta]-th visible neighbour; hidden columns keep their places. */
+    fun move(order: List<String>, hidden: Set<String>, id: String, delta: Int): List<String> {
+        val visible = order.filter { it !in hidden }
+        val from = visible.indexOf(id)
+        if (from < 0 || delta == 0) return order
+        val to = (from + delta).coerceIn(0, visible.size - 1)
+        if (to == from) return order
+        val newVisible = visible.toMutableList().apply { add(to, removeAt(from)) }
+        // put the visible ids back into the slots visible ids occupied
+        var next = 0
+        return order.map { if (it in hidden) it else newVisible[next++] }
     }
 }

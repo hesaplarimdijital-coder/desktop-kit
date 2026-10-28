@@ -37,4 +37,18 @@
     <string name="dk_density_auto">Automatic (follows mouse or touch)</string>
     <string name="dk_density_touch">Touch</string>
     <string name="dk_density_pointer">Mouse and keyboard</string>
+
+    <!-- 1.0: player, sheets, tables, workstation, dialogs -->
+    <string name="dk_player">Player</string>
+    <string name="dk_player_expand">Open the player</string>
+    <string name="dk_player_collapse">Close the player</string>
+    <string name="dk_columns">Columns</string>
+    <string name="dk_columns_move_left">Move left</string>
+    <string name="dk_columns_move_right">Move right</string>
+    <string name="dk_columns_reset">Reset columns</string>
+    <string name="dk_inspector">Inspector</string>
+    <string name="dk_inspector_show">Show the inspector</string>
+    <string name="dk_inspector_hide">Hide the inspector</string>
+    <string name="dk_resize_inspector">Resize the inspector</string>
+    <string name="dk_key_esc">Esc</string>
 </resources>

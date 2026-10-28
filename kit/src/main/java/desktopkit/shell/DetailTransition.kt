@@ -31,6 +31,8 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.dp
 import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
+import desktopkit.theme.LocalMotionTier
+import desktopkit.theme.MotionTier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -47,7 +49,8 @@ import kotlinx.coroutines.launch
  *   swipe came from; letting go closes it with [onBack], swiping back cancels and it springs back.
  *   On older Android versions the Back button or gesture simply closes it.
  *
- * Works in every width class. The Back gesture is taken over while a detail is shown, also from a
+ * On a phone the slides run on the gesture spring ([desktopkit.theme.MotionTier.Gesture]); from tablet
+ * width up on the timed curves above; with reduced motion the detail simply appears. Works in every width class. The Back gesture is taken over while a detail is shown, also from a
  * [CompactTopBar] inside it (both normally call the same close function), unless [handleBack] is false.
  * [detailKey] tells details apart (the default compares the values); [animate] false switches
  * without motion, e.g. for screenshot tests.
@@ -64,6 +67,7 @@ fun <T : Any> DetailTransition(
     detailContent: @Composable (T) -> Unit,
 ) {
     val colors = DeskTheme.colors
+    val tier = LocalMotionTier.current
     val scope = rememberCoroutineScope()
     val backProgress = remember { Animatable(0f) }
     var swipeEdge by remember { mutableIntStateOf(BackEventCompat.EDGE_LEFT) }
@@ -80,7 +84,7 @@ fun <T : Any> DetailTransition(
                 val p = backProgress.value
                 drawRect(if (p > 0f) lerp(page, behind, p) else page)
             },
-        transitionSpec = { detailTransform(initialState, targetState, animate) },
+        transitionSpec = { detailTransform(initialState, targetState, animate, tier) },
         contentKey = { it?.let(detailKey) },
         label = "detailTransition",
     ) { target ->
@@ -136,10 +140,20 @@ fun <T : Any> DetailTransition(
     }
 }
 
-private fun <T> detailTransform(initial: T?, target: T?, animate: Boolean): ContentTransform {
-    if (!animate) return fadeIn(tween(0)) togetherWith fadeOut(tween(0))
+private fun <T> detailTransform(initial: T?, target: T?, animate: Boolean, tier: MotionTier): ContentTransform {
+    if (!animate || tier == MotionTier.Reduced) return fadeIn(tween(0)) togetherWith fadeOut(tween(0))
     val opening = initial == null && target != null
     val closing = initial != null && target == null
+    if (tier == MotionTier.Gesture && (opening || closing)) {
+        // phone: the slide is the interruptible gesture spring, the fades stay short and timed
+        val direction = if (opening) 1 else -1
+        return (slideInHorizontally(DeskMotion.gesture()) { direction * it / 10 } +
+            fadeIn(tween(DeskMotion.MEDIUM_MS, delayMillis = 50, easing = DeskMotion.StandardDecelerate)))
+            .togetherWith(
+                slideOutHorizontally(DeskMotion.gesture()) { -direction * it / 10 } +
+                    fadeOut(tween(DeskMotion.SHORT_MS, easing = DeskMotion.StandardAccelerate)),
+            )
+    }
     return when {
         opening ->
             (slideInHorizontally(tween(DeskMotion.LONG_MS + 50, easing = DeskMotion.EmphasizedDecelerate)) { it / 10 } +

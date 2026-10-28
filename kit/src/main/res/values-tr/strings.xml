@@ -37,4 +37,18 @@
     <string name="dk_density_auto">Otomatik (fare ya da dokunmaya göre)</string>
     <string name="dk_density_touch">Dokunmatik</string>
     <string name="dk_density_pointer">Fare ve klavye</string>
+
+    <!-- 1.0: oynatıcı, sayfalar, tablolar, iş istasyonu, iletişim kutuları -->
+    <string name="dk_player">Oynatıcı</string>
+    <string name="dk_player_expand">Oynatıcıyı aç</string>
+    <string name="dk_player_collapse">Oynatıcıyı küçült</string>
+    <string name="dk_columns">Sütunlar</string>
+    <string name="dk_columns_move_left">Sola taşı</string>
+    <string name="dk_columns_move_right">Sağa taşı</string>
+    <string name="dk_columns_reset">Sütunları sıfırla</string>
+    <string name="dk_inspector">Ayrıntı paneli</string>
+    <string name="dk_inspector_show">Ayrıntı panelini göster</string>
+    <string name="dk_inspector_hide">Ayrıntı panelini gizle</string>
+    <string name="dk_resize_inspector">Ayrıntı panelini boyutlandır</string>
+    <string name="dk_key_esc">Esc</string>
 </resources>

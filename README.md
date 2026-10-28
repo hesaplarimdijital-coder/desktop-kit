@@ -8,19 +8,26 @@ arayüzünden çıkarıldı. Klavye, fare, sağ tık ve dokunmatik aynı uygulam
   yığını ve kaydırma konumu korunur. Sığmayan ekranlar otomatik bir **"Daha fazla"** ekranında listelenir.
   Ekran geçişleri canlandırılır (telefonda fade-through, geniş pencerede kısa geçiş); telefonun üst
   çubuğunu ekran kendisi değiştirebilir (`CompactTopBar`).
-- **Telefona göre:** telefonda alt çubuk 64 dp, satırlar 52 dp; içerik kaydırılınca alt çubuk çekilir, yukarı
-  kaydırınca geri gelir. Chip filtreler tek satırda yana kayar, gereksiz tablo sütunları gizlenir, ayar
+- **Buzlu cam:** telefonun alt ve üst çubuğu, oynatıcı şeridi, alt sayfalar ve menüler arkalarındaki içeriği
+  bulanıklaştırır (Android 12+); eski sürümlerde yarı saydam, pil tasarrufunda opak.
+- **Telefona göre:** telefonda alt çubuk 64 dp, satırlar 52 dp; içerik çubukların altından geçer, kaydırılınca
+  alt çubuk çekilir (yalnızca çizimde, ekran yeniden ölçülmez), yukarı kaydırınca geri gelir. Üç sekme ve "⋯",
+  genişleyen oynatıcı. Chip filtreler tek satırda yana kayar, gereksiz tablo sütunları gizlenir, ayar
   satırları sığmazsa alt alta dizilir. Tablet ve DeX'te yazılar bir punto büyük, düzen aynı.
-- **Android hareketleri:** fade-through ve paylaşılan eksen geçişleri, öngörülü geri hareketi
-  (`DetailTransition`), akıcı kenar çubuğu, köşeden açılan menüler, yaylanan gezinme göstergesi ve dokunma
-  geri bildirimi. Hepsi sistemin animasyon ölçeğine uyar.
+- **Android hareketleri:** telefonda parmağı izleyen, kesilebilen yaylar; tablet ve DeX'te kısa, süreli
+  geçişler. Fade-through ve paylaşılan eksen geçişleri, öngörülü geri hareketi (`DetailTransition`, genişleyen
+  oynatıcı), akıcı kenar çubuğu, köşeden açılan menüler, yaylanan gezinme göstergesi ve dokunma geri bildirimi.
+  Hepsi sistemin animasyon ölçeğine uyar.
+- **İş istasyonu:** tablet ve DeX'te kenar çubuğu, ana bölme ve sekmeli, boyutlandırılabilir ayrıntı paneli;
+  yüzen cam oynatıcı çubuğu.
 - **İki yoğunluk:** fare veya touchpad kullanılınca sıkı düzen (24 dp hedef), parmakla
   dokununca geniş düzen (48 dp). Geçiş otomatiktir; kullanıcı ayarlardan sabitleyebilir.
 - **Tema:** açık, koyu ve OLED siyah. Dört hazır vurgu rengi var; istediğin markanın rengini de
   verebilirsin. Tüm metinler WCAG AA kontrastını (4.5:1) testle sağlar.
 - **Bileşenler:** düğme, simge düğmesi, segment ve renk seçimi, kaydırıcı (tekerlek ve ok
-  tuşları), yoğun tablo (sıralama, seçim, satır menüsü), bölünmüş panel, menü çubuğu, sağ tık
-  menüsü (sağ tık, iki parmak dokunma, uzun basma, Menu tuşu), ipucu (tooltip), ayar satırı.
+  tuşları), yoğun tablo (sıralama, çoklu seçim, sütun seçici, satır menüsü), bölünmüş panel, menü çubuğu, sağ tık
+  menüsü (sağ tık, iki parmak dokunma, uzun basma, Menu tuşu), "⋯" sayfası, iletişim kutusu, ipucu (tooltip),
+  ayar satırı.
   Her birinde üzerine gelme, odak halkası ve basılı durumu var ve testle denetleniyor.
 - **Klavye kısayolları:** tek tablodan menü çubuğu, ipuçları, ayarlardaki liste ve sistemin
   Meta+/ listesi üretilir.
@@ -48,12 +55,14 @@ Uygulama modülünün `build.gradle.kts` dosyası:
 
 ```kotlin
 dependencies {
-    implementation("com.github.hesaplarimdijital-coder:desktop-kit:0.2.0")
-    implementation("androidx.activity:activity-compose:1.9.3")
+    implementation("com.github.hesaplarimdijital-coder:desktop-kit:1.0.0")
+    implementation("androidx.activity:activity-compose:1.10.1")
 }
 ```
 
-Gereksinimler: `minSdk` 21 ve Compose açık (`buildFeatures { compose = true }` ile Kotlin Compose eklentisi).
+Gereksinimler: `minSdk` 21, `compileSdk` 35 ve Compose açık (`buildFeatures { compose = true }` ile Kotlin Compose
+eklentisi). Kit Compose BOM 2024.12.01 (Compose 1.7) ile derlenir ve buzlu cam için
+[Haze](https://github.com/chrisbanes/haze) 1.5.4'ü (Apache-2.0) getirir.
 
 ## Yeni uygulama: en kısa hâli
 
@@ -157,7 +166,7 @@ Değerlere doğrudan erişim için `DeskTheme.colors.text`, `DeskTheme.type.body
 | `DeskButton`, `DeskIconButton` | `primary`, `selected`, `enabled` |
 | `SegmentedChoice`, `SwatchChoice`, `SettingRow` | Ayar ekranları için |
 | `DeskSlider` | 0..1 değer; sürükleme, tıklama, fare tekerleği, ok/Home/End, TalkBack |
-| `DenseTable` | Sabit başlık, sıralama, seçili satır, `rowMenu` ile satır başına sağ tık menüsü. Çoklu seçim için aşağıya bak. |
+| `DenseTable` | Cam başlık, sıralama, seçili satır, `rowMenu` ile satır başına sağ tık menüsü. Çoklu seçim ve sütun seçici için aşağıya bak. |
 | `HorizontalSplitPane`, `TwoPane` | Sürüklenebilir ve klavyeyle taşınabilir ayırıcı |
 | `ContextMenuArea`, `Modifier.contextMenuGesture` | Sağ tık, uzun basma, Menu tuşu, Shift+F10 |
 | `MenuPopup`, `MenuBarMenus`, `MenuEntry` | Kenarda taşmayan menüler |
@@ -167,6 +176,154 @@ Değerlere doğrudan erişim için `DeskTheme.colors.text`, `DeskTheme.type.body
 | `AppearanceSection`, `InputSection`, `ShortcutListSection`, `SettingsSection` | Hazır ayar bölümleri |
 | `DeskChip`, `ChipRow`, `FilterChips` | Filtre chip'leri: telefonda tek satır yana kayar, genişte sarar (aşağıya bak) |
 | `DetailTransition` | Liste → ayrıntı geçişi ve öngörülü geri hareketi (aşağıya bak) |
+| `ExpandablePlayer` | Telefonda mini oynatıcıdan tam ekrana büyüyen oynatıcı, yana kaydırarak parça atlama (aşağıya bak) |
+| `MoreSheet`, `MoreButton`, `GlassBottomSheet`, `ActionGroup` | "⋯" eylemleri: telefonda cam alt sayfa, genişte menü |
+| `WorkstationLayout`, `InspectorPane`, `InspectorToggleButton` | Tablet ve DeX'te sekmeli, boyutlandırılabilir ayrıntı paneli |
+| `DeskDialog`, `DialogFrame`, `DialogDismissButton` | İletişim kutusu; klavye varsa "Esc", yoksa × |
+
+### Buzlu cam
+
+Kabuk içerik alanını cam kaynağı yapar; çubuklar, sayfalar ve menüler onu bulanıklaştırarak çizer.
+
+| Cihaz durumu | Görünüm |
+| --- | --- |
+| Android 12+ (API 31), donanım çizimi | Bulanık cam (Haze) |
+| Android 11 ve öncesi | Yarı saydam düz yüzey, bulanıklık yok |
+| Pil tasarrufu ya da "Animasyonları kaldır" | Opak yüzey, içerik kaydedilmez |
+
+- Cam yüzeyler: telefonda alt çubuk ve oynatıcı şeridi, içerik altına kaydıkça üst çubuk, alt sayfalar, menüler
+  ve sağ tık menüleri; tablet ve DeX'te tablonun başlığı, yüzen oynatıcı çubuğu ve menüler. **Başka yüzeyi cam
+  yapmadan önce düşün:** her bulanık yüzey her karede ayrı bir GPU geçişidir. Büyük, sık değişen alanlarda
+  (tam ekran oynatıcı, liste satırları) kullanma.
+- Kendi yüzeyin için: `Modifier.glass(DeskGlass.chrome(DeskTheme.colors, GlassThickness.Thin))`. `chrome` çubuklar
+  için, `raised` menü ve sayfalar için. Yazı taşıyan yüzeyde `Thin` ya da `Regular` kullan; ikisi de arkada en
+  kötü içerik varken bile yazıyı 4.5:1'de tutar. `UltraThin` yalnızca yazısız yüzeyler için.
+- Kendi cam kaynağın (örneğin bir listenin üstünde duran başlık): `val kaynak = remember { HazeState() }`, listede
+  `Modifier.glassSource(kaynak, DeskGlass.mode)`, başlıkta `Modifier.glass(malzeme, source = kaynak)`. Cam, kendi
+  kaynağının içinde olamaz; kardeş olmalı.
+- `DesktopShell(glass = false)` her şeyi düz yapar. `LocalGlassMode provides GlassMode.Translucent` bir alt ağaç
+  için kipi sabitler (testler, ekran görüntüsü).
+- Bulanık cam kaynağı yazılım tuvaline çizilemez: pencereyi `View.draw(Canvas(bitmap))` ile resme dökeceksen o sırada
+  `LocalGlassMode` ile `Translucent` ver ya da `PixelCopy` kullan. Robolectric testlerinde kit bunu kendisi yapar.
+
+### Telefonda içerik çubukların altında
+
+Telefonda içerik pencerenin tamamını kaplar; üst çubuk, oynatıcı şeridi ve alt çubuk üstüne biner. Çubukların
+altına uzanan ekran, kapladıkları yeri kabuktan alır ve listesinin uçlarına ekler:
+
+```kotlin
+@Composable
+fun Sarkilar() {
+    val bosluk = rememberShellContentPadding()    // üst: üst çubuk; alt: oynatıcı + alt çubuk
+    LazyColumn(contentPadding = bosluk + PaddingValues(bottom = 8.dp)) { … }
+}
+```
+
+- İlk satır üst çubuğun altında, son satır alt çubuğun üstünde durabilir; arada satırlar camın altından geçer.
+- Kaydırınca alt çubuk ve oynatıcı yalnızca çizimde kayar (`graphicsLayer`): ekran yeniden ölçülmez, yeniden
+  oluşturulmaz. 120 Hz'de bile kare başına iş yalnızca listenin kendisi.
+- Kaydırılmayan ekran için `Modifier.shellContentPadding()`.
+- `rememberShellContentPadding()` çağırmayan ekranlar eskisi gibi çubukların arasına yerleşir; 0.2.0 ekranları
+  değiştirmeden aynı görünür (yalnızca onlar çubuk kayarken yeniden ölçülür).
+- Tablet ve DeX'te boşluk sıfırdır; yalnızca `DesktopShell(floatingPlayer = true)` iken altta yüzen oynatıcının yeri gelir.
+
+### Hareket katmanları
+
+| Pencere | Yer değiştiren, sürüklenen | Solma, renk |
+| --- | --- | --- |
+| Telefon (`WidthClass.Compact`) | `DeskMotion.gesture()`: sekmesiz, `StiffnessMediumLow` yay; kesilebilir, fırlatma hızını alır | Kısa, süreli |
+| Tablet ve DeX | 0.2.0 süreleri: 90 ms solma, 210 ms %98→%100 büyüme, DeX'te 150 ms geçiş, 300 ms panel | Aynı |
+| "Animasyonları kaldır" | Anında | Anında |
+
+Kendi animasyonların için `DeskMotion.spatial(LocalMotionTier.current, tween(300))` (telefonda yay, genişte verilen
+süre, azaltılmış harekette atlama) ve `DeskMotion.fade(tier, tween(150))`. View kodunda
+`ViewAnimators.bind(view).start(animator)`, Compose'da `rememberViewAnimators()`: ekran kapanınca ve yapılandırma
+değişince animatör durur ve son değerine atlar.
+
+### Genişleyen oynatıcı (telefon)
+
+```kotlin
+val oynatici = rememberExpandablePlayerState()
+DesktopShell(…, bottomBar = { tur ->
+    if (tur == NavKind.BottomBar) {
+        ExpandablePlayer(
+            state = oynatici,
+            mini = { MiniOynatici() },          // şerit; camı kit çizer
+            full = { TamOynatici(kapat = { kapsam.launch { oynatici.collapse() } }) },
+            onPrevious = calar::onceki,
+            onNext = calar::sonraki,
+        )
+    } else {
+        CalmaCubugu()                           // tablet ve DeX
+    }
+})
+```
+
+- Mini oynatıcı yukarı sürüklenince ya da dokununca büyür; tam oynatıcı aşağı sürüklenince küçülür. Yarı yolu
+  geçmişse ya da hızlı fırlatıldıysa açılır, yoksa geri döner; yerleşme fırlatma hızını alan bir yaydır.
+- Perde, miniden tama geçiş ve alt çubuğun çekilmesi parmağı izler (`oynatici.progress`, çizimde okunur).
+- Öngörülü geri hareketi tam oynatıcıyı küçültür ve kapatır.
+- Mini oynatıcıyı sola kaydırmak `onNext`, sağa `onPrevious`; şerit parmağı izler, eşikte titreşir, eşiğe
+  varmazsa yaylanarak geri gelir.
+
+### "⋯" eylemleri ve telefonda 3 sekme
+
+```kotlin
+MoreButton(groups = {
+    listOf(
+        ActionGroup(null, listOf(MenuEntry.Item("Sıradaki yap", ::siradaki, icon = DeskIcons.Play))),
+        ActionGroup("Git", listOf(MenuEntry.Item("Sanatçı", ::sanatci, icon = DeskIcons.Artists))),
+    )
+})
+```
+
+Telefonda cam alt sayfa, genişte menü. Klavyeyle gezilir; Esc, Geri ya da aşağı kaydırmak kapatır.
+
+Telefonda üç sekme ve "⋯": `ShellSpec(bottomBar = listOf("muzik", "podcast", "radyo"), moreStyle = MoreStyle.Sheet)`.
+"⋯" sığmayan ekranları bölümleriyle ve `DesktopShell(moreActions = listOf(ActionGroup(…)))` eylemlerini listeler.
+
+### İş istasyonu (tablet ve DeX)
+
+```kotlin
+val panel = rememberInspectorState(prefs)            // genişlik ve açık/kapalı saklanır
+WorkstationLayout(
+    state = panel,
+    main = { Kitaplik() },
+    inspector = {
+        InspectorPane(sekmeler, selected = panel.selectedTab, onSelect = { panel.selectedTab = it },
+            onCollapse = panel::toggle) { sekme -> SekmeIcerigi(sekme) }
+    },
+)
+```
+
+Ayırıcı sürüklenir ya da odaktayken ←/→ ile taşınır. Telefonda yalnızca `main` görünür. Paneli araç çubuğundan
+açıp kapatmak için `InspectorToggleButton(panel)`.
+
+### Tablo sütunları
+
+```kotlin
+DenseTable(…, columnsState = rememberTableColumnsState("sarkilar", prefs))
+```
+
+Başlığa sağ tık, uzun basma ya da Menu tuşu: sütunları göster/gizle, sola/sağa taşı, sıfırla. Seçim saklanır;
+sütunlar `TableColumn(id = "sure")` ile tanınır. Satırlar başlığın altından geçerken başlık cama döner.
+
+### İletişim kutusu
+
+```kotlin
+if (acik) DeskDialog(onDismiss = { acik = false }, title = "Listeyi kaydet", actions = {
+    DeskButton("Vazgeç", { acik = false })
+    DeskButton("Kaydet", ::kaydet, primary = true)
+}) { … }
+```
+
+Başlığın yanındaki kapatma işareti klavye bağlıyken "Esc", dokunmatikte × düğmesidir. Kendi çerçevende
+`DialogDismissButton()` aynı kuralı `LocalDialogDismiss` üzerinden uygular.
+
+### Vurgu rengi
+
+Vurgu (ve camın tonu) değişince renkler 150 ms'de geçer. Çalan parçanın kapağından vurgu almak için
+`DesktopKitRoot(prefs, accent = Accent.custom("Kapak", kapakRengi))`; saklanan vurgu değişmez.
 
 ### Chip filtreler
 
@@ -242,8 +399,8 @@ DenseTable(
 ### Ekran geçişleri
 
 `DesktopShell(transitions = ShellTransitions.Default)` (varsayılan): telefonda (alt çubuklu düzen)
-ekranlar arasında fade-through: eski ekran 90 ms'de solar, yenisi 210 ms'de belirirken %98'den tam
-boyuta büyür. Ray ve kenar çubuklu düzende (tablet, DeX) hareketsiz, 150 ms'lik kısa bir geçiş.
+ekranlar arasında fade-through: eski ekran 90 ms'de solar, yenisi 210 ms'de belirirken %96'dan tam
+boyuta yaylanarak büyür. Ray ve kenar çubuklu düzende (tablet, DeX) hareketsiz, 150 ms'lik kısa bir geçiş.
 Geri dönüş aynı biçimde. Süreler sistemin animasyon ölçeğine uyar ("Animasyonları kaldır" açıksa
 geçiş olmaz). Alt çubuk, ray ve kenar çubuğundaki seçim rengi 150 ms'de yumuşakça değişir.
 `ShellTransitions.None` geçişi kapatır (ekran görüntüsü testleri için).
@@ -256,7 +413,8 @@ hareketi geçişi parmakla oynatır.
 ### Telefonda kaydırma ve boyutlar
 
 - `hideBarsOnScroll = true` (varsayılan): içerik aşağı kaydırılınca alt çubuk ve üstündeki şerit çekilir, yukarı
-  kaydırınca gelir; ekran değişince hep görünür başlar. Üst çubuk kaydırılmış içerikte çerçeve rengini alır.
+  kaydırınca gelir; ekran değişince hep görünür başlar. Üst çubuk kaydırılmış içerikte cama döner ve altında ince
+  bir çizgi belirir.
 - `compactSizes = true` (varsayılan): alt çubuk 64 dp, dokunmatik satır 52 dp.
 - `largeWindowTextStep = 1f` (varsayılan): tablet ve DeX'te her yazı 1 sp büyük. `0f` eski boyutlar.
 
@@ -310,13 +468,14 @@ CompactTopBar(
 ## Sürüm yayınlamak
 
 1. `CHANGELOG.md` dosyasına ne değiştiğini yaz.
-2. Etiketle ve gönder: `git tag 0.2.0 && git push origin 0.2.0`
-3. JitPack ilk istekte derler. Uygulamada sürümü `0.2.0` yapman yeterli.
+2. Etiketle ve gönder: `git tag 1.0.0 && git push origin 1.0.0`
+3. JitPack ilk istekte derler. Uygulamada sürümü `1.0.0` yapman yeterli.
 
 Sürüm numaraları [SemVer](https://semver.org/lang/tr/) kuralına uyar: uyumu bozan değişiklik
-ana sürümü artırır. `1.0.0` öncesinde ikinci sayı artırılır.
+ana sürümü, yeni özellik ikinci sayıyı, düzeltme üçüncüyü artırır.
 
 ## Lisans
 
 Kod: [Apache License 2.0](LICENSE). Yazı tipi: IBM Plex, [SIL Open Font License 1.1](licenses/OFL-IBM-Plex.txt).
+Buzlu cam: [Haze](https://github.com/chrisbanes/haze), Apache License 2.0.
 Ayrıntılar [NOTICE](NOTICE) dosyasında.

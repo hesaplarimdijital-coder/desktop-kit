@@ -61,6 +61,9 @@ dependencies {
     api(libs.compose.foundation)
     api(libs.compose.material3)
     api(libs.navigation.compose)
+    // frosted glass for the chrome (bars, sheets, menus); see desktopkit.theme.DeskGlass
+    api(libs.haze)
+    api(libs.haze.materials)
     implementation(libs.compose.ui.tooling.preview)
     // BackHandler for CompactTopBar; navigation-compose already brings it in
     implementation(libs.activity.compose)

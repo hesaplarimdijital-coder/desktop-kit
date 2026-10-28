@@ -66,8 +66,11 @@ import desktopkit.components.deskClickable
 import desktopkit.components.focusRing
 import desktopkit.components.pressScale
 import desktopkit.components.stateBackground
+import desktopkit.theme.DeskGlass
 import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
+import desktopkit.theme.GlassThickness
+import desktopkit.theme.glass
 
 /** Item counts and badges shown next to sidebar entries ("4 812", "4 new"), by route. */
 typealias NavBadges = Map<String, String>
@@ -76,14 +79,31 @@ typealias NavBadges = Map<String, String>
 @Composable
 internal fun moreItem() = NavItem(ShellSpec.MORE_ROUTE, stringResource(R.string.dk_more), DeskIcons.Menu)
 
+/** The "⋯" entry of [MoreStyle.Sheet]. */
+@Composable
+internal fun moreSheetItem() = NavItem(ShellSpec.MORE_ROUTE, stringResource(R.string.dk_more), DeskIcons.MoreHorizontal)
+
 // ---------------------------------------------------------------- compact: bottom bar
 
+/**
+ * The phone's bottom bar: the [ShellSpec.bottomBarRoutes] and, when other screens (or, with
+ * [MoreStyle.Sheet], [hasMoreActions]) are left, a "More" tab ("⋯" with [MoreStyle.Sheet]) that
+ * calls [onSelect] with [ShellSpec.MORE_ROUTE]. Glass inside [DesktopShell], chrome colour elsewhere.
+ */
 @Composable
-fun BottomNavBar(spec: ShellSpec, currentRoute: String?, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
+fun BottomNavBar(
+    spec: ShellSpec,
+    currentRoute: String?,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    hasMoreActions: Boolean = false,
+) {
     val colors = DeskTheme.colors
     val label = stringResource(R.string.dk_main_navigation)
-    val items = spec.shown(NavKind.BottomBar) + if (spec.overflow(NavKind.BottomBar).isEmpty()) emptyList() else listOf(moreItem())
-    Column(modifier.fillMaxWidth().background(colors.chrome)) {
+    val sheet = spec.moreStyle == MoreStyle.Sheet
+    val needsMore = spec.overflow(NavKind.BottomBar).isNotEmpty() || (sheet && hasMoreActions)
+    val items = spec.shown(NavKind.BottomBar) + if (!needsMore) emptyList() else listOf(if (sheet) moreSheetItem() else moreItem())
+    Column(modifier.fillMaxWidth().glass(DeskGlass.chrome(colors, GlassThickness.Regular))) {
         HorizontalRule()
         Row(
             modifier = Modifier
@@ -382,7 +402,9 @@ private fun SidebarItem(item: NavItem, selected: Boolean, collapsed: Boolean, ba
 // ---------------------------------------------------------------- top bars
 
 /**
- * Compact and medium top bar: page title and, when [onSearch] is set, a search button. On compact
+ * Compact and medium top bar: page title and, when [onSearch] is set, a search button. With
+ * [glass] (the phone shell, where the content lies under the bar) it turns to glass once [scrolled].
+ * On compact
  * windows the shell passes what the current screen asked for with [CompactTopBar]: [onBack] adds a
  * back or close button before the title and [actions] add icon buttons before the search button
  * (more than three: two icons and a "more" menu). The title cross-fades when it changes.
@@ -396,18 +418,25 @@ fun PageTopBar(
     backIcon: TopBarBackIcon = TopBarBackIcon.Back,
     actions: List<TopBarAction> = emptyList(),
     scrolled: Boolean = false,
+    glass: Boolean = false,
 ) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
     val latestOnBack by rememberUpdatedState(onBack)
     val (shown, overflow) = remember(actions) { splitTopBarActions(actions) }
-    // content scrolled beneath: the bar takes the chrome colour and a rule fades in, as Android's top app bar does
-    val background by animateColorAsState(if (scrolled) colors.chrome else colors.background, tween(DeskMotion.MEDIUM_MS), label = "topBar")
+    // content scrolled beneath: the bar takes the chrome colour (or turns to glass over content lying
+    // under it) and a rule fades in, as Android's top app bar does
+    val rest = if (glass) colors.background else Color.Transparent
+    val background by animateColorAsState(
+        if (scrolled) (if (glass) Color.Transparent else colors.chrome) else colors.background,
+        tween(DeskMotion.MEDIUM_MS), label = "topBar",
+    )
     val ruleAlpha by animateFloatAsState(if (scrolled) 1f else 0f, tween(DeskMotion.MEDIUM_MS), label = "topBarRule")
     val rule = colors.border
     Column(
         modifier
             .fillMaxWidth()
+            .glass(DeskGlass.chrome(colors, GlassThickness.Regular), enabled = glass && scrolled, rest = rest)
             .background(background)
             // drawn over the bottom edge, so the bar keeps its height whether or not the rule shows
             .drawBehind {

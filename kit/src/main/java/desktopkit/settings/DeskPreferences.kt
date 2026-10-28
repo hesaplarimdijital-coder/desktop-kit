@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -14,9 +15,9 @@ import desktopkit.theme.DensityPreference
 import desktopkit.theme.ThemeMode
 
 /**
- * Appearance and shell preferences (theme, accent, density, sidebar), stored in shared
- * preferences and observable from Compose. [accents] lists the accents the app offers; the
- * stored name is looked up there.
+ * Appearance and shell preferences (theme, accent, density, sidebar, inspector width, table
+ * columns), stored in shared preferences and observable from Compose. [accents] lists the accents
+ * the app offers; the stored name is looked up there.
  */
 @Stable
 class DeskPreferences(
@@ -32,6 +33,12 @@ class DeskPreferences(
     var density by mutableStateOf(prefs.enumValue(KEY_DENSITY, DensityPreference.Auto))
         private set
     var sidebarCollapsed by mutableStateOf(prefs.getBoolean(KEY_SIDEBAR_COLLAPSED, false))
+        private set
+
+    /** Width of the workstation's inspector pane in dp; NaN until the user resizes it. */
+    var inspectorWidth by mutableFloatStateOf(prefs.getFloat(KEY_INSPECTOR_WIDTH, Float.NaN))
+        private set
+    var inspectorCollapsed by mutableStateOf(prefs.getBoolean(KEY_INSPECTOR_COLLAPSED, false))
         private set
 
     fun updateThemeMode(value: ThemeMode) {
@@ -54,8 +61,36 @@ class DeskPreferences(
         prefs.edit().putBoolean(KEY_SIDEBAR_COLLAPSED, value).apply()
     }
 
+    fun updateInspectorWidth(value: Float) {
+        inspectorWidth = value
+        prefs.edit().putFloat(KEY_INSPECTOR_WIDTH, value).apply()
+    }
+
+    fun updateInspectorCollapsed(value: Boolean) {
+        inspectorCollapsed = value
+        prefs.edit().putBoolean(KEY_INSPECTOR_COLLAPSED, value).apply()
+    }
+
+    /** The column order and hidden columns stored for the table [key], or null when never changed. */
+    fun tableColumns(key: String): Pair<List<String>, Set<String>>? {
+        val order = prefs.getString(KEY_TABLE_PREFIX + key + "_order", null) ?: return null
+        val hidden = prefs.getString(KEY_TABLE_PREFIX + key + "_hidden", "").orEmpty()
+        return order.split(SEPARATOR).filter { it.isNotEmpty() } to hidden.split(SEPARATOR).filter { it.isNotEmpty() }.toSet()
+    }
+
+    fun updateTableColumns(key: String, order: List<String>, hidden: Set<String>) {
+        prefs.edit()
+            .putString(KEY_TABLE_PREFIX + key + "_order", order.joinToString(SEPARATOR))
+            .putString(KEY_TABLE_PREFIX + key + "_hidden", hidden.joinToString(SEPARATOR))
+            .apply()
+    }
+
     companion object {
         const val FILE = "desktopkit"
+        const val KEY_INSPECTOR_WIDTH = "dk_inspector_width"
+        const val KEY_INSPECTOR_COLLAPSED = "dk_inspector_collapsed"
+        const val KEY_TABLE_PREFIX = "dk_table_"
+        private const val SEPARATOR = "\u001F"
         const val KEY_THEME = "dk_theme"
         const val KEY_ACCENT = "dk_accent"
         const val KEY_DENSITY = "dk_density"
