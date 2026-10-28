@@ -42,7 +42,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import desktopkit.R
-import desktopkit.shell.KeyCap
 import desktopkit.theme.DeskTheme
 
 /** How a dialog shows that it can be closed: an "Esc" key cap with a hardware keyboard, a × button otherwise. */
@@ -83,15 +82,27 @@ fun DialogDismissButton(modifier: Modifier = Modifier) {
         DismissStyle.EscKey -> {
             val interaction = remember { MutableInteractionSource() }
             val state = interaction.collectState()
+            val colors = DeskTheme.colors
             val shape = RoundedCornerShape(6.dp)
+            // a key cap drawn as a key: outlined, so it reads on the dialog's raised surface too
             Box(
                 modifier
+                    .heightIn(min = DeskTheme.dimens.minTarget)
                     .focusRing(state, shape)
                     .background(stateBackground(state), shape)
                     .deskClickable(interaction, dismiss.onDismiss, role = Role.Button, onClickLabel = label)
-                    .padding(4.dp),
+                    .padding(horizontal = 6.dp),
                 contentAlignment = Alignment.Center,
-            ) { KeyCap(stringResource(R.string.dk_key_esc)) }
+            ) {
+                Text(
+                    stringResource(R.string.dk_key_esc),
+                    style = DeskTheme.type.mono,
+                    color = colors.textSecondary,
+                    modifier = Modifier
+                        .border(1.dp, colors.borderStrong, RoundedCornerShape(4.dp))
+                        .padding(horizontal = 6.dp, vertical = 1.dp),
+                )
+            }
         }
     }
 }
