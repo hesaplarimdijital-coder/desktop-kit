@@ -97,7 +97,7 @@ object DeskGlass {
                 GlassThickness.Regular -> 28.dp
             },
             noise = 0.04f,
-            translucent = tinted.copy(alpha = if (oled) 0.96f else 0.94f),
+            translucent = tinted.copy(alpha = if (oled) 0.97f else 0.96f),
             solid = base,
         )
     }
@@ -111,7 +111,7 @@ object DeskGlass {
         }
         dark -> when (thickness) {
             GlassThickness.UltraThin -> 0.55f
-            GlassThickness.Thin -> 0.70f
+            GlassThickness.Thin -> 0.72f
             GlassThickness.Regular -> 0.82f
         }
         else -> when (thickness) {

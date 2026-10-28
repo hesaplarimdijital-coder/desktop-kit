@@ -111,7 +111,7 @@ fun DeskDialog(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        DialogFrame(onDismiss, title, modifier.padding(24.dp), maxWidth, actions, content)
+        DialogFrame(onDismiss, title, modifier.padding(24.dp), maxWidth, actions, content = content)
     }
 }
 
