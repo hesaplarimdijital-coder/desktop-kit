@@ -12,16 +12,18 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.unit.Velocity
 import desktopkit.theme.DeskMotion
+import desktopkit.theme.MotionTier
 
 /**
  * How the phone (compact) chrome follows the content's scrolling, as Android's own apps do:
  * - scrolling down slides the bottom navigation bar (and the strip above it) out of the way, so the
  *   list gets the whole height; scrolling up brings them back. When the finger lifts half way, they
- *   settle fully shown or fully hidden;
- * - once the content has moved away from its top, the top bar takes the chrome colour and a thin
- *   rule appears under it, so the title stays apart from the content passing beneath it.
+ *   settle fully shown or fully hidden, on a spring that takes over the fling's speed;
+ * - once the content has moved away from its top, the top bar takes the chrome colour (glass) and
+ *   a thin rule appears under it, so the title stays apart from the content passing beneath it.
  *
- * The shell creates one and resets it whenever the screen changes.
+ * [offsetPx] is only read while drawing (a layer translation), so a scrolled pixel never measures
+ * or recomposes the screen. The shell creates one and resets it whenever the screen changes.
  */
 @Stable
 internal class ShellScrollState {
@@ -42,6 +44,9 @@ internal class ShellScrollState {
     /** Hides the bottom chrome while scrolling down; false keeps it in place (the top bar still reacts). */
     var hideOnScroll by mutableStateOf(true)
 
+    /** How the settle moves: a spring on phones, nothing with reduced motion. */
+    var tier: MotionTier = MotionTier.Gesture
+
     val connection = object : NestedScrollConnection {
         override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
             if (!enabled) return Offset.Zero
@@ -55,24 +60,46 @@ internal class ShellScrollState {
         }
 
         override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-            if (enabled && hideOnScroll) settle()
+            // the bars move against the content; what the list could not use (it hit an end) carries on into them
+            if (enabled && hideOnScroll) settle(-available.y)
             return Velocity.Zero
         }
     }
 
-    /** Finishes a half-way bar: fully hidden past half its height, fully shown otherwise. */
-    suspend fun settle() {
+    /**
+     * Finishes a half-way bar: fully hidden past half its height, fully shown otherwise. [velocity]
+     * (px/s, positive = downwards) starts the spring at the speed the content was moving.
+     */
+    suspend fun settle(velocity: Float = 0f) {
         val start = offsetPx
-        if (start <= 0f || start >= maxOffsetPx) return
-        val target = if (start > maxOffsetPx / 2f) maxOffsetPx else 0f
-        animate(start, target, animationSpec = tween(DeskMotion.MEDIUM_MS + 50, easing = DeskMotion.Emphasized)) { value, _ ->
-            offsetPx = value
+        val target = settleTarget(start, maxOffsetPx) ?: return
+        when (tier) {
+            MotionTier.Reduced -> offsetPx = target
+            MotionTier.Gesture -> animate(start, target, initialVelocity = velocity, animationSpec = DeskMotion.gesture()) { value, _ ->
+                offsetPx = value.coerceIn(0f, maxOffsetPx)
+            }
+            MotionTier.Timed -> animate(start, target, animationSpec = tween(DeskMotion.MEDIUM_MS + 50, easing = DeskMotion.Emphasized)) { value, _ ->
+                offsetPx = value
+            }
         }
+    }
+
+    /** Brings the bottom chrome back at once (an expanding player starts from it). */
+    fun showBars() {
+        offsetPx = 0f
     }
 
     /** A new screen starts with the chrome shown and the top bar flat. */
     fun reset() {
         offsetPx = 0f
         scrolled = false
+    }
+
+    companion object {
+        /** Where a bar left at [offset] of [max] settles; null when it is already at rest. Half-way rule of 0.2.0. */
+        fun settleTarget(offset: Float, max: Float): Float? {
+            if (offset <= 0f || offset >= max) return null
+            return if (offset > max / 2f) max else 0f
+        }
     }
 }

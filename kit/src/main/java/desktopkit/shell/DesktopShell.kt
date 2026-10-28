@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -24,10 +26,15 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
@@ -38,13 +45,29 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import desktopkit.components.ActionGroup
+import desktopkit.components.ActionGroupList
+import desktopkit.components.GlassBottomSheet
 import desktopkit.components.MenuBarMenus
+import desktopkit.components.MenuEntry
 import desktopkit.components.MenuSpec
 import desktopkit.screens.OverflowScreen
+import desktopkit.theme.DeskGlass
 import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
+import desktopkit.theme.GlassMode
+import desktopkit.theme.GlassThickness
 import desktopkit.theme.LocalDeskDimens
 import desktopkit.theme.LocalDeskType
+import desktopkit.theme.LocalGlassMode
+import desktopkit.theme.LocalGlassSource
+import desktopkit.theme.LocalMotionTier
+import desktopkit.theme.MotionTier
+import desktopkit.theme.glass
+import desktopkit.theme.glassSource
+import desktopkit.theme.rememberReducedMotion
+import desktopkit.theme.rememberSystemGlassMode
+import dev.chrisbanes.haze.HazeState
 import desktopkit.theme.forCompactWindow
 import desktopkit.theme.grow
 import desktopkit.theme.toMaterialTypography
@@ -58,7 +81,7 @@ val LocalNavKind = compositionLocalOf { NavKind.Sidebar }
  *
  * - [Default]: Android's fade-through between top-level screens on phones and tablets (bottom bar,
  *   rail): the old screen fades out in 90 ms, the new one fades in over 210 ms while growing from
- *   96 % (phone) or 98 % (tablet) to full size, on the emphasized curve. In the sidebar layout (large
+ *   96 % (phone, on the gesture spring) or 98 % (tablet, on the emphasized curve) to full size. In the sidebar layout (large
  *   windows, DeX) a plain 150 ms cross-fade without movement, as on a desktop. Going back looks the
  *   same and, on Android 14 and later with `android:enableOnBackInvokedCallback="true"`, follows the
  *   predictive Back gesture: the transition plays along with the finger and can be cancelled.
@@ -90,6 +113,12 @@ class ShellNavigator(private val navController: NavHostController) {
  * monitors). The navigation graph lives in one slot of [ShellLayout], so resizing a window
  * across width classes keeps back stacks, scroll positions and text fields.
  *
+ * On a phone the content fills the window and the bars lie over it, drawn as frosted glass
+ * ([desktopkit.theme.DeskGlass]); a screen that lays its lists out under them asks for
+ * [rememberShellContentPadding] and pads the list's ends with it. Screens that do not ask are
+ * kept clear of the bars as in 0.2.0. The content area is the glass source of the bars, sheets
+ * and menus ([desktopkit.theme.LocalGlassSource]).
+ *
  * The bottom navigation bar (compact windows) is hidden while the on-screen keyboard is open, so
  * it does not ride up on top of the keyboard; the content then reaches down to the keyboard. The
  * content ends above the keyboard because [desktopkit.DesktopKitRoot] pads the whole app with
@@ -98,8 +127,11 @@ class ShellNavigator(private val navController: NavHostController) {
  * On compact windows the chrome follows the content's scrolling (see [hideBarsOnScroll]); tablet and
  * DeX windows keep their chrome in place. Text is [largeWindowTextStep] sp larger on rail and sidebar
  * layouts (tablet, DeX); phones get slightly tighter sizes ([compactSizes]) so more fits on screen.
+ * Motion follows the window ([desktopkit.theme.MotionTier]): springs on a phone, the 0.2.0 timings
+ * from tablet width up, none with reduced motion.
  *
- * @param bottomBar optional strip under the content (a player, a status bar); it receives the current [NavKind].
+ * @param bottomBar optional strip under the content (a player, a status bar); it receives the current
+ *   [NavKind]. On a phone an [desktopkit.components.ExpandablePlayer] fits here.
  * @param hideNavigationWithKeyboard false keeps the bottom navigation bar above the open keyboard.
  * @param transitions how switching screens is animated; see [ShellTransitions].
  * @param hideBarsOnScroll on phones, scrolling the content down slides the bottom navigation bar and
@@ -110,6 +142,11 @@ class ShellNavigator(private val navController: NavHostController) {
  *   targets stay at least 48 dp. False keeps the touch sizes as they are.
  * @param menus menu bar menus, shown in the sidebar layout; [desktopkit.input.ShortcutRegistry.menus] builds them.
  * @param onSearch shows a search field (sidebar layout) or a search button (smaller windows) when set.
+ * @param moreActions the app's own entries in the phone's "⋯" sheet ([MoreStyle.Sheet]), after the
+ *   screens that do not fit the bottom bar.
+ * @param floatingPlayer on tablet and DeX, the [bottomBar] floats over the content's bottom edge as a
+ *   rounded glass bar (the content scrolls beneath it) instead of being stacked under the content.
+ * @param glass false draws every bar, sheet and menu as a solid surface.
  * @param content the screen for a route of [spec]. The "More" route is handled by the shell. On
  *   compact windows a screen can change the top bar with [CompactTopBar]; [LocalWidthClass] and
  *   [currentWidthClass] tell it the width class in use.
@@ -135,6 +172,9 @@ fun DesktopShell(
     hideBarsOnScroll: Boolean = true,
     largeWindowTextStep: Float = 1f,
     compactSizes: Boolean = true,
+    moreActions: List<ActionGroup> = emptyList(),
+    floatingPlayer: Boolean = false,
+    glass: Boolean = true,
     content: @Composable (route: String, navigator: ShellNavigator) -> Unit,
 ) {
     // tablet and DeX read one size larger; phones get the tighter compact sizes
@@ -147,7 +187,16 @@ fun DesktopShell(
     val windowDimens = remember(baseDimens, navKindForTheme, compactSizes) {
         if (compactSizes && navKindForTheme == NavKind.BottomBar) baseDimens.forCompactWindow() else baseDimens
     }
-    CompositionLocalProvider(LocalDeskType provides windowType, LocalDeskDimens provides windowDimens) {
+    val reduced = rememberReducedMotion()
+    val tier = DeskMotion.tier(widthClass, reduced)
+    val systemGlass = rememberSystemGlassMode()
+    val glassMode = if (!glass) GlassMode.Solid else LocalGlassMode.current ?: systemGlass
+    CompositionLocalProvider(
+        LocalDeskType provides windowType,
+        LocalDeskDimens provides windowDimens,
+        LocalMotionTier provides tier,
+        LocalGlassMode provides glassMode,
+    ) {
         MaterialTheme(colorScheme = MaterialTheme.colorScheme, typography = windowType.toMaterialTypography()) {
             ShellContent(
                 spec = spec,
@@ -166,6 +215,10 @@ fun DesktopShell(
                 hideNavigationWithKeyboard = hideNavigationWithKeyboard,
                 transitions = transitions,
                 hideBarsOnScroll = hideBarsOnScroll,
+                moreActions = moreActions,
+                floatingPlayer = floatingPlayer,
+                tier = tier,
+                glassMode = glassMode,
                 content = content,
             )
         }
@@ -191,6 +244,10 @@ private fun ShellContent(
     hideNavigationWithKeyboard: Boolean,
     transitions: ShellTransitions,
     hideBarsOnScroll: Boolean,
+    moreActions: List<ActionGroup>,
+    floatingPlayer: Boolean,
+    tier: MotionTier,
+    glassMode: GlassMode,
     content: @Composable (route: String, navigator: ShellNavigator) -> Unit,
 ) {
     val navigator = remember(navController) { ShellNavigator(navController) }
@@ -198,12 +255,13 @@ private fun ShellContent(
     val currentRoute = entry?.destination?.route ?: spec.startRoute
     val navKind = NavKind.forWidth(widthClass)
     val more = moreItem()
+    val colors = DeskTheme.colors
+    val density = LocalDensity.current
     // Not laid out at all while the keyboard is up; the root's safeDrawing padding already ends the
     // content above it. isImeVisible alone is not enough: it reads true until the first insets arrive
     // (and forever when the window never passes insets to Compose), so the keyboard must also take space.
     val imeVisible = WindowInsets.isImeVisible
     val ime = WindowInsets.ime
-    val density = LocalDensity.current
     val imeTakesSpace by remember(ime, density) { derivedStateOf { ime.getBottom(density) > 0 } }
     val showBottomNav = !(hideNavigationWithKeyboard && imeVisible && imeTakesSpace)
     // The graph builder below must not capture changing values, or NavHost would rebuild the graph.
@@ -211,19 +269,35 @@ private fun ShellContent(
     val currentSpec by rememberUpdatedState(spec)
     val currentKind by rememberUpdatedState(navKind)
     val currentTransitions by rememberUpdatedState(transitions)
+    val currentTier by rememberUpdatedState(tier)
     // read when a transition starts, so a new width class or setting applies to the next one
     val enter: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition =
-        remember { { shellEnter(currentTransitions, currentKind) } }
+        remember { { shellEnter(currentTransitions, currentKind, currentTier) } }
     val exit: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition =
-        remember { { shellExit(currentTransitions, currentKind) } }
+        remember { { shellExit(currentTransitions, currentKind, currentTier) } }
     val topBarHost = remember { CompactTopBarHost() }
     val scroll = remember { ShellScrollState() }
+    val metrics = remember { ShellChromeMetrics() }
+    val overlayHost = remember { ShellOverlayHost() }
+    val glassSource = remember { HazeState() }
+    val padding = remember(metrics, density) { shellPaddingValues(metrics, density) }
+    val floating = floatingPlayer && navKind != NavKind.BottomBar
+    val floatingMargin = 12.dp
+    var moreOpen by remember { mutableStateOf(false) }
     SideEffect {
         scroll.enabled = navKind == NavKind.BottomBar
         scroll.hideOnScroll = hideBarsOnScroll && showBottomNav
+        scroll.tier = tier
+        metrics.underTop = navKind == NavKind.BottomBar
+        metrics.underBottom = navKind == NavKind.BottomBar
+        metrics.underFloatingPlayer = floating
+        metrics.floatingMarginPx = with(density) { floatingMargin.roundToPx() }
+        if (!showBottomNav || navKind != NavKind.BottomBar) metrics.navPx = 0
+        overlayHost.onExpandStart = { scroll.showBars() }
     }
     // every screen starts with the bars shown and a flat top bar
     LaunchedEffect(currentRoute, navKind, showBottomNav) { scroll.reset() }
+    LaunchedEffect(navKind) { if (navKind != NavKind.BottomBar) moreOpen = false }
 
     val searchSlot: (@Composable () -> Unit)? = if (onSearch == null) null else {
         {
@@ -231,11 +305,24 @@ private fun ShellContent(
                 modifier = Modifier.widthIn(min = 220.dp, max = 380.dp))
         }
     }
+    val select: (String) -> Unit = { route ->
+        if (route == ShellSpec.MORE_ROUTE && spec.moreStyle == MoreStyle.Sheet && navKind == NavKind.BottomBar) {
+            moreOpen = true
+        } else {
+            navigator.navigate(route)
+        }
+    }
 
-    CompositionLocalProvider(LocalWidthClass provides widthClass, LocalCompactTopBarHost provides topBarHost) {
+    CompositionLocalProvider(
+        LocalWidthClass provides widthClass,
+        LocalCompactTopBarHost provides topBarHost,
+        LocalGlassSource provides glassSource,
+        LocalShellOverlayHost provides overlayHost,
+        LocalShellContentPadding provides padding,
+    ) {
         ShellLayout(
             navKind = navKind,
-            modifier = modifier.fillMaxSize().background(DeskTheme.colors.background),
+            modifier = modifier.fillMaxSize().background(colors.background),
             topBar = {
                 if (navKind == NavKind.Sidebar) {
                     MenuBarChrome(
@@ -255,6 +342,8 @@ private fun ShellContent(
                         backIcon = screen?.backIcon ?: TopBarBackIcon.Back,
                         actions = screen?.actions.orEmpty(),
                         scrolled = navKind == NavKind.BottomBar && scroll.scrolled,
+                        glass = navKind == NavKind.BottomBar,
+                        modifier = Modifier.onSizeChanged { metrics.topPx = it.height },
                     )
                 }
             },
@@ -262,8 +351,15 @@ private fun ShellContent(
                 when (navKind) {
                     NavKind.BottomBar -> if (showBottomNav) {
                         BottomNavBar(
-                            spec, currentRoute, navigator::navigate,
-                            modifier = Modifier.onSizeChanged { scroll.maxOffsetPx = it.height.toFloat() },
+                            spec, currentRoute, select,
+                            hasMoreActions = moreActions.isNotEmpty(),
+                            modifier = Modifier
+                                .onSizeChanged {
+                                    scroll.maxOffsetPx = it.height.toFloat()
+                                    metrics.navPx = it.height
+                                }
+                                // an expanding player pushes the bar out of the way
+                                .graphicsLayer { translationY = overlayHost.expandProgress() * size.height },
                         )
                     }
                     NavKind.Rail -> NavRail(spec, currentRoute, navigator::navigate, brand = brand)
@@ -277,10 +373,27 @@ private fun ShellContent(
                     )
                 }
             },
-            player = { bottomBar(navKind) },
+            player = {
+                val shape = RoundedCornerShape(DeskTheme.dimens.radiusCard.coerceAtLeast(12.dp))
+                Box(
+                    Modifier
+                        .onSizeChanged { metrics.playerPx = it.height }
+                        .then(
+                            if (!floating) Modifier else Modifier
+                                .glass(DeskGlass.raised(colors, GlassThickness.Thin), shape)
+                                .border(1.dp, colors.borderStrong, shape),
+                        ),
+                ) { bottomBar(navKind) }
+            },
             content = {
                 CompositionLocalProvider(LocalNavKind provides navKind) {
-                    Box(Modifier.fillMaxSize().nestedScroll(scroll.connection)) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .glassSource(glassSource, glassMode)
+                            .background(colors.background)
+                            .nestedScroll(scroll.connection),
+                    ) {
                         NavHost(
                             navController = navController,
                             startDestination = spec.startRoute,
@@ -290,17 +403,44 @@ private fun ShellContent(
                             popExitTransition = exit,
                         ) {
                             spec.items.forEach { item ->
-                                composable(item.route) { currentContent(item.route, navigator) }
+                                composable(item.route) {
+                                    ShellScreenFrame(metrics, scroll) { currentContent(item.route, navigator) }
+                                }
                             }
                             composable(ShellSpec.MORE_ROUTE) {
-                                OverflowScreen(currentSpec.overflow(currentKind), onSelect = navigator::navigate)
+                                ShellScreenFrame(metrics, scroll) {
+                                    OverflowScreen(currentSpec.overflow(currentKind), onSelect = navigator::navigate)
+                                }
                             }
                         }
                     }
                 }
             },
+            overlay = {
+                Box(Modifier.fillMaxSize().onGloballyPositioned { overlayHost.coordinates = it }) {
+                    overlayHost.layers.forEach { layer -> key(layer) { layer.content() } }
+                }
+            },
             navigationOffset = { if (navKind == NavKind.BottomBar) scroll.offsetPx.roundToInt() else 0 },
+            floatingPlayer = floating,
+            floatingMargin = floatingMargin,
         )
+
+        if (spec.moreStyle == MoreStyle.Sheet) {
+            GlassBottomSheet(visible = moreOpen, onDismiss = { moreOpen = false }, title = more.label) {
+                ActionGroupList(moreSheetGroups(spec, navKind, navigator) + moreActions, onDismiss = { moreOpen = false })
+            }
+        }
+    }
+}
+
+/** The screens the phone's bottom bar leaves out, by sidebar section, as entries of the "⋯" sheet. */
+internal fun moreSheetGroups(spec: ShellSpec, kind: NavKind, navigator: ShellNavigator): List<ActionGroup> {
+    val left = spec.overflow(kind).map { it.route }.toSet()
+    val sections = spec.sections.map { section -> section.title to section.items.filter { it.route in left } } +
+        listOf(null to listOfNotNull(spec.footer).filter { it.route in left })
+    return sections.filter { it.second.isNotEmpty() }.map { (title, items) ->
+        ActionGroup(title, items.map { item -> MenuEntry.Item(item.label, { navigator.navigate(item.route) }, icon = item.icon) })
     }
 }
 
@@ -308,10 +448,16 @@ private const val FADE_OUT_MS = 90
 private const val FADE_IN_MS = 210
 private const val CROSSFADE_MS = 150
 
-/** Fade-through (Material motion) between top-level screens; desktop cross-fade in the sidebar layout. */
-private fun shellEnter(transitions: ShellTransitions, kind: NavKind): EnterTransition = when {
-    transitions == ShellTransitions.None -> EnterTransition.None
+/**
+ * Fade-through (Material motion) between top-level screens; desktop cross-fade in the sidebar layout.
+ * On a phone the scale-in is the gesture spring; the fades stay timed.
+ */
+internal fun shellEnter(transitions: ShellTransitions, kind: NavKind, tier: MotionTier = MotionTier.Timed): EnterTransition = when {
+    transitions == ShellTransitions.None || tier == MotionTier.Reduced -> EnterTransition.None
     kind == NavKind.Sidebar -> fadeIn(tween(CROSSFADE_MS, easing = DeskMotion.Standard))
+    kind == NavKind.BottomBar && tier == MotionTier.Gesture ->
+        fadeIn(tween(FADE_IN_MS, delayMillis = FADE_OUT_MS, easing = DeskMotion.EmphasizedDecelerate)) +
+            scaleIn(DeskMotion.gesture(), initialScale = 0.96f)
     else -> {
         val scale = if (kind == NavKind.BottomBar) 0.96f else 0.98f
         fadeIn(tween(FADE_IN_MS, delayMillis = FADE_OUT_MS, easing = DeskMotion.EmphasizedDecelerate)) +
@@ -319,8 +465,8 @@ private fun shellEnter(transitions: ShellTransitions, kind: NavKind): EnterTrans
     }
 }
 
-private fun shellExit(transitions: ShellTransitions, kind: NavKind): ExitTransition = when {
-    transitions == ShellTransitions.None -> ExitTransition.None
+internal fun shellExit(transitions: ShellTransitions, kind: NavKind, tier: MotionTier = MotionTier.Timed): ExitTransition = when {
+    transitions == ShellTransitions.None || tier == MotionTier.Reduced -> ExitTransition.None
     kind == NavKind.Sidebar -> fadeOut(tween(CROSSFADE_MS, easing = DeskMotion.Standard))
     else -> fadeOut(tween(FADE_OUT_MS, easing = DeskMotion.EmphasizedAccelerate))
 }
