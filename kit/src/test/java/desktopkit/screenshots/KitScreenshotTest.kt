@@ -22,7 +22,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
@@ -122,8 +124,11 @@ class KitScreenshotTest {
             compose.onNodeWithTag("tracks").performTouchInput { swipeDown(startY = centerY - 150f, endY = centerY + 150f, durationMillis = 800) }
             compose.waitForIdle()
         }
-        // the test window starts outside touch mode and hands its first focus to a focusable; a phone would not
+        // the test window starts in keyboard mode and hands its first focus to a focusable; a tap puts it in touch
+        // mode, as any real touch would
+        compose.onRoot().performTouchInput { click(androidx.compose.ui.geometry.Offset(2f, 2f)) }
         compose.runOnIdle { focusManager.clearFocus(force = true) }
+        compose.waitForIdle()
         after()
         window(name)
     }
