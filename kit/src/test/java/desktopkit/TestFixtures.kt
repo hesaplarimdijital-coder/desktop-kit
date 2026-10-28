@@ -244,7 +244,11 @@ fun SampleFullPlayer(track: Int = 0) {
         Text(sampleTracks[track % sampleTracks.size].first, style = DeskTheme.type.headline, color = DeskTheme.colors.text)
         Text(sampleTracks[track % sampleTracks.size].second, style = DeskTheme.type.body, color = DeskTheme.colors.textSecondary)
         Spacer(Modifier.height(24.dp))
-        DeskSlider(value = 0.35f, onValueChange = {}, modifier = Modifier.fillMaxWidth())
+        // a plain progress line: a focusable slider would take the test window's first (keyboard) focus
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth().height(4.dp).background(DeskTheme.colors.borderStrong)) {
+            androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth(0.35f).height(4.dp).background(DeskTheme.colors.accent))
+        }
+        Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
             DeskIconButton(DeskIcons.Previous, "Önceki", {})
             DeskIconButton(DeskIcons.Pause, "Duraklat", {}, size = 64.dp, iconSize = 28.dp)
