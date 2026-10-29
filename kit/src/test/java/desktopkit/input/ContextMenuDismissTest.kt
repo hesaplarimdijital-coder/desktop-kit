@@ -88,16 +88,24 @@ class ContextMenuDismissTest {
 
     private fun Offset.rounded() = IntOffset(x.roundToInt(), y.roundToInt())
 
-    /** The menu windows (pop-up panels) that are on screen now. */
+    private val global by lazy { Class.forName("android.view.WindowManagerGlobal").getMethod("getInstance").invoke(null) }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun <T> globalList(name: String): List<T> =
+        (global.javaClass.getDeclaredField(name).apply { isAccessible = true }.get(global) as List<T>).toList()
+
+    /** Every window of the app: its root view and its layout parameters (where the window is). */
+    private fun windows(): List<Pair<View, WindowManager.LayoutParams>> = globalList<View>("mViews").zip(globalList("mParams"))
+
+    /** The menu windows (pop-ups: every window but the activity's own) that are on screen now. */
     private fun menus(): List<View> {
-        val global = Class.forName("android.view.WindowManagerGlobal").getMethod("getInstance").invoke(null)
-        val field = global.javaClass.getDeclaredField("mViews").apply { isAccessible = true }
-        @Suppress("UNCHECKED_CAST")
-        val views = (field.get(global) as List<View>).toList()
-        return views.filter { (it.layoutParams as? WindowManager.LayoutParams)?.type == WindowManager.LayoutParams.TYPE_APPLICATION_PANEL }
+        val decor = compose.activity.window.decorView
+        return windows().filter { (view, _) -> view !== decor }.map { it.first }
     }
 
-    private fun View.at(): IntOffset = (layoutParams as WindowManager.LayoutParams).let { IntOffset(it.x, it.y) }
+    private fun describeWindows() = windows().joinToString { (view, params) -> "${view.javaClass.simpleName} type=${params.type} at ${params.x},${params.y}" }
+
+    private fun View.at(): IntOffset = windows().first { it.first === this }.second.let { IntOffset(it.x, it.y) }
 
     private fun record() {
         menus().forEach { frames += Frame(it, it.at()) }
@@ -127,7 +135,8 @@ class ContextMenuDismissTest {
     private fun openAt(at: Offset): View {
         rightClick(at)
         compose.waitForIdle()
-        val menu = menus().single()
+        compose.onNodeWithText("Sil").assertExists()
+        val menu = menus().singleOrNull() ?: error("expected one menu window: ${describeWindows()}")
         assertEquals(at.rounded(), menu.at())
         return menu
     }
@@ -179,7 +188,7 @@ class ContextMenuDismissTest {
 
         framesOf { rightClick(b) }
 
-        val now = menus().single()
+        val now = menus().singleOrNull() ?: error("expected one menu window: ${describeWindows()}")
         assertNotSame(old, now)
         assertEquals(b.rounded(), now.at())
         compose.onNodeWithText("Aç: ${names[4]}").assertExists()
@@ -197,7 +206,7 @@ class ContextMenuDismissTest {
 
         framesOf { rightClick(b) }
 
-        val now = menus().single()
+        val now = menus().singleOrNull() ?: error("expected one menu window: ${describeWindows()}")
         assertNotSame(old, now)
         assertEquals(b.rounded(), now.at())
         frames.filter { it.menu === old }.forEach { assertEquals(a.rounded(), it.at) }
@@ -231,7 +240,7 @@ class ContextMenuDismissTest {
         table()
         compose.onNodeWithText(names[2]).performTouchInput { longClick(center) }
         compose.waitForIdle()
-        assertEquals(1, menus().size)
+        assertEquals(describeWindows(), 1, menus().size)
         compose.onNodeWithText("Aç: ${names[2]}").assertExists()
         assertEquals(emptyList<String>(), clicked)
     }
