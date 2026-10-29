@@ -193,7 +193,12 @@ fun StatusBanner(
             .background(color.copy(alpha = if (colors.isDark) 0.12f else 0.10f), shape)
             .border(1.dp, color.copy(alpha = 0.45f), shape)
             .semantics { liveRegion = LiveRegionMode.Polite }
-            .padding(start = dimens.gapM + 2.dp, end = dimens.gapS, top = dimens.gapS, bottom = dimens.gapS),
+            .padding(
+                start = dimens.gapM + 2.dp,
+                end = if (actionLabel != null || closeLabel != null) dimens.gapS + 2.dp else dimens.gapM + 2.dp,
+                top = if (title != null) dimens.gapM else dimens.gapS,
+                bottom = if (title != null) dimens.gapM else dimens.gapS,
+            ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(dimens.gapM),
     ) {

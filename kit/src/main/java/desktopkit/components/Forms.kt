@@ -117,6 +117,37 @@ fun DeskTextField(
     imeAction: ImeAction = ImeAction.Default,
     onImeAction: (() -> Unit)? = null,
     interactionSource: MutableInteractionSource? = null,
+) = TextFieldImpl(
+    value, onValueChange, modifier, hint, label, leading, trailing, suffix, clearable, singleLine, minLines, maxLines, password,
+    error, supportingText, supportingText, enabled, readOnly, mono, keyboardType, imeAction, onImeAction, interactionSource,
+)
+
+/** [DeskTextField] with [errorDescription], what TalkBack says about an error shown elsewhere. */
+@Composable
+internal fun TextFieldImpl(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier,
+    hint: String,
+    label: String?,
+    leading: ImageVector?,
+    trailing: (@Composable () -> Unit)?,
+    suffix: String?,
+    clearable: Boolean,
+    singleLine: Boolean,
+    minLines: Int,
+    maxLines: Int,
+    password: Boolean,
+    error: Boolean,
+    supportingText: String?,
+    errorDescription: String?,
+    enabled: Boolean,
+    readOnly: Boolean,
+    mono: Boolean,
+    keyboardType: KeyboardType,
+    imeAction: ImeAction,
+    onImeAction: (() -> Unit)?,
+    interactionSource: MutableInteractionSource?,
 ) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
@@ -146,7 +177,7 @@ fun DeskTextField(
         onValueChange = onValueChange,
         modifier = modifier
             .hoverable(interaction, enabled)
-            .semantics { if (error) this.error(supportingText ?: "") },
+            .semantics { if (error) this.error(errorDescription ?: "") },
         enabled = enabled,
         readOnly = readOnly,
         textStyle = textStyle,
@@ -286,47 +317,66 @@ fun NumberField(
         onValueChange(next)
     }
     val touch = isTouchDensity()
-    DeskTextField(
-        value = text,
-        onValueChange = { input ->
-            val filtered = input.filterIndexed { i, c -> c.isDigit() || (c == '-' && i == 0 && min < 0) }.take(11)
-            text = filtered
-            filtered.toIntOrNull()?.takeIf { it in min..max }?.let(onValueChange)
-        },
-        // the default width goes after the caller's modifier, so a width given there wins
-        modifier = modifier
-            .width(
-                when {
-                    steppers && touch -> 214.dp
-                    steppers -> 156.dp
-                    touch -> 150.dp
-                    else -> 112.dp
+    // the range goes under the field, aligned with its end, as wide as it needs
+    Column(horizontalAlignment = Alignment.End) {
+        TextFieldImpl(
+            value = text,
+            onValueChange = { input ->
+                val filtered = input.filterIndexed { i, c -> c.isDigit() || (c == '-' && i == 0 && min < 0) }.take(11)
+                text = filtered
+                filtered.toIntOrNull()?.takeIf { it in min..max }?.let(onValueChange)
+            },
+            // the default width goes after the caller's modifier, so a width given there wins
+            modifier = modifier
+                .width(
+                    when {
+                        steppers && touch -> 214.dp
+                        steppers -> 156.dp
+                        touch -> 150.dp
+                        else -> 112.dp
+                    },
+                )
+                .onPreviewKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyDown || !enabled) return@onPreviewKeyEvent false
+                    when (event.key) {
+                        Key.DirectionUp -> { stepBy(step); true }
+                        Key.DirectionDown -> { stepBy(-step); true }
+                        else -> false
+                    }
                 },
-            )
-            .onPreviewKeyEvent { event ->
-                if (event.type != KeyEventType.KeyDown || !enabled) return@onPreviewKeyEvent false
-                when (event.key) {
-                    Key.DirectionUp -> { stepBy(step); true }
-                    Key.DirectionDown -> { stepBy(-step); true }
-                    else -> false
+            hint = "",
+            label = label,
+            leading = null,
+            suffix = suffix,
+            clearable = false,
+            singleLine = true,
+            minLines = 1,
+            maxLines = 1,
+            password = false,
+            error = !valid,
+            supportingText = null,
+            errorDescription = rangeText,
+            enabled = enabled,
+            readOnly = false,
+            mono = true,
+            keyboardType = KeyboardType.Number,
+            imeAction = ImeAction.Default,
+            onImeAction = null,
+            interactionSource = null,
+            trailing = if (!steppers) null else {
+                {
+                    Row {
+                        FieldButton(DeskIcons.Minus, stringResource(R.string.dk_number_decrease), enabled = enabled && (parsed ?: value) > min) { stepBy(-step) }
+                        FieldButton(DeskIcons.Plus, stringResource(R.string.dk_number_increase), enabled = enabled && (parsed ?: value) < max) { stepBy(step) }
+                    }
                 }
             },
-        label = label,
-        suffix = suffix,
-        error = !valid,
-        supportingText = if (valid) null else rangeText,
-        enabled = enabled,
-        mono = true,
-        keyboardType = KeyboardType.Number,
-        trailing = if (!steppers) null else {
-            {
-                Row {
-                    FieldButton(DeskIcons.Minus, stringResource(R.string.dk_number_decrease), enabled = enabled && (parsed ?: value) > min) { stepBy(-step) }
-                    FieldButton(DeskIcons.Plus, stringResource(R.string.dk_number_increase), enabled = enabled && (parsed ?: value) < max) { stepBy(step) }
-                }
-            }
-        },
-    )
+        )
+        if (!valid) {
+            Text(rangeText, style = DeskTheme.type.labelSmall, color = DeskTheme.colors.danger, maxLines = 1,
+                modifier = Modifier.padding(top = 4.dp))
+        }
+    }
 }
 
 /**
