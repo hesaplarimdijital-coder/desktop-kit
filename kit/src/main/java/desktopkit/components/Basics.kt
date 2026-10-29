@@ -1,6 +1,5 @@
 package desktopkit.components
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -29,7 +28,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
 
 /** Square icon button with hover, press and focus states. Its size never drops below the touch or pointer target. */
@@ -89,7 +87,7 @@ fun DeskButton(
         primary -> colors.accent
         else -> stateBackground(state, rest = colors.surfaceRaised)
     }
-    val background by animateColorAsState(target, DeskMotion.color(), label = "buttonBackground")
+    val background by animateInteractionColor(target)
     val content = if (primary) colors.onAccent else colors.text
     Row(
         modifier = modifier

@@ -1,5 +1,11 @@
 # Değişiklikler
 
+## 0.2.1 (2026-10-29)
+
+- Fareyle tablo ve listelerde gezinirken iz kalması düzeltildi: üzerine gelme ve basma renkleri farede anında
+  değişir (0.1.x'teki gibi), yalnızca imlecin altındaki satır vurgulanır; dokunmatikte solma ve seçim geçişi kalır,
+  saydama doğru solarken artık koyu griye dönmez.
+
 ## 0.2.0 (2026-10-23)
 
 Telefonda daha çok yer, tablette biraz daha büyük yazı, Android'in kendi hareket diliyle animasyonlar.

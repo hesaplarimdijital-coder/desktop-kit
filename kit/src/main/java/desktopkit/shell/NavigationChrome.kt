@@ -61,6 +61,7 @@ import desktopkit.components.DeskIcons
 import desktopkit.components.HorizontalRule
 import desktopkit.components.SectionCaption
 import desktopkit.components.VerticalRule
+import desktopkit.components.animateInteractionColor
 import desktopkit.components.collectState
 import desktopkit.components.deskClickable
 import desktopkit.components.focusRing
@@ -147,7 +148,10 @@ private fun NavIndicator(
 ) {
     val colors = DeskTheme.colors
     val fraction by animateFloatAsState(if (selected) 1f else 0f, DeskMotion.spatial(), label = "navIndicator")
-    val feedback by animateNavColor(if (state.pressed) colors.pressed else if (state.hovered && !selected) colors.hover else Color.Transparent)
+    val feedback by animateInteractionColor(
+        if (state.pressed) colors.pressed else if (state.hovered && !selected) colors.hover else Color.Transparent,
+        selected, tween(NAV_COLOR_MS),
+    )
     val selection = colors.selection
     Box(
         modifier = modifier
@@ -339,7 +343,7 @@ private fun SidebarItem(item: NavItem, selected: Boolean, collapsed: Boolean, ba
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
     val shape = RoundedCornerShape(dimens.radiusControl)
-    val indicator by animateNavColor(stateBackground(state, selected))
+    val indicator by animateInteractionColor(stateBackground(state, selected), selected, tween(NAV_COLOR_MS))
     val iconTint by animateNavColor(if (selected) colors.accentText else colors.textSecondary)
     val labelColor by animateNavColor(if (selected) colors.onSelection else colors.text)
     // a collapsed item centres its icon; the same start padding keeps it still while the panel opens

@@ -1,6 +1,7 @@
 package desktopkit.components
 
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.Animatable
+import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -11,8 +12,11 @@ import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -75,10 +79,62 @@ fun Modifier.deskClickable(
 fun Modifier.focusRing(state: InteractionState, shape: Shape): Modifier =
     if (state.focused) this.border(2.dp, DeskTheme.colors.focusRing, shape) else this
 
-/** [stateBackground] that eases between states in 150 ms instead of jumping (hover, press, selection). */
+/**
+ * [stateBackground] with touch feedback that does not lag behind a mouse.
+ *
+ * With a mouse ([InputMode.Pointer]) hover and press change the colour in the same frame, as on a
+ * desktop: only the element under the pointer is ever lit, nothing trails behind it. A change of
+ * [selected] (a click, a key) still eases in [DeskMotion.color]. With touch every change eases.
+ */
 @Composable
 fun animatedStateBackground(state: InteractionState, selected: Boolean = false, rest: Color = Color.Transparent): State<Color> =
-    animateColorAsState(stateBackground(state, selected, rest), DeskMotion.color(), label = "stateBackground")
+    animateInteractionColor(stateBackground(state, selected, rest), selected)
+
+/**
+ * The colour behind [animatedStateBackground], for kit controls that compute their own hover and
+ * press colour: jumps to [target] in pointer mode unless [selected] changed, eases otherwise. A fade
+ * to or from a transparent colour changes only the opacity (an Oklab fade toward transparent black
+ * would pass through grey).
+ */
+@Composable
+internal fun animateInteractionColor(
+    target: Color,
+    selected: Boolean = false,
+    spec: AnimationSpec<Color> = DeskMotion.color(),
+): State<Color> {
+    val fade = remember { InteractionFade(target, selected) }
+    fade.retarget(target, selected, instant = DeskTheme.inputMode == InputMode.Pointer)
+    val current = rememberUpdatedState(target)
+    LaunchedEffect(fade, target) { fade.run(target, spec) }
+    return if (fade.easing) fade.color.asState() else current
+}
+
+private class InteractionFade(initial: Color, private var selected: Boolean) {
+    val color = Animatable(initial)
+    private var target = initial
+
+    /** Whether the latest change eases; when false the caller gets the target itself, with no frame in between. */
+    var easing = false
+        private set
+
+    fun retarget(newTarget: Color, newSelected: Boolean, instant: Boolean) {
+        if (newTarget == target && newSelected == selected) return
+        easing = !instant || newSelected != selected
+        target = newTarget
+        selected = newSelected
+    }
+
+    suspend fun run(to: Color, spec: AnimationSpec<Color>) {
+        if (!easing) {
+            color.snapTo(to)
+            return
+        }
+        val from = color.value
+        if (from.alpha == 0f && to.alpha > 0f) color.snapTo(to.copy(alpha = 0f))
+        color.animateTo(if (to.alpha == 0f) from.copy(alpha = 0f) else to, spec)
+        color.snapTo(to)
+    }
+}
 
 /**
  * Touch feedback in place of a ripple: the element shrinks slightly while a finger holds it and

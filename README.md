@@ -48,7 +48,7 @@ Uygulama modülünün `build.gradle.kts` dosyası:
 
 ```kotlin
 dependencies {
-    implementation("com.github.hesaplarimdijital-coder:desktop-kit:0.2.0")
+    implementation("com.github.hesaplarimdijital-coder:desktop-kit:0.2.1")
     implementation("androidx.activity:activity-compose:1.9.3")
 }
 ```
@@ -310,8 +310,8 @@ CompactTopBar(
 ## Sürüm yayınlamak
 
 1. `CHANGELOG.md` dosyasına ne değiştiğini yaz.
-2. Etiketle ve gönder: `git tag 0.2.0 && git push origin 0.2.0`
-3. JitPack ilk istekte derler. Uygulamada sürümü `0.2.0` yapman yeterli.
+2. Etiketle ve gönder: `git tag 0.2.1 && git push origin 0.2.1`
+3. JitPack ilk istekte derler. Uygulamada sürümü `0.2.1` yapman yeterli.
 
 Sürüm numaraları [SemVer](https://semver.org/lang/tr/) kuralına uyar: uyumu bozan değişiklik
 ana sürümü artırır. `1.0.0` öncesinde ikinci sayı artırılır.
