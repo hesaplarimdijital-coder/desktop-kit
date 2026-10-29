@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import desktopkit.theme.Accent
 import desktopkit.theme.DensityPreference
@@ -98,15 +99,23 @@ class DeskPreferences(
     }
 }
 
-/** Preferences kept in their own file ("desktopkit"), so they never clash with the app's keys. */
+/**
+ * Preferences kept in their own file ("desktopkit"), so they never clash with the app's keys.
+ * [dynamicAccent] adds the wallpaper's colour ([Accent.dynamic]) after [accents]; it is read again
+ * whenever the configuration changes, so a new wallpaper brings its new colour.
+ */
 @Composable
 fun rememberDeskPreferences(
     accents: List<Accent> = Accent.presets,
     defaultTheme: ThemeMode = ThemeMode.System,
+    dynamicAccent: Boolean = false,
 ): DeskPreferences {
-    val context = LocalContext.current.applicationContext
-    return remember(accents, defaultTheme) {
-        DeskPreferences(context.getSharedPreferences(DeskPreferences.FILE, Context.MODE_PRIVATE), accents, defaultTheme)
+    val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val offered = if (dynamicAccent) remember(accents, configuration) { accents + Accent.dynamic(context) } else accents
+    val app = context.applicationContext
+    return remember(offered, defaultTheme) {
+        DeskPreferences(app.getSharedPreferences(DeskPreferences.FILE, Context.MODE_PRIVATE), offered, defaultTheme)
     }
 }
 

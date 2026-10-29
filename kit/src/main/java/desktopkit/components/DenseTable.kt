@@ -1,5 +1,8 @@
 package desktopkit.components
 
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.foundation.lazy.items
+import androidx.compose.runtime.State
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -150,6 +153,7 @@ fun <T> DenseTable(
     toggleOnClick: Boolean = false,
     columnsState: TableColumnsState? = null,
     glassHeader: Boolean = true,
+    loading: Boolean = false,
 ) {
     val dimens = DeskTheme.dimens
     val colors = DeskTheme.colors
@@ -175,6 +179,10 @@ fun <T> DenseTable(
     val tracker = remember { SelectionTracker() }
     val focusManager = LocalFocusManager.current
     val keysInOrder = { rows.map(key) }
+    // while the rows load: breathing placeholder rows under the header
+    val skeleton = loading && rows.isEmpty()
+    val pulse = if (skeleton) rememberSkeletonPulse() else null
+    val loadingLabel = stringResource(R.string.dk_loading)
     fun update(result: TableSelection.Result) {
         tracker.anchor = result.anchor
         if (result.selection != selection) onSelectionChange?.invoke(result.selection)
@@ -229,7 +237,17 @@ fun <T> DenseTable(
                     },
             ),
     ) {
-        LazyColumn(state = state, modifier = Modifier.fillMaxSize().glassSource(rowsGlass, glassMode), contentPadding = padding) {
+        LazyColumn(
+            state = state,
+            modifier = Modifier
+                .fillMaxSize()
+                .glassSource(rowsGlass, glassMode)
+                .then(if (!skeleton) Modifier else Modifier.semantics { contentDescription = loadingLabel }),
+            contentPadding = padding,
+        ) {
+            if (pulse != null) {
+                items(8) { i -> SkeletonTableRow(shownColumns, i, pulse) }
+            }
             itemsIndexed(rows, key = { _, item -> key(item) }) { index, item ->
                 val itemKey = key(item)
                 val onClick = {
@@ -430,6 +448,27 @@ private fun <T> TableRow(columns: List<IndexedValue<TableColumn<T>>>, item: T, s
                     overflow = TextOverflow.Ellipsis,
                     textAlign = if (column.alignEnd) TextAlign.End else TextAlign.Start,
                 )
+            }
+        }
+    }
+}
+
+/** A table row while the rows load: one breathing bar per cell, of varying length. */
+@Composable
+private fun <T> SkeletonTableRow(columns: List<IndexedValue<TableColumn<T>>>, index: Int, pulse: State<Float>) {
+    val dimens = DeskTheme.dimens
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = dimens.pagePadding - 12.dp)
+            .heightIn(min = dimens.rowHeight.coerceAtLeast(dimens.minTarget))
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        columns.forEachIndexed { position, (_, column) ->
+            Box(Modifier.cell(this, column.width).padding(horizontal = 8.dp), contentAlignment = if (column.alignEnd) Alignment.CenterEnd else Alignment.CenterStart) {
+                val fraction = 0.4f + ((index * 7 + position * 3) % 5) * 0.1f
+                SkeletonBlock(Modifier.fillMaxWidth(fraction).height(10.dp), pulse)
             }
         }
     }

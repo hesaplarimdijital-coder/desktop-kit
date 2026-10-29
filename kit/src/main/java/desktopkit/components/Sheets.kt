@@ -82,6 +82,7 @@ import desktopkit.theme.GlassThickness
 import desktopkit.theme.LocalMotionTier
 import desktopkit.theme.MotionTier
 import desktopkit.theme.glass
+import desktopkit.theme.rememberDeskHaptics
 import kotlinx.coroutines.launch
 
 /** A titled group of actions for [MoreSheet] and menus ("Play", "Edit", "Share"); a null [title] draws a plain gap. */
@@ -281,6 +282,9 @@ private fun SheetSurface(
     val focus = remember { FocusRequester() }
     val shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
     val label = title ?: stringResource(R.string.dk_more_options)
+    val haptics = rememberDeskHaptics()
+    // dragged past the point where letting go closes the sheet: one tick on the way there
+    var armed by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     Box(Modifier.fillMaxSize()) {
         // the scrim darkens with the sheet and lightens while it is dragged down
@@ -316,9 +320,16 @@ private fun SheetSurface(
                 .draggable(
                     orientation = Orientation.Vertical,
                     state = rememberDraggableState { delta ->
-                        scope.launch { drag.snapTo((drag.value + delta).coerceAtLeast(0f)) }
+                        val next = (drag.value + delta).coerceAtLeast(0f)
+                        val past = sheetHeight > 0 && next > sheetHeight / 3f
+                        if (past != armed) {
+                            armed = past
+                            if (past) haptics.threshold()
+                        }
+                        scope.launch { drag.snapTo(next) }
                     },
                     onDragStopped = { velocity ->
+                        armed = false
                         val far = sheetHeight > 0 && drag.value > sheetHeight / 3f
                         val flung = velocity > with(density) { 800.dp.toPx() }
                         if (far || flung) {

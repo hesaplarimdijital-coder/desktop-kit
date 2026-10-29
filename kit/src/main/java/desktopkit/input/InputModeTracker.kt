@@ -20,9 +20,10 @@ import desktopkit.theme.InputMode
 
 /**
  * Tracks whether the user drives the app with a mouse/touchpad (pointer density) or with
- * fingers (touch density). Starts from the connected devices, then follows the last input:
- * a mouse move or click switches to [InputMode.Pointer], a finger touch back to
- * [InputMode.Touch]. Stylus input keeps the current mode.
+ * fingers (touch density). Starts from the connected devices (a mouse or touchpad that is switched
+ * on: DeX, a keyboard cover) and follows them as they come, go or are switched on and off; then
+ * follows the last input: a mouse move or click (a touchpad counts as a mouse) switches to
+ * [InputMode.Pointer], a finger touch back to [InputMode.Touch]. Stylus input keeps the current mode.
  */
 @Stable
 class InputModeState(initial: InputMode) {
@@ -59,7 +60,13 @@ fun rememberInputModeState(): InputModeState {
                 if (!hasPrecisePointer(context)) state.detected = InputMode.Touch
             }
 
-            override fun onInputDeviceChanged(deviceId: Int) = Unit
+            // a keyboard cover's touchpad switched on or off, a mouse woken up
+            override fun onInputDeviceChanged(deviceId: Int) {
+                when {
+                    isPrecisePointer(InputDevice.getDevice(deviceId)) -> state.detected = InputMode.Pointer
+                    !hasPrecisePointer(context) -> state.detected = InputMode.Touch
+                }
+            }
         }
         inputManager?.registerInputDeviceListener(listener, null)
         onDispose { inputManager?.unregisterInputDeviceListener(listener) }
@@ -82,7 +89,7 @@ internal fun hasPrecisePointer(context: Context): Boolean =
     InputDevice.getDeviceIds().any { isPrecisePointer(InputDevice.getDevice(it)) }
 
 private fun isPrecisePointer(device: InputDevice?): Boolean {
-    if (device == null || device.isVirtual) return false
+    if (device == null || device.isVirtual || !device.isEnabled) return false
     val sources = device.sources
     return (sources and InputDevice.SOURCE_MOUSE) == InputDevice.SOURCE_MOUSE ||
         (sources and InputDevice.SOURCE_TOUCHPAD) == InputDevice.SOURCE_TOUCHPAD

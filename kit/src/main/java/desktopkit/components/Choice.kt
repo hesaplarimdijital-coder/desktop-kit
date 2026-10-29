@@ -1,5 +1,6 @@
 package desktopkit.components
 
+import desktopkit.theme.rememberDeskHaptics
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -41,6 +42,7 @@ fun <T> SegmentedChoice(options: List<Pair<T, String>>, selected: T, onSelect: (
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
     val outer = RoundedCornerShape(dimens.radiusControl + 2.dp)
+    val haptics = rememberDeskHaptics()
     Row(
         modifier = modifier
             .background(colors.surface, outer)
@@ -65,6 +67,7 @@ fun <T> SegmentedChoice(options: List<Pair<T, String>>, selected: T, onSelect: (
                     .background(background, shape)
                     .pointerHoverIcon(PointerIcon.Hand)
                     .selectable(selected = isSelected, interactionSource = interaction, indication = null, role = Role.RadioButton) {
+                        if (!isSelected) haptics.tick()
                         onSelect(value)
                     }
                     .padding(horizontal = dimens.gapM),

@@ -66,4 +66,5 @@
     <string name="dk_tab_close">Close tab</string>
     <string name="dk_tabs">Tabs</string>
     <string name="dk_loading">Loading</string>
+    <string name="dk_accent_system">Wallpaper</string>
 </resources>

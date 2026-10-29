@@ -1,5 +1,6 @@
 package desktopkit.components
 
+import desktopkit.theme.rememberDeskHaptics
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -500,6 +501,7 @@ fun DeskSwitch(
     val halo = if (enabled) stateBackground(state) else Color.Transparent
     val shadow = if (colors.isDark) Color.Transparent else colors.text.copy(alpha = 0.18f)
     val trackShape = RoundedCornerShape(trackHeight / 2)
+    val haptics = rememberDeskHaptics()
     Box(
         modifier
             .heightIn(min = dimens.minTarget)
@@ -508,7 +510,10 @@ fun DeskSwitch(
                 if (onCheckedChange == null) Modifier else Modifier
                     .pointerHoverIcon(PointerIcon.Hand)
                     .hoverable(interaction, enabled)
-                    .toggleable(checked, interaction, indication = null, enabled = enabled, role = Role.Switch, onValueChange = onCheckedChange),
+                    .toggleable(checked, interaction, indication = null, enabled = enabled, role = Role.Switch) { on ->
+                        haptics.toggle(on)
+                        onCheckedChange(on)
+                    },
             )
             .alpha(if (enabled) 1f else 0.4f),
         contentAlignment = Alignment.Center,
@@ -541,13 +546,17 @@ fun SwitchRow(
     enabled: Boolean = true,
 ) {
     val interaction = remember { MutableInteractionSource() }
+    val haptics = rememberDeskHaptics()
     ToggleRow(
         title = title,
         subtitle = subtitle,
         enabled = enabled,
         modifier = modifier
             .hoverable(interaction, enabled)
-            .toggleable(checked, interaction, indication = null, enabled = enabled, role = Role.Switch, onValueChange = onCheckedChange),
+            .toggleable(checked, interaction, indication = null, enabled = enabled, role = Role.Switch) { on ->
+                haptics.toggle(on)
+                onCheckedChange(on)
+            },
         end = { DeskSwitch(checked, onCheckedChange = null, enabled = enabled, interactionSource = interaction) },
     )
 }

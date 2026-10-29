@@ -1,5 +1,6 @@
 package desktopkit.components
 
+import desktopkit.theme.rememberDeskHaptics
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
@@ -72,6 +73,7 @@ fun DeskChip(
     val state = interaction.collectState()
     val colors = DeskTheme.colors
     val touch = DeskTheme.inputMode == InputMode.Touch
+    val haptics = rememberDeskHaptics()
     val shape = RoundedCornerShape(50)
     val iconSize = if (touch) 18.dp else 14.dp
     val background by animatedStateBackground(state, selected, rest = colors.surface)
@@ -93,7 +95,10 @@ fun DeskChip(
                 indication = null,
                 enabled = enabled,
                 role = Role.Checkbox,
-                onValueChange = { onClick() },
+                onValueChange = { on ->
+                    haptics.toggle(on)
+                    onClick()
+                },
             )
             .padding(start = if (touch) 12.dp else 10.dp, end = if (touch) 14.dp else 10.dp),
         verticalAlignment = Alignment.CenterVertically,

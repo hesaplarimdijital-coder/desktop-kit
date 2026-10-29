@@ -1,5 +1,6 @@
 package desktopkit.theme
 
+import android.content.Context
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
@@ -38,6 +39,17 @@ class Accent(
 
         /** Any brand colour; it is lightened for the dark themes and darkened for the light one as needed. */
         fun custom(name: String, color: Color): Accent = Accent(name, color.copy(alpha = 1f))
+
+        /** The name [dynamic] accents carry; stored in the preferences like any other accent. */
+        const val DYNAMIC = "System"
+
+        /**
+         * The device's own accent colour, taken from the wallpaper (Android 12 and later): the system's
+         * light accent tone, fitted to each theme by the same contrast rules as [custom]. It changes
+         * with the wallpaper; [desktopkit.settings.rememberDeskPreferences] with `dynamicAccent = true`
+         * offers it next to the presets and reads it again after a configuration change.
+         */
+        fun dynamic(context: Context): Accent = Accent(DYNAMIC, Color(context.getColor(android.R.color.system_accent1_200)))
 
         /** Looks up a stored accent name; unknown names fall back to [default]. */
         fun fromName(name: String?, default: Accent = Blue, extra: List<Accent> = emptyList()): Accent =

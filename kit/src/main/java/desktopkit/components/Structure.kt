@@ -1,5 +1,6 @@
 package desktopkit.components
 
+import desktopkit.theme.rememberDeskHaptics
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -429,6 +430,7 @@ fun DeskTab(
     val textColor by animateInteractionColor(if (selected) colors.text else colors.textSecondary, selected)
     val accent = colors.accent
     val showClose = onClose != null && (touch || selected || state.hovered || state.focused)
+    val haptics = rememberDeskHaptics()
     val latestClose by rememberUpdatedState(onClose)
     val closeByMiddleClick: () -> Unit = remember { { latestClose?.invoke() } }
     Row(
@@ -451,7 +453,10 @@ fun DeskTab(
                 }
             }
             .middleClick(onClose != null, closeByMiddleClick)
-            .deskClickable(interaction, onClick, role = Role.Tab)
+            .deskClickable(interaction, {
+                if (!selected) haptics.tick()
+                onClick()
+            }, role = Role.Tab)
             .semantics { this.selected = selected }
             .padding(start = 12.dp, end = if (onClose != null) 4.dp else 12.dp),
         verticalAlignment = Alignment.CenterVertically,

@@ -127,7 +127,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            val prefs = rememberDeskPreferences(accents = Accent.presets + BrandAccent)
+            // the wallpaper's colour (Android 12+) is offered after the presets and the brand colour
+            val prefs = rememberDeskPreferences(accents = Accent.presets + BrandAccent, dynamicAccent = true)
             val navController = rememberNavController()
             val navigator = remember(navController) { ShellNavigator(navController) }
             val context = LocalContext.current
@@ -191,7 +192,7 @@ class MainActivity : ComponentActivity() {
                         "music" -> MusicScreen(playing = track, onPlay = { track = it })
                         "settings" -> LazyColumn(Modifier.fillMaxSize()) {
                             item { PageHeader(stringResource(desktopkit.R.string.dk_settings)) }
-                            item { AppearanceSection(prefs, accentLabel = { if (it == BrandAccent) "Marka" else it.name }) }
+                            item { AppearanceSection(prefs, accentLabel = { if (it == BrandAccent) "Marka" else if (it.name == Accent.DYNAMIC) "Duvar kâğıdı" else it.name }) }
                             item { InputSection(prefs) }
                             item { ShortcutListSection(shortcuts) }
                         }
