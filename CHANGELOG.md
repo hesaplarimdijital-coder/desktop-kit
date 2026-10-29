@@ -66,6 +66,8 @@ ayrıntı panelli iş istasyonu düzeni. Tablet ve DeX'teki animasyon süreleri 
 - **Vurgu rengi geçişi:** tema, vurgu (ve camın tonu) değişince renkleri 150 ms'de geçirir; kapak resminden
   alınan vurgu yumuşakça değişir. `DesktopKitRoot(prefs, accent = Accent.custom("Kapak", renk))` saklanan
   vurguyu kaydetmeden geçersiz kılar. `DesktopKitTheme(colorChangeMillis = 150)`, `lerpColors(a, b, t)`.
+- Fareyle tablo ve listelerde gezinirken iz kalması düzeltildi (0.2.1'deki düzeltme): üzerine gelme ve basma
+  renkleri farede anında değişir; dokunmatikte solma ve seçim geçişi kalır, saydama solarken koyu griye dönmez.
 - Menüler ve sağ tık menüleri kabuğun içinde buzlu cam; kabuk dışında eskisi gibi gölgeli düz yüzey.
 - Bağımlılıklar: `dev.chrisbanes.haze:haze` ve `haze-materials` 1.5.4 (Apache-2.0; Compose 1.7 ve Kotlin 2.1
   üzerine kurulu son Haze serisi; 1.6 Compose 1.8 ister). `activity-compose` 1.10.1 (Haze'in istediği).
