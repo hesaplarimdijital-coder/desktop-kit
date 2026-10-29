@@ -51,4 +51,19 @@
     <string name="dk_inspector_hide">Ayrıntı panelini gizle</string>
     <string name="dk_resize_inspector">Ayrıntı panelini boyutlandır</string>
     <string name="dk_key_esc">Esc</string>
+
+    <!-- 2.0: formlar, geri bildirim, yapı -->
+    <string name="dk_clear">Temizle</string>
+    <string name="dk_password_show">Parolayı göster</string>
+    <string name="dk_password_hide">Parolayı gizle</string>
+    <string name="dk_number_range">%1$s ile %2$s arasında olmalı</string>
+    <string name="dk_number_min">En az %1$s olmalı</string>
+    <string name="dk_number_max">En çok %1$s olabilir</string>
+    <string name="dk_number_decrease">Azalt</string>
+    <string name="dk_number_increase">Artır</string>
+    <string name="dk_notification">Bildirim</string>
+    <string name="dk_selection_clear">Seçimi kaldır</string>
+    <string name="dk_tab_close">Sekmeyi kapat</string>
+    <string name="dk_tabs">Sekmeler</string>
+    <string name="dk_loading">Yükleniyor</string>
 </resources>

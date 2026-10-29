@@ -21,6 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -65,7 +66,10 @@ fun DeskIconButton(
     }
 }
 
-/** Text button. [primary] fills it with the accent colour. */
+/**
+ * Text button. [primary] fills it with the accent colour. [icon] goes before the text,
+ * [trailingIcon] after it (a menu button's chevron).
+ */
 @Composable
 fun DeskButton(
     text: String,
@@ -74,6 +78,8 @@ fun DeskButton(
     icon: ImageVector? = null,
     primary: Boolean = false,
     enabled: Boolean = true,
+    trailingIcon: ImageVector? = null,
+    role: Role = Role.Button,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val state = interaction.collectState()
@@ -96,8 +102,9 @@ fun DeskButton(
             .focusRing(state, shape)
             .background(background, shape)
             .then(if (primary) Modifier else Modifier.border(1.dp, colors.borderStrong, shape))
-            .deskClickable(interaction, onClick, enabled = enabled, role = Role.Button)
-            .padding(horizontal = dimens.gapM),
+            .deskClickable(interaction, onClick, enabled = enabled, role = role)
+            .padding(start = dimens.gapM, end = if (trailingIcon != null) dimens.gapS else dimens.gapM)
+            .alpha(if (enabled) 1f else 0.5f),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
@@ -106,6 +113,10 @@ fun DeskButton(
             Spacer(Modifier.width(dimens.gapS))
         }
         Text(text, style = DeskTheme.type.label, color = content, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (trailingIcon != null) {
+            Spacer(Modifier.width(dimens.gapXs + 2.dp))
+            Icon(trailingIcon, contentDescription = null, tint = if (primary) content else colors.textSecondary, modifier = Modifier.size(dimens.icon))
+        }
     }
 }
 

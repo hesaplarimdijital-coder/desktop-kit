@@ -51,4 +51,19 @@
     <string name="dk_inspector_hide">Hide the inspector</string>
     <string name="dk_resize_inspector">Resize the inspector</string>
     <string name="dk_key_esc">Esc</string>
+
+    <!-- 2.0: forms, feedback, structure -->
+    <string name="dk_clear">Clear</string>
+    <string name="dk_password_show">Show password</string>
+    <string name="dk_password_hide">Hide password</string>
+    <string name="dk_number_range">Must be between %1$s and %2$s</string>
+    <string name="dk_number_min">Must be %1$s or more</string>
+    <string name="dk_number_max">Must be %1$s or less</string>
+    <string name="dk_number_decrease">Decrease</string>
+    <string name="dk_number_increase">Increase</string>
+    <string name="dk_notification">Notification</string>
+    <string name="dk_selection_clear">Clear selection</string>
+    <string name="dk_tab_close">Close tab</string>
+    <string name="dk_tabs">Tabs</string>
+    <string name="dk_loading">Loading</string>
 </resources>

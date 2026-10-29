@@ -8,13 +8,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.geometry.Offset
@@ -49,6 +52,12 @@ import desktopkit.components.DeskChip
 import desktopkit.components.DeskIconButton
 import desktopkit.components.DeskIcons
 import desktopkit.components.DeskSlider
+import desktopkit.components.DeskCard
+import desktopkit.components.DeskCheckbox
+import desktopkit.components.DeskListRow
+import desktopkit.components.DeskSwitch
+import desktopkit.components.DeskTab
+import desktopkit.components.DeskTextField
 import desktopkit.components.SegmentedChoice
 import desktopkit.components.SwatchChoice
 import desktopkit.components.TableColumn
@@ -113,6 +122,13 @@ class ComponentStatesTest {
         Sample("Tablo satırı", { compose.onNodeWithText("Tatil fotoğrafları") }),
         Sample("Kaydırıcı", { compose.onNodeWithTag("slider") }),
         Sample("Bölme ayırıcısı", { compose.onNodeWithContentDescription("Bölme ayırıcısı") }, margin = 12.dp),
+        // 2.0
+        Sample("Onay kutusu", { compose.onNodeWithTag("checkbox") }),
+        Sample("Anahtar", { compose.onNodeWithTag("switch") }),
+        Sample("Metin alanı", { compose.onNodeWithTag("text-field") }),
+        Sample("Sekme", { compose.onNodeWithTag("tab") }),
+        Sample("Liste satırı", { compose.onNodeWithTag("list-row") }, { compose.onNodeWithText("Kış Bahçesi") }),
+        Sample("Kart", { compose.onNodeWithTag("card") }),
     )
 
     private val states = listOf("Normal", "Üzerinde", "Odak", "Basılı")
@@ -153,6 +169,21 @@ class ComponentStatesTest {
                 )
             }
             DeskSlider(value = 0.3f, onValueChange = {}, modifier = Modifier.width(320.dp).testTag("slider"))
+            Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
+                DeskCheckbox(checked = true, onCheckedChange = {}, modifier = Modifier.testTag("checkbox"))
+                DeskSwitch(checked = false, onCheckedChange = {}, modifier = Modifier.testTag("switch"))
+                DeskTextField("Mavi Hat", {}, Modifier.width(220.dp).testTag("text-field"), leading = DeskIcons.Search)
+                DeskTab("Albümler", selected = false, onClick = {}, modifier = Modifier.testTag("tab"))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                Box(Modifier.width(320.dp)) {
+                    DeskListRow("Kış Bahçesi", Modifier.testTag("list-row"), subtitle = "Mavi Hat · 2021", trailing = "42:10", onClick = {})
+                }
+                DeskCard(Modifier.width(220.dp).testTag("card"), onClick = {}) {
+                    Text("Çalma listesi", style = DeskTheme.type.bodyStrong, color = DeskTheme.colors.text)
+                    Text("24 parça", style = DeskTheme.type.labelSmall, color = DeskTheme.colors.textTertiary)
+                }
+            }
             Box(Modifier.size(420.dp, 80.dp)) {
                 HorizontalSplitPane(
                     state = rememberSplitState(200.dp),

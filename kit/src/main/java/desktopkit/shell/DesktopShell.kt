@@ -32,6 +32,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Size
@@ -51,6 +52,8 @@ import androidx.navigation.compose.rememberNavController
 import desktopkit.LocalRootInsets
 import desktopkit.components.ActionGroup
 import desktopkit.components.ActionGroupList
+import desktopkit.components.DeskToastState
+import desktopkit.components.ToastHost
 import desktopkit.components.GlassBottomSheet
 import desktopkit.components.MenuBarMenus
 import desktopkit.components.MenuEntry
@@ -151,6 +154,8 @@ class ShellNavigator(private val navController: NavHostController) {
  * @param floatingPlayer on tablet and DeX, the [bottomBar] floats over the content's bottom edge as a
  *   rounded glass bar (the content scrolls beneath it) instead of being stacked under the content.
  * @param glass false draws every bar, sheet and menu as a solid surface.
+ * @param toasts short messages ([desktopkit.components.DeskToastState.show]) shown above the bottom bar
+ *   and the player on a phone, above the player on tablet and DeX.
  * @param content the screen for a route of [spec]. The "More" route is handled by the shell. On
  *   compact windows a screen can change the top bar with [CompactTopBar]; [LocalWidthClass] and
  *   [currentWidthClass] tell it the width class in use.
@@ -179,6 +184,7 @@ fun DesktopShell(
     moreActions: List<ActionGroup> = emptyList(),
     floatingPlayer: Boolean = false,
     glass: Boolean = true,
+    toasts: DeskToastState? = null,
     content: @Composable (route: String, navigator: ShellNavigator) -> Unit,
 ) {
     // tablet and DeX read one size larger; phones get the tighter compact sizes
@@ -223,6 +229,7 @@ fun DesktopShell(
                 floatingPlayer = floatingPlayer,
                 tier = tier,
                 glassMode = glassMode,
+                toasts = toasts,
                 content = content,
             )
         }
@@ -252,6 +259,7 @@ private fun ShellContent(
     floatingPlayer: Boolean,
     tier: MotionTier,
     glassMode: GlassMode,
+    toasts: DeskToastState?,
     content: @Composable (route: String, navigator: ShellNavigator) -> Unit,
 ) {
     val navigator = remember(navController) { ShellNavigator(navController) }
@@ -431,6 +439,19 @@ private fun ShellContent(
             },
             overlay = {
                 Box(Modifier.fillMaxSize().onGloballyPositioned { overlayHost.coordinates = it }) {
+                    // toasts sit above the bars and the player, under sheets and the expanded player
+                    if (toasts != null) {
+                        val toastBottom: () -> Int = {
+                            val system = systemBottom()
+                            when {
+                                navKind == NavKind.BottomBar ->
+                                    metrics.navPx + metrics.playerPx + system - scroll.offsetPx.roundToInt().coerceIn(0, metrics.navPx)
+                                floating -> metrics.playerPx + metrics.floatingMarginPx + system
+                                else -> metrics.playerPx + system
+                            }
+                        }
+                        ToastHost(toasts, Modifier.align(Alignment.BottomCenter).bottomInsetPadding(toastBottom))
+                    }
                     overlayHost.layers.forEach { layer -> key(layer) { layer.content() } }
                 }
             },
