@@ -68,6 +68,9 @@ ayrıntı panelli iş istasyonu düzeni. Tablet ve DeX'teki animasyon süreleri 
   vurguyu kaydetmeden geçersiz kılar. `DesktopKitTheme(colorChangeMillis = 150)`, `lerpColors(a, b, t)`.
 - Fareyle tablo ve listelerde gezinirken iz kalması düzeltildi (0.2.1'deki düzeltme): üzerine gelme ve basma
   renkleri farede anında değişir; dokunmatikte solma ve seçim geçişi kalır, saydama solarken koyu griye dönmez.
+- Sağ tık menüsü (0.2.2'deki düzeltme): menü açıkken başka yere tıklayınca menü bir anlığına başka yerde
+  görünmüyor, açıldığı yerde solarak kapanır. Başka yere sol tık ya da dokunma yalnızca menüyü kapatır, altındaki
+  satırı seçmez; sağ tık eski menüyü kapatıp tıklanan yerde yenisini açar. Esc menüyü her durumda kapatır.
 - Menüler ve sağ tık menüleri kabuğun içinde buzlu cam; kabuk dışında eskisi gibi gölgeli düz yüzey.
 - Bağımlılıklar: `dev.chrisbanes.haze:haze` ve `haze-materials` 1.5.4 (Apache-2.0; Compose 1.7 ve Kotlin 2.1
   üzerine kurulu son Haze serisi; 1.6 Compose 1.8 ister). `activity-compose` 1.10.1 (Haze'in istediği).
