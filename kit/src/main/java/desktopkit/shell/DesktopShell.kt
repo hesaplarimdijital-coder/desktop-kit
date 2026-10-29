@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.derivedStateOf
@@ -32,6 +33,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -45,6 +48,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import desktopkit.LocalRootInsets
 import desktopkit.components.ActionGroup
 import desktopkit.components.ActionGroupList
 import desktopkit.components.GlassBottomSheet
@@ -281,6 +285,13 @@ private fun ShellContent(
     val overlayHost = remember { ShellOverlayHost() }
     val glassSource = remember { HazeState() }
     val padding = remember(metrics, density) { shellPaddingValues(metrics, density) }
+    // the root leaves the system navigation bar at the bottom to the shell, which draws its chrome behind it
+    val rootInsets = LocalRootInsets.current
+    DisposableEffect(rootInsets) {
+        rootInsets?.let { it.shells++ }
+        onDispose { rootInsets?.let { it.shells-- } }
+    }
+    val systemBottom: () -> Int = remember(rootInsets, density) { { rootInsets?.navigationBottom?.getBottom(density) ?: 0 } }
     val floating = floatingPlayer && navKind != NavKind.BottomBar
     val floatingMargin = 12.dp
     var moreOpen by remember { mutableStateOf(false) }
@@ -293,6 +304,8 @@ private fun ShellContent(
         metrics.underFloatingPlayer = floating
         metrics.floatingMarginPx = with(density) { floatingMargin.roundToPx() }
         if (!showBottomNav || navKind != NavKind.BottomBar) metrics.navPx = 0
+        metrics.systemBottomPx = systemBottom
+        overlayHost.systemBottomPx = systemBottom
         overlayHost.onExpandStart = { scroll.showBars() }
     }
     // every screen starts with the bars shown and a flat top bar
@@ -424,6 +437,8 @@ private fun ShellContent(
             navigationOffset = { if (navKind == NavKind.BottomBar) scroll.offsetPx.roundToInt() else 0 },
             floatingPlayer = floating,
             floatingMargin = floatingMargin,
+            systemBottom = systemBottom,
+            systemBand = { SystemBand(navKind, scroll) },
         )
 
         if (spec.moreStyle == MoreStyle.Sheet) {
@@ -431,6 +446,30 @@ private fun ShellContent(
                 ActionGroupList(moreSheetGroups(spec, navKind, navigator) + moreActions, onDismiss = { moreOpen = false })
             }
         }
+    }
+}
+
+/**
+ * What lies behind the system navigation bar (three buttons or the gesture handle): on a phone the
+ * glass of the bottom bar, which stays when the bars slide away beneath it and then shows a rule along
+ * its top; on tablets the chrome colour, continuing the rail or sidebar.
+ */
+@Composable
+private fun SystemBand(navKind: NavKind, scroll: ShellScrollState) {
+    val colors = DeskTheme.colors
+    if (navKind == NavKind.BottomBar) {
+        val rule = colors.border
+        Box(
+            Modifier
+                .fillMaxSize()
+                .glass(DeskGlass.chrome(colors, GlassThickness.Regular))
+                .drawBehind {
+                    val hidden = if (scroll.maxOffsetPx > 0f) (scroll.offsetPx / scroll.maxOffsetPx).coerceIn(0f, 1f) else 0f
+                    if (hidden > 0f) drawRect(rule.copy(alpha = rule.alpha * hidden), size = Size(size.width, 1.dp.toPx()))
+                },
+        )
+    } else {
+        Box(Modifier.fillMaxSize().background(colors.chrome))
     }
 }
 

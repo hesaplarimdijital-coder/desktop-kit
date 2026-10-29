@@ -21,6 +21,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.offset
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
@@ -45,11 +46,17 @@ internal class ShellChromeMetrics {
     var underFloatingPlayer by mutableStateOf(false)
     var floatingMarginPx by mutableIntStateOf(0)
 
+    /**
+     * The system navigation bar at the bottom of the window (three buttons or the gesture handle),
+     * which the shell's chrome continues behind; read while measuring.
+     */
+    var systemBottomPx: () -> Int by mutableStateOf({ 0 })
+
     val topPadPx: Int get() = if (underTop) topPx else 0
 
     val bottomPadPx: Int
         get() = when {
-            underBottom -> navPx + playerPx
+            underBottom -> navPx + playerPx + systemBottomPx()
             underFloatingPlayer && playerPx > 0 -> playerPx + 2 * floatingMarginPx
             else -> 0
         }
@@ -163,6 +170,23 @@ internal class ShellOverlayHost {
 
     /** Called when the player starts to expand: the shell brings the bars back first. */
     var onExpandStart: () -> Unit = {}
+
+    /**
+     * Height of the system navigation bar the overlay reaches behind (px, read while measuring):
+     * sheets and the expanded player keep their controls above it.
+     */
+    var systemBottomPx: () -> Int by mutableStateOf({ 0 })
+}
+
+/**
+ * Pads the bottom by [px] pixels, read while measuring (so a changing inset re-measures without
+ * recomposing); for content that must stay clear of the system navigation bar.
+ */
+internal fun Modifier.bottomInsetPadding(px: () -> Int): Modifier = layout { measurable, constraints ->
+    val bottom = px().coerceAtLeast(0)
+    val placeable = measurable.measure(constraints.offset(vertical = -bottom))
+    val height = (placeable.height + bottom).coerceIn(constraints.minHeight, constraints.maxHeight)
+    layout(placeable.width, height) { placeable.place(0, 0) }
 }
 
 internal val LocalShellOverlayHost = staticCompositionLocalOf<ShellOverlayHost?> { null }

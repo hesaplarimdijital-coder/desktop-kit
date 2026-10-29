@@ -73,6 +73,7 @@ import desktopkit.R
 import desktopkit.shell.LocalShellOverlayHost
 import desktopkit.shell.ShellOverlayHost
 import desktopkit.shell.WidthClass
+import desktopkit.shell.bottomInsetPadding
 import desktopkit.shell.currentWidthClass
 import desktopkit.theme.DeskGlass
 import desktopkit.theme.DeskMotion
@@ -230,7 +231,7 @@ fun GlassBottomSheet(
     }
     val host = LocalShellOverlayHost.current
     if (host != null) {
-        OverlayLayer(host, sheet)
+        OverlayLayer(host) { SheetSurface(progress, drag, tier, title, modifier, { latestDismiss() }, content, host.systemBottomPx) }
         BackHandler(enabled = visible) { latestDismiss() }
     } else {
         val view = LocalView.current
@@ -270,6 +271,7 @@ private fun SheetSurface(
     modifier: Modifier,
     onDismiss: () -> Unit,
     content: @Composable ColumnScope.() -> Unit,
+    bottomInset: () -> Int = { 0 },
 ) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
@@ -327,7 +329,9 @@ private fun SheetSurface(
                         }
                     },
                 )
-                .padding(bottom = dimens.gapM),
+                .padding(bottom = dimens.gapM)
+                // the glass reaches behind the system navigation bar, the last row stays above it
+                .bottomInsetPadding(bottomInset),
         ) {
             // the handle says "drag me"
             Box(Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 6.dp), contentAlignment = Alignment.Center) {

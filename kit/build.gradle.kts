@@ -69,6 +69,8 @@ dependencies {
     implementation(libs.compose.ui.tooling.preview)
     // BackHandler for CompactTopBar; navigation-compose already brings it in
     implementation(libs.activity.compose)
+    // WindowCompat (system bar icons), ViewCompat
+    implementation(libs.core)
     implementation(libs.coroutines.android)
 
     testImplementation(libs.junit)
