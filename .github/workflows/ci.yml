@@ -1,7 +1,8 @@
 # Builds the kit and the sample app, runs the unit tests (including the Robolectric screenshot
 # tests) and compares the screenshots with kit/src/test/screenshots. On main the screenshots are
 # pushed to the ci/screenshots branch for review. Build errors and failed tests are reported as
-# annotations on the commit.
+# annotations on the commit; for a pull request from this repository the whole build output and
+# the test results are also pushed to ci/logs-pr-<number>, readable with git.
 name: CI
 
 on:
@@ -26,14 +27,16 @@ jobs:
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '17'
+          # Robolectric needs Java 21 to run the tests on Android 16 (API 36); the kit still
+          # targets Java 17 bytecode, and JitPack builds it with Java 17 (jitpack.yml)
+          java-version: '21'
 
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Build and test
         run: |
           ./gradlew :kit:testDebugUnitTest :kit:publishToMavenLocal :sample:assembleDebug \
-            --continue --console=plain 2>&1 | tee build.log
+            --continue --stacktrace --console=plain 2>&1 | tee build.log
           exit ${PIPESTATUS[0]}
 
       - name: Annotate errors
@@ -41,6 +44,24 @@ jobs:
         run: |
           python3 tools/annotate_gradle_errors.py build.log
           python3 tools/annotate_test_failures.py kit/build/test-results
+
+      - name: Push logs to ci/logs-pr-<number>
+        if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          TOKEN: ${{ github.token }}
+          TARGET: ci/logs-pr-${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          out="$RUNNER_TEMP/logs"
+          rm -rf "$out" && mkdir -p "$out"
+          [ -f build.log ] && cp build.log "$out/"
+          [ -d kit/build/test-results ] && cp -r kit/build/test-results "$out/"
+          echo "${HEAD_SHA}" > "$out/HEAD_SHA"
+          cd "$out"
+          git init -q && git checkout -q --orphan "$TARGET"
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com add -A
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -q -m "Logs for ${HEAD_SHA::7}"
+          git push -q --force "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/$TARGET"
 
       - name: Compare screenshots
         if: always()
@@ -54,6 +75,7 @@ jobs:
         env:
           TOKEN: ${{ github.token }}
           TARGET: ${{ github.event_name == 'pull_request' && format('ci/screenshots-pr-{0}', github.event.pull_request.number) || 'ci/screenshots' }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           src=kit/build/outputs/screenshots
           [ -d "$src" ] || exit 0
@@ -62,7 +84,7 @@ jobs:
           cd "$out"
           git init -q && git checkout -q --orphan "$TARGET"
           git -c user.name=ci -c user.email=ci@users.noreply.github.com add -A
-          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -q -m "Screenshots for ${GITHUB_SHA::7}"
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -q -m "Screenshots for ${HEAD_SHA::7}"
           git push -q --force "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/$TARGET"
 
       - name: Screenshots
