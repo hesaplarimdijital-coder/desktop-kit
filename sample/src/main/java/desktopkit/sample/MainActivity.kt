@@ -226,7 +226,7 @@ class MainActivity : ComponentActivity() {
 
     /** Meta+/ (or the system's keyboard shortcuts screen) lists the same table. */
     override fun onProvideKeyboardShortcuts(data: MutableList<KeyboardShortcutGroup>, menu: Menu?, deviceId: Int) {
-        if (android.os.Build.VERSION.SDK_INT >= 24) data.addAll(shortcuts.keyboardShortcutGroups(resources))
+        data.addAll(shortcuts.keyboardShortcutGroups(resources))
     }
 }
 

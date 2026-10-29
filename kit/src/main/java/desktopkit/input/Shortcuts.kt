@@ -4,7 +4,6 @@ import android.content.res.Resources
 import android.view.KeyEvent as AndroidKeyEvent
 import android.view.KeyboardShortcutGroup
 import android.view.KeyboardShortcutInfo
-import androidx.annotation.RequiresApi
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.input.key.Key
@@ -195,7 +194,6 @@ class ShortcutRegistry(val groups: List<ShortcutGroup>, val shortcuts: List<Shor
      * The keyboard shortcut helper list (Meta+/ or the system's keyboard shortcuts screen).
      * Return it from `Activity.onProvideKeyboardShortcuts`.
      */
-    @RequiresApi(24)
     fun keyboardShortcutGroups(resources: Resources): List<KeyboardShortcutGroup> =
         groups.mapNotNull { group ->
             val items = inGroup(group).map { shortcut ->

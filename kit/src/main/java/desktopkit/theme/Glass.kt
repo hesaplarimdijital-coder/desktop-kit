@@ -42,10 +42,11 @@ enum class GlassThickness { UltraThin, Thin, Regular }
 
 /**
  * What glass looks like on this device right now:
- * - [Blur]: Android 12+ (API 31) with hardware rendering: the content behind is blurred (Haze).
+ * - [Blur]: hardware rendering: the content behind is blurred (Haze).
  *   A blur source cannot be drawn into a software canvas (`View.draw(Canvas(bitmap))`); to capture
  *   a window as a picture use `PixelCopy`, or provide [LocalGlassMode] = [Translucent] while drawing it;
- * - [Translucent]: Android 11 and older: a translucent tint, no blur;
+ * - [Translucent]: software rendering (and Android 11 and older, which the kit no longer runs on):
+ *   a translucent tint, no blur;
  * - [Solid]: battery saver or "Remove animations" (animator scale 0) is on: an opaque surface,
  *   nothing is recorded or blurred.
  */
@@ -185,7 +186,7 @@ fun rememberSystemGlassMode(): GlassMode {
 
 /**
  * Robolectric draws into software canvases, which cannot draw the blur's render nodes; tests get
- * the translucent look instead (as on Android 11).
+ * the translucent look instead.
  */
 private val isTestRenderer: Boolean = Build.FINGERPRINT == "robolectric"
 

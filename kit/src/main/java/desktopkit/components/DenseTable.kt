@@ -380,7 +380,7 @@ private fun <T> HeaderCell(column: TableColumn<T>, index: Int, sort: TableSort?,
             .background(if (clickable) stateBackground(state) else Color.Transparent, shape)
             .then(
                 if (clickable) Modifier.deskClickable(interaction, {
-                    onSortChange?.invoke(TableSort(index, if (active) !(sort?.ascending ?: true) else true))
+                    onSortChange(TableSort(index, if (active) !sort.ascending else true))
                 }, role = Role.Button) else Modifier,
             )
             .padding(horizontal = 8.dp),
@@ -390,7 +390,7 @@ private fun <T> HeaderCell(column: TableColumn<T>, index: Int, sort: TableSort?,
         Text(column.title, style = DeskTheme.type.labelSmall, color = if (active) colors.text else colors.textTertiary, maxLines = 1)
         if (active) {
             Spacer(Modifier.width(4.dp))
-            Icon(if (sort?.ascending != false) DeskIcons.ChevronUp else DeskIcons.ChevronDown, contentDescription = null,
+            Icon(if (sort.ascending) DeskIcons.ChevronUp else DeskIcons.ChevronDown, contentDescription = null,
                 tint = colors.textSecondary, modifier = Modifier.size(12.dp))
         }
     }

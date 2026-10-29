@@ -3,7 +3,6 @@ package desktopkit.theme
 import android.animation.ValueAnimator
 import android.content.Context
 import android.database.ContentObserver
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
@@ -139,7 +138,7 @@ fun rememberReducedMotion(): Boolean {
 object SystemMotion {
     /** "Remove animations" is on, or the animator duration scale is 0. */
     fun reduced(context: Context): Boolean {
-        if (Build.VERSION.SDK_INT >= 26 && !ValueAnimator.areAnimatorsEnabled()) return true
+        if (!ValueAnimator.areAnimatorsEnabled()) return true
         val scale = runCatching {
             Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
         }.getOrDefault(1f)
