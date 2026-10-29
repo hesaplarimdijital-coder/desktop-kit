@@ -1,5 +1,14 @@
 # Değişiklikler
 
+## 0.2.2 (2026-10-30)
+
+- Sağ tık menüsü: menü açıkken başka yere tıklayınca menü bir anlığına başka yerde görünmüyor. Kapanırken
+  açıldığı yerde solar (önceden satırın köşesine sıçrayıp orada soluyordu).
+- Menü açıkken başka yere sol tık ya da dokunma yalnızca menüyü kapatır; altındaki satırı seçmez
+  (Android'in açılır menüleri gibi). Sağ tık ise eski menüyü kapatıp tıklanan yerde yenisini açar.
+- Esc menüyü her durumda kapatır (fareyle açılıp hiçbir öğe seçilmemişken de). Kapanmakta olan menü
+  artık tıklamaları ve klavyeyi tutmaz.
+
 ## 0.2.1 (2026-10-29)
 
 - Fareyle tablo ve listelerde gezinirken iz kalması düzeltildi: üzerine gelme ve basma renkleri farede anında

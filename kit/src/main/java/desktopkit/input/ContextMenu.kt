@@ -5,6 +5,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -82,6 +83,9 @@ private suspend fun androidx.compose.ui.input.pointer.AwaitPointerEventScope.con
  * gestures, the Menu key or Shift+F10 opens it for the focused element, and TalkBack gets a
  * custom action with the same label.
  *
+ * While the menu is open, a click or tap elsewhere only closes it (where it is); a right click
+ * elsewhere closes it and opens the menu of whatever is under the pointer. Esc closes it too.
+ *
  * [onOpen] runs just before the menu opens, whichever way it is opened, and before [entries] is
  * called: a list uses it to select the row under the pointer.
  */
@@ -119,11 +123,15 @@ fun ContextMenuArea(
             },
     ) {
         content()
-        MenuPopup(
-            visible = menu.isOpen,
-            onDismiss = menu::close,
-            entries = if (menu.isOpen) currentEntries() else emptyList(),
-            offset = menu.offset ?: IntOffset.Zero,
-        )
+        // a new pop-up for every opening: reopened elsewhere, the old menu goes at once instead of
+        // moving to the new place; closed, it fades out where it was
+        key(menu.generation) {
+            MenuPopup(
+                visible = menu.isOpen,
+                onDismiss = menu::close,
+                entries = if (menu.isOpen) currentEntries() else emptyList(),
+                offset = menu.offset ?: IntOffset.Zero,
+            )
+        }
     }
 }
