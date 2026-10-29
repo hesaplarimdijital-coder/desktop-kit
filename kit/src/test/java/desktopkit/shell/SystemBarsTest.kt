@@ -96,10 +96,11 @@ class SystemBarsTest {
         // the bottom bar's tabs stay above the buttons
         val tab = compose.onNodeWithText("Müzik").getBoundsInRoot()
         assertTrue("tab ends at ${tab.bottom}, buttons start at ${root.bottom - 48.dp}", tab.bottom <= root.bottom - 48.dp)
-        // a screen that does not pad itself ends where the status strip (49 dp) and the bottom bar (64 dp) start
+        // a screen that does not pad itself ends where the status strip (1 dp rule + 48 dp) and the bottom
+        // bar (1 dp rule + 64 dp) start; each rounds to whole pixels
         val content = compose.onNodeWithTag("content").getBoundsInRoot()
-        val gap = root.bottom - content.bottom - (48.dp + 64.dp + 49.dp)
-        assertTrue("content ends ${gap} away from the bars", abs(gap.value) < 1f)
+        val gap = root.bottom - content.bottom - (48.dp + 65.dp + 49.dp)
+        assertTrue("content ends $gap away from the bars", abs(gap.value) < 1.5f)
         // behind the buttons: the bar's chrome, not the window background
         val bitmap = window("compact-dark-three-button-navigation")
         val behindButtons = bitmap.getPixel(bitmap.width / 2, bitmap.height - px(12.dp))
