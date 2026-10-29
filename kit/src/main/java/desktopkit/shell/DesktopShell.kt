@@ -156,6 +156,8 @@ class ShellNavigator(private val navController: NavHostController) {
  * @param glass false draws every bar, sheet and menu as a solid surface.
  * @param toasts short messages ([desktopkit.components.DeskToastState.show]) shown above the bottom bar
  *   and the player on a phone, above the player on tablet and DeX.
+ * @param overlays drawn over the whole shell, bars included, with the shell's glass: the place for the
+ *   [desktopkit.components.CommandPalette].
  * @param content the screen for a route of [spec]. The "More" route is handled by the shell. On
  *   compact windows a screen can change the top bar with [CompactTopBar]; [LocalWidthClass] and
  *   [currentWidthClass] tell it the width class in use.
@@ -185,6 +187,7 @@ fun DesktopShell(
     floatingPlayer: Boolean = false,
     glass: Boolean = true,
     toasts: DeskToastState? = null,
+    overlays: @Composable () -> Unit = {},
     content: @Composable (route: String, navigator: ShellNavigator) -> Unit,
 ) {
     // tablet and DeX read one size larger; phones get the tighter compact sizes
@@ -230,6 +233,7 @@ fun DesktopShell(
                 tier = tier,
                 glassMode = glassMode,
                 toasts = toasts,
+                overlays = overlays,
                 content = content,
             )
         }
@@ -260,6 +264,7 @@ private fun ShellContent(
     tier: MotionTier,
     glassMode: GlassMode,
     toasts: DeskToastState?,
+    overlays: @Composable () -> Unit,
     content: @Composable (route: String, navigator: ShellNavigator) -> Unit,
 ) {
     val navigator = remember(navController) { ShellNavigator(navController) }
@@ -467,6 +472,7 @@ private fun ShellContent(
                 ActionGroupList(moreSheetGroups(spec, navKind, navigator) + moreActions, onDismiss = { moreOpen = false })
             }
         }
+        CompositionLocalProvider(LocalNavKind provides navKind) { overlays() }
     }
 }
 

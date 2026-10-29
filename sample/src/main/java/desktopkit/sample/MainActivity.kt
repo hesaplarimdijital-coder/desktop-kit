@@ -49,6 +49,11 @@ import desktopkit.DesktopKitRoot
 import desktopkit.components.ActionGroup
 import desktopkit.components.ChipOption
 import desktopkit.components.ColumnWidth
+import desktopkit.components.CommandPalette
+import desktopkit.components.PaletteItem
+import desktopkit.components.paletteItems
+import desktopkit.components.rememberCommandPaletteState
+import desktopkit.components.rememberToastState
 import desktopkit.components.DenseTable
 import desktopkit.components.DeskButton
 import desktopkit.components.DeskDialog
@@ -132,8 +137,13 @@ class MainActivity : ComponentActivity() {
             val navController = rememberNavController()
             val navigator = remember(navController) { ShellNavigator(navController) }
             val context = LocalContext.current
+            // Ctrl+K: the command palette over the shortcut table and the app's screens
+            val palette = rememberCommandPaletteState()
+            val toasts = rememberToastState()
+            val appSpec = spec()
             perform = { id ->
                 when (id) {
+                    CommonShortcuts.SEARCH -> palette.open()
                     CommonShortcuts.SETTINGS -> navigator.navigate("settings")
                     CommonShortcuts.SHORTCUT_LIST -> navigator.navigate("settings")
                     CommonShortcuts.TOGGLE_SIDEBAR -> prefs.updateSidebarCollapsed(!prefs.sidebarCollapsed)
@@ -163,6 +173,17 @@ class MainActivity : ComponentActivity() {
                     badges = mapOf("files" to "128"),
                     menus = shortcuts.menus(context.resources, perform = { perform(it) }),
                     onSearch = { perform(CommonShortcuts.SEARCH) },
+                    toasts = toasts,
+                    overlays = {
+                        CommandPalette(
+                            state = palette,
+                            items = {
+                                appSpec.items.map { item ->
+                                    PaletteItem(item.route, item.label, "Ekranlar", { navigator.navigate(item.route) }, icon = item.icon)
+                                } + shortcuts.paletteItems(context.resources) { id -> perform(id) }
+                            },
+                        )
+                    },
                     // phone: three tabs and "⋯"; the sheet lists the other screens, then these
                     moreActions = listOf(
                         ActionGroup("App", listOf(

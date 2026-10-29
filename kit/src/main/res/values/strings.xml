@@ -67,4 +67,9 @@
     <string name="dk_tabs">Tabs</string>
     <string name="dk_loading">Loading</string>
     <string name="dk_accent_system">Wallpaper</string>
+    <string name="dk_palette">Command palette</string>
+    <string name="dk_palette_best">Best match</string>
+    <string name="dk_palette_all">All</string>
+    <string name="dk_palette_none">Nothing found</string>
+    <string name="dk_palette_new_window">in a new window</string>
 </resources>

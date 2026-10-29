@@ -151,6 +151,8 @@ fun TestShell(
     floatingPlayer: Boolean = false,
     glassMode: GlassMode? = GlassMode.Translucent,
     moreActions: List<ActionGroup> = emptyList(),
+    toasts: desktopkit.components.DeskToastState? = null,
+    overlays: @Composable () -> Unit = {},
     content: @Composable (String, ShellNavigator) -> Unit = { route, _ -> SampleScreen(route) },
 ) {
     val navController = rememberNavController()
@@ -172,6 +174,8 @@ fun TestShell(
             transitions = transitions,
             floatingPlayer = floatingPlayer,
             moreActions = moreActions,
+            toasts = toasts,
+            overlays = overlays,
             content = content,
         )
     }
