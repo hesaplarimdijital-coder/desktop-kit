@@ -1,11 +1,11 @@
 # Değişiklikler
 
-## 2.0.1 (2026-10-30)
+## 2.1.0 (2026-10-30)
 
 Galaxy S24 ve Galaxy Tab S11 Ultra'daki kullanım testlerinde bulunanların düzeltmeleri. 2.0.0 için yazılmış kod
-değişmeden derlenir; düzeltmelere eşlik eden üç küçük ekleme var: `Modifier.keepsKeyboardOpen()`,
-`hasHardwareKeyboard()` ve `detailSharedElement(…, shape)`. Uygulamanın fark edebileceği davranış değişiklikleri
-[MIGRATION.md](MIGRATION.md#200dan-201e) içinde.
+değişmeden derlenir. Düzeltmelere eşlik eden üç ekleme (`Modifier.keepsKeyboardOpen()`, `hasHardwareKeyboard()`,
+`detailSharedElement(…, shape)`) ve davranış değişiklikleri yüzünden sürüm, kuralımız gereği ikinci sayıyı artırır.
+Uygulamanın fark edebileceği değişiklikler [MIGRATION.md](MIGRATION.md#200dan-210a) içinde.
 
 ### Telefon
 
@@ -16,24 +16,26 @@ değişmeden derlenir; düzeltmelere eşlik eden üç küçük ekleme var: `Modi
   çizmediğini ölçüm sırasında okuyordu; kabuk tam o sırada kaydolduğu için boşluk bir sonraki yeniden yerleşime
   (tema değişimi gibi) kadar yanlış kalıyordu.
 - **Cam alt sayfa ("⋯"):** listenin her yerinden aşağı çekince kapanır (liste en üstteyken), yalnızca tutamaktan ve
-  başlıktan değil; çekilmiş sayfayı yukarı itmek önce sayfayı kaldırır, sonra liste kayar. Fare tekerleği sayfayı
-  oynatmaz.
+  başlıktan değil: yavaşça üçte birini geçince ya da hızlı bir fırlatışla. Çekilmiş sayfayı yukarı itmek önce sayfayı
+  kaldırır, sonra liste kayar. Fare tekerleği sayfayı oynatmaz.
 - **Açık/kapalı eylemler:** `MenuEntry.Item(checked = …)` alt sayfada satırın sonunda bir anahtardır (kapalıyken boş
   duran onay sütunu yok). Öğe kendi simgesini korur, dokunmak sayfayı kapatmadan değiştirir, TalkBack anahtar olarak
   okur. Menülerde onay işareti kalır ve durumunu TalkBack'e söyler.
 - **Kapak geçişi:** albümden geri dönerken kapak uçarken de köşeleri yuvarlak (önce köşeli uçup yerine inince
   yuvarlanıyordu). `Modifier.detailSharedElement(key, shape)` öğeyi yerinde de uçarken de o biçimle kırpar;
   `CoverCell` içinde hücrenin biçimi varsayılandır.
-- **Izgara ve tablo dokunmatikte:** dokunuş kapağı ya da satırı açar, seçmez (açıp geri gelince "18'den 1 seçili"
-  yazıyor, her kapakta işaret dairesi duruyordu); uzun basma yalnızca menüyü açar. Seçim, seçim modunda
-  (`toggleOnClick`) yapılır; bir öğe seçiliyken dokunuş ekler ya da çıkarır. Farede tıklama eskisi gibi seçer, işaret
-  daireleri farede birden çok kapak seçiliyken görünür.
+- **Izgara ve tablo:** parmak ya da kalem dokunuşu kapağı ya da satırı açar, seçmez (açıp geri gelince "18'den 1
+  seçili" yazıyor, her kapakta işaret dairesi duruyordu). Seçim, seçim modunda (`toggleOnClick`) yapılır; bir öğe
+  seçiliyken dokunuş ekler ya da çıkarır. Uzun basma menüyü açar ve öğeyi seçer, menü üzerinde çalıştığı öğeyi
+  seçimde bulur. Yerleşim değil işaretçi belirler: fare tıklaması dokunmatik yerleşimde de seçer, parmak fare
+  yerleşiminde de açar. İşaret daireleri farede birden çok kapak seçiliyken görünür.
 - **Ekran klavyesi:** çubuklar kaydırmayla gizlendikten sonra klavye açılınca mini oynatıcı klavyenin arkasında
-  kalmıyor, klavyenin hemen üstünde durur. Parmakla içeriği kaydırmak ya da kitin metin alanlarının dışına dokunmak
-  alanın odağını alır ve klavye kapanır; alana (düğmeleri dâhil) dokunmak, alanın görünür kalmak için yaptığı kaydırma
-  ve fare tekerleği klavyeyi açık bırakır. Açık bırakması gereken denetim (mesaj alanının yanındaki Gönder düğmesi,
-  uygulamanın kendi metin alanı) `Modifier.keepsKeyboardOpen()` alır. Fare tıklamasını Compose kendisi yönetir
-  (varsayılan olarak alanın dışına tıklamak odağı alır).
+  kalmıyor, klavyenin hemen üstünde durur. Klavye açıkken parmakla içeriği kaydırmak ya da metin alanlarının dışına
+  dokunmak alanın odağını alır ve klavye kapanır. Alanın içinden başlayan hareket (alana ya da düğmelerine dokunmak,
+  uzun metni kaydırmak), alanın görünür kalmak için yaptığı kaydırma ve fare tekerleği klavyeyi açık bırakır;
+  donanım klavyesi bağlıyken odak yerinde kalır, yazmak sürer. Açık bırakması gereken denetim (mesaj alanının
+  yanındaki Gönder düğmesi) ya da uygulamanın kendi metin alanı `Modifier.keepsKeyboardOpen()` alır. Fare
+  tıklamasını Compose kendisi yönetir (varsayılan olarak alanın dışına tıklamak odağı alır).
 - **Oynatıcı:** tam ekran oynatıcı kapanınca alt çubuk yarım saniye gizli kalıp sonra birden belirmiyor: sayfa,
   yayının son piksel kesirlerini beklemeden mini oynatıcı göründüğü anda çekilir.
 - **Kısayol ipuçları:** menülerde ve "⋯" sayfasında kısayollar (Ctrl+K gibi) yalnızca fare ya da donanım klavyesi
@@ -44,10 +46,11 @@ değişmeden derlenir; düzeltmelere eşlik eden üç küçük ekleme var: `Modi
 
 ### Tablet ve DeX
 
-- **Sürükle bırak:** Samsung Dosyalarım'daki gibi, işaretçi öğenin üstünde sistemin dokunup basılı tutma süresi kadar
-  (Ayarlar › Erişilebilirlik, varsayılan yarım saniye) durunca başlar; daha önce kayarsa sürükleme olmaz, listede
-  hızlıca gezinirken satır kapılmaz. Fare ve touchpad'de her zaman, parmakta `touch = true` ile. Satırın saydam
-  kopyası yerine işaretçinin üstünde küçük bir kart taşınır: etiket ve birden çok öğede vurgu renginde sayı.
+- **Sürükle bırak:** Samsung Dosyalarım'daki gibi, işaretçi önce öğenin üstünde sistemin dokunup basılı tutma süresi
+  kadar (Ayarlar › Erişilebilirlik, varsayılan yarım saniye) durmalı; daha önce kayarsa sürükleme olmaz, listede
+  hızlıca gezinirken satır kapılmaz. Fare, touchpad ve kalemde sürükleme bundan sonra işaretçi kayınca başlar, yavaş
+  bir tıklama (öğeye ya da içindeki düğmeye) tıklama olarak kalır; parmakta süre dolunca, `touch = true` ile. Satırın
+  saydam kopyası yerine işaretçinin üstünde küçük bir kart taşınır: etiket ve birden çok öğede vurgu renginde sayı.
 - **Canlı satırlar:** Compose'un hazır sürükleme kaynağı öğeyi bir kez alınmış bir resimle çiziyordu; sürüklenebilir
   satırlar üzerine gelmeyi göstermiyor, Dosyalar "6'dan 1 seçili" derken hiçbir satır işaretli değildi, Parçalar
   önceki çalan parçayı işaretli tutuyordu. Kit sürüklemeyi artık kendisi başlatır ve öğenin çizimine dokunmaz.
@@ -67,10 +70,12 @@ değişmeden derlenir; düzeltmelere eşlik eden üç küçük ekleme var: `Modi
 
 ### Testler
 
-- Yeni testler: üst çubuğun solması (kare kare parlaklık), ilk açılıştaki boşluk, alt sayfanın her yerden çekilmesi,
-  uçan kapağın köşeleri, basılı tutunca başlayan sürükleme ve canlı kalan satırlar, dokunmatikte seçim, klavyenin
-  kapanması (dokunuş, kaydırma, Gönder düğmesi, fare tekerleği), klavye açıkken oynatıcı, oynatıcı kapanınca alt
-  çubuk, bildirimlerin yer değiştirmesi, menünün konumu ve kısayol ipuçları.
+- Yeni testler: üst çubuğun solması (kare kare parlaklık), ilk açılıştaki boşluk, alt sayfanın her yerden hızlı ve
+  yavaş çekilmesi, uçan kapağın köşeleri, basılı tutunca başlayan sürükleme, tıklama olarak kalan yavaş tıklama ve
+  canlı kalan satırlar, parmak ve fareyle seçim, uzun basmanın seçtiği öğe, klavyenin kapanması ve kapanmaması
+  (dokunuş, kaydırma, alan içinde kaydırma, Gönder düğmesi, fare tekerleği, ekran klavyesi yokken, klavye kapağıyla),
+  klavye açıkken oynatıcı, oynatıcı kapanınca alt çubuk, bildirimlerin yer değiştirmesi, menünün konumu ve kısayol
+  ipuçları.
 - Robolectric'in penceresi klavye kipinde başlar; orada odak bırakılınca sistem onu hemen ilk alana geri verir.
   Klavye testleri, gerçek bir dokunuşun yaptığı gibi dokunma kipinde başlar.
 
@@ -80,7 +85,7 @@ değişmeden derlenir; düzeltmelere eşlik eden üç küçük ekleme var: `Modi
   sürükleme sürerken açılan ekranın hedefleri bırakmayı almaz.
 - **Uygun olmayan hedefleri soldurmak:** Compose sürüklemenin bittiğini yalnızca sürüklemeyi kabul eden hedefe
   söyler. Soldurmak için her hedefin her sürüklemeyi kabul edip yanlış türü bırakılırken geri çevirmesi gerekir;
-  bu, bir düzeltme sürümüne göre büyük bir değişiklik.
+  bu, düzeltmelerden oluşan bu sürüme göre büyük bir değişiklik.
 
 ## 2.0.0 (2026-10-30)
 
