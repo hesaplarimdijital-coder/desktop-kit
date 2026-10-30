@@ -14,8 +14,9 @@ import androidx.compose.ui.platform.LocalHapticFeedback
  * the device's touch-feedback setting and strength). Only for fingers: with a mouse or touchpad
  * (DeX) nothing vibrates, as on a desktop.
  *
- * The kit's controls already use it: a switch toggling ([toggle]), a segment or tab chosen ([tick]),
- * a sheet dragged past the point where it closes ([threshold]). Apps use the same words:
+ * The kit's controls already use it: a switch, check box or filter chip turned on or off
+ * ([toggle]), a segment or tab chosen ([tick]), a sheet dragged past the point where it closes
+ * ([threshold]). Apps use the same words:
  *
  * ```
  * val haptics = rememberDeskHaptics()
@@ -24,10 +25,10 @@ import androidx.compose.ui.platform.LocalHapticFeedback
  */
 @Stable
 class DeskHaptics internal constructor(private val feedback: HapticFeedback, private val active: () -> Boolean) {
-    /** A switch or check box turned on or off. */
+    /** A switch, check box or filter chip turned on or off. */
     fun toggle(on: Boolean) = perform(if (on) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
 
-    /** One of several choices picked: a segment, a tab, a chip. */
+    /** One of several choices picked: a segment, a tab. */
     fun tick() = perform(HapticFeedbackType.SegmentTick)
 
     /** A drag crossed the point where letting go acts (close a sheet, skip a track). */

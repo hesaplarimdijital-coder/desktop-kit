@@ -23,8 +23,14 @@ fun appResources(): Resources {
     return LocalContext.current.resources
 }
 
-/** A quantity string ("1 file", "3 files") that follows a language change like [appResources]. */
+/**
+ * A quantity string ("1 file", "3 files") that follows a language change like [appResources].
+ * Without [formatArgs] the count fills the string's placeholder ("%d files"), as most plurals
+ * expect; with them, they do (the count then only picks the form).
+ */
 @Composable
 @ReadOnlyComposable
-fun pluralString(@PluralsRes id: Int, count: Int, vararg formatArgs: Any): String =
-    appResources().getQuantityString(id, count, *formatArgs)
+fun pluralString(@PluralsRes id: Int, count: Int, vararg formatArgs: Any): String {
+    val resources = appResources()
+    return if (formatArgs.isEmpty()) resources.getQuantityString(id, count, count) else resources.getQuantityString(id, count, *formatArgs)
+}

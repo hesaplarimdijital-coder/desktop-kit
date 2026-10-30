@@ -51,27 +51,48 @@ fun rememberInputModeState(): InputModeState {
     val state = remember { InputModeState(if (hasPrecisePointer(context)) InputMode.Pointer else InputMode.Touch) }
     DisposableEffect(context) {
         val inputManager = context.getSystemService(Context.INPUT_SERVICE) as? InputManager
+        val devices = PointerDevices(InputDevice.getDeviceIds()) { isPrecisePointer(InputDevice.getDevice(it)) }
         val listener = object : InputManager.InputDeviceListener {
             override fun onInputDeviceAdded(deviceId: Int) {
-                if (isPrecisePointer(InputDevice.getDevice(deviceId))) state.detected = InputMode.Pointer
+                devices.added(deviceId)?.let { state.detected = it }
             }
 
             override fun onInputDeviceRemoved(deviceId: Int) {
-                if (!hasPrecisePointer(context)) state.detected = InputMode.Touch
+                devices.removed(deviceId)?.let { state.detected = it }
             }
 
             // a keyboard cover's touchpad switched on or off, a mouse woken up
             override fun onInputDeviceChanged(deviceId: Int) {
-                when {
-                    isPrecisePointer(InputDevice.getDevice(deviceId)) -> state.detected = InputMode.Pointer
-                    !hasPrecisePointer(context) -> state.detected = InputMode.Touch
-                }
+                devices.changed(deviceId)?.let { state.detected = it }
             }
         }
         inputManager?.registerInputDeviceListener(listener, null)
         onDispose { inputManager?.unregisterInputDeviceListener(listener) }
     }
     return state
+}
+
+/**
+ * The mice and touchpads that are switched on, by device id. A device's change counts only when it
+ * switches one on or off: the other changes a keyboard cover reports (a new layout, a reconfigured
+ * key map) leave the density alone, so a finger on the screen keeps touch sizes.
+ */
+internal class PointerDevices(ids: IntArray, private val isPrecise: (Int) -> Boolean) {
+    private val on = ids.filterTo(mutableSetOf()) { isPrecise(it) }
+
+    /** The mode a new device calls for, or null when it changes nothing. */
+    fun added(id: Int): InputMode? = if (isPrecise(id) && on.add(id)) InputMode.Pointer else null
+
+    fun removed(id: Int): InputMode? = if (on.remove(id) && on.isEmpty()) InputMode.Touch else null
+
+    fun changed(id: Int): InputMode? {
+        val now = isPrecise(id)
+        return when {
+            now && on.add(id) -> InputMode.Pointer
+            !now && on.remove(id) && on.isEmpty() -> InputMode.Touch
+            else -> null
+        }
+    }
 }
 
 /** Observes every pointer event in the initial pass, without consuming it, to update [state]. */

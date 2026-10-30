@@ -43,6 +43,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -343,9 +344,9 @@ fun ToastHost(state: DeskToastState, modifier: Modifier = Modifier) {
         delay(millis)
         current.dismiss()
     }
-    // the last toast stays drawn while it fades out
-    var shown by remember { mutableStateOf<DeskToast?>(null) }
-    if (current != null) shown = current
+    // the last toast stays drawn while it fades out (remembered after each composition, not during it)
+    val last = remember { mutableStateOf<DeskToast?>(null) }
+    SideEffect { if (current != null) last.value = current }
     val tier = LocalMotionTier.current
     AnimatedVisibility(
         visible = current != null,
@@ -355,7 +356,7 @@ fun ToastHost(state: DeskToastState, modifier: Modifier = Modifier) {
         exit = if (tier == MotionTier.Reduced) fadeOut(tween(0)) else
             fadeOut(tween(DeskMotion.MEDIUM_MS, easing = DeskMotion.EmphasizedAccelerate)) + slideOutVertically(tween(DeskMotion.MEDIUM_MS)) { it / 4 },
     ) {
-        shown?.let { ToastCard(it) }
+        (current ?: last.value)?.let { ToastCard(it) }
     }
 }
 
