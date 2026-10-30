@@ -1,8 +1,10 @@
-# 2.0'a geçiş
+# 2.2.0'a geçiş
 
-Bu rehber kiti kullanan uygulamaları 2.0'a taşımak için. Soulseek+ ve Walkman Sync şu an 0.1.3 kullanıyor;
-1.0.0'dan geçenler 1. adımdan sonra doğrudan [1.0'dan 2.0'a](#10dan-20a) bölümüne atlayabilir. 2.0.0 kullananlar
-yalnızca [2.0.0'dan 2.1.0'a](#200dan-210a) bölümüne bakar.
+Bu rehber kiti kullanan uygulamaları en güncel sürüme, 2.2.0'a taşımak için. 0.1.3'ten gelenler baştan
+başlar; adımlardan sonra [görünümde fark edecekleri](#013ten-gelince-görünümde-fark-edecekleriniz) ayrıca
+yazılı. 1.0.0'dan geçenler 1. adımdan sonra doğrudan [1.0'dan 2.0'a](#10dan-20a) bölümüne atlayabilir. 2.0.0
+ya da 2.1.0 kullananlar yalnızca [2.0.0'dan 2.1.0'a](#200dan-210a) ve [2.1.0'dan 2.2.0'a](#210dan-220a)
+bölümlerine bakar.
 
 Sıra şöyle: önce derleme ortamı (kitin kendisi aynı adımları `7845eb5` gönderisinde attı, örnek olarak
 oraya bakılabilir), sonra uygulamanın kendi yazdığı bileşenler kitinkilerle değiştirilir, en son yeni
@@ -10,7 +12,7 @@ oraya bakılabilir), sonra uygulamanın kendi yazdığı bileşenler kitinkilerl
 
 ## 1. Derleme ortamı
 
-| | 0.1.3 uygulamaları | 2.0.0 |
+| | 0.1.3 uygulamaları | 2.2.0 |
 | --- | --- | --- |
 | Android Gradle eklentisi (AGP) | 8.7.3 | 9.4.1 (en az 9.1.1) |
 | Gradle | 8.11.1 | 9.8.2 |
@@ -29,7 +31,7 @@ cihazlar uygulamayı kuramaz. Uygulamalar Play'de olmadığı için başka bir e
 Adımlar:
 
 1. `gradle/wrapper/gradle-wrapper.properties`: `distributionUrl=https\://services.gradle.org/distributions/gradle-9.8.2-bin.zip`
-2. `gradle/libs.versions.toml`: yukarıdaki sürümler ve `desktopKit = "2.0.0"`. En kolayı kitin kendi
+2. `gradle/libs.versions.toml`: yukarıdaki sürümler ve `desktopKit = "2.2.0"`. En kolayı kitin kendi
    `gradle/libs.versions.toml` dosyasındaki sürümleri almak.
 3. AGP 9 Kotlin'i kendisi derler (yerleşik Kotlin). Modüllerden `alias(libs.plugins.kotlin.android)`
    satırını sil, `kotlin.compose` kalsın. Kökteki `build.gradle.kts` dosyasında eklentiyi uygulamadan
@@ -40,13 +42,20 @@ Adımlar:
        alias(libs.plugins.android.application) apply false
        alias(libs.plugins.kotlin.android) apply false   // yalnızca Kotlin sürümünü sabitler
        alias(libs.plugins.kotlin.compose) apply false
+       alias(libs.plugins.kotlin.jvm) apply false       // saf Kotlin/JVM modülü varsa
    }
    ```
+
+   Saf Kotlin/JVM modülü (Android'siz bir `core` gibi) `kotlin.jvm` eklentisini kullanmaya devam eder; kökteki
+   satır onun da katalogdaki Kotlin'i kullanmasını sağlar.
 4. `app/build.gradle.kts`: `kotlinOptions { jvmTarget = "17" }` bloğunu sil (`compileOptions` içindeki Java 17
    yeter); `compileSdk = 37`, `minSdk = 34`, `targetSdk = 36`.
 5. `gradle.properties`: `android.useAndroidX` ve `android.nonTransitiveRClass` satırları AGP 9'da varsayılan,
    silinebilir.
 6. Android 14 öncesi için yazılmış `Build.VERSION.SDK_INT` dallarını temizle; kit de kendininkileri sildi.
+7. `settings.gradle.kts` içinde `org.gradle.toolchains.foojay-resolver-convention` varsa en az 1.0.0 yap. Eski
+   sürümler Gradle 9'un kaldırdığı `JvmVendorSpec.IBM_SEMERU` alanına başvurur; araç zinciri bir JDK indirmek
+   zorunda kaldığında derleme `NoSuchFieldError` ile düşer. Walkman Sync 0.9.0'dan 1.0.0'a geçip derlendi.
 
 Uygulama doğrudan Haze kullanıyorsa: kit artık Haze 2.0.1 getiriyor. `LocalGlassSource` bir Haze 2
 `HazeState`'idir; kendi cam yüzeyin için en kolayı `Modifier.glass(DeskGlass.chrome(DeskTheme.colors))`.
@@ -72,11 +81,12 @@ tanımı sil, `import desktopkit.components.…` ekle.
 | `FilterTextField(value, onValueChange, hint)` | `DeskSearchField(value, onValueChange, hint = hint)` | Büyüteç, temizleme düğmesi; Esc temizler. |
 | `NumberField(value, onValue, min, max)` | `NumberField(value, onValueChange, min = …, max = …)` | Aralık dışı değer için altında yerelleştirilmiş uyarı (alan yerinde kalır); `steppers = true` ile − / + düğmeleri. Değer bir Flow'dan geç gelse de yazılan korunur. |
 | `OptionalNumberField(value, onValue, hint, reset)` | `OptionalNumberField(value, onValueChange, hint = …)` | `reset` gerekmez: dışarıdan gelen değer yazılanın yerine geçer. |
-| `MenuButton(text, entries, icon, enabled)` | `MenuButton(...)` | Aynı; sağında aşağı ok. |
+| `MenuButton(text, entries, icon, enabled)` | `MenuButton(...)` | Aşağı ok sona kendiliğinden çizilir; `icon = DeskIcons.ChevronDown` verdiysen kaldır, yoksa iki ok çıkar. |
 | `IconMenuButton(icon, label, entries)` | `IconMenuButton(...)` | Aynı. |
-| `SurfaceCard { }` | `DeskCard { }` | `title` ve `onClick` (tıklanabilir kart) eklendi; iç boşluk `contentPadding`. |
-| `KeyValueRow(label, value, mono, valueColor, maxLines)` | `KeyValueRow(...)` | Ek: `labelWidth`, `selectable` (değer seçilip kopyalanır). |
-| `BannerTone`, `StatusBanner(tone, text, actionLabel, onAction, closeLabel, onClose)` | Aynı adlar | Ek: `title` (iki satırlı şerit), `icon`. Uygulamanın kendi `BannerTone`'unu sil. |
+| `SurfaceCard { }` | `DeskCard { }` | `title` ve `onClick` (tıklanabilir kart) eklendi. Varsayılan iç boşluk yatayda `gapL + 4 dp`, dikeyde `gapS`; öğeler arasında boşluk yok. Eski kartın görünümü (her yanda `gapL`, öğeler arası `gapS`): `DeskCard(contentPadding = PaddingValues(gapL), verticalArrangement = Arrangement.spacedBy(gapS))`, boyutlar `DeskTheme.dimens` içinden. |
+| `KeyValueRow(label, value, mono, valueColor, maxLines)` | `KeyValueRow(...)` | Ek: `labelWidth`, `selectable` (değer seçilip kopyalanır). Kendi dikey `gapXs` boşluğu var; mono değer gövde boyunda; etiket farede 128 dp, dokunmada 112 dp; `maxLines` varsayılanı 3. Aralıklı bir Column'da art arda gelen satırları aralıksız bir Column'a al, yoksa aralık iki kat olur. |
+| `BannerTone`, `StatusBanner(tone, text, actionLabel, onAction, closeLabel, onClose)` | Aynı adlar | Ek: `title` (iki satırlı şerit), `icon`. Tonların simgeleri kitin (`Info`, `Warning`, `Error`, `CheckCircle`); uygulamanın kendi simgesi için `icon =`. Uygulamanın kendi `BannerTone`'unu sil. |
+| Onay kutusu + metin satırı (`Row { DeskCheckbox(…); Text(…) }`) | `CheckboxRow(title, checked, onCheckedChange)` | Satırın tamamı tıklanır, TalkBack adını ve durumunu söyler; ara durum için `ToggleableState`'li hâli. |
 | `CountBadge(count, color, onColor)` | `CountBadge(...)` | Ek: `max` (99+). |
 | `ToggleChip(label, selected, onClick, icon)` | `DeskChip(text, selected, onClick, icon = …)` | Ek: `count`. Birden fazlası için `FilterChips`. |
 | `TabChip(label, selected, onClick, icon, badge, closeLabel, onClose, busy)` | `DeskTab(...)` | Aynı parametreler, ama adlarıyla ver: kitte `modifier` dördüncü sırada, `busy` de yer değiştirdi. `closeLabel` kitin metnine düşer. Orta tık kapatır. |
@@ -110,7 +120,7 @@ val toasts = rememberToastState()
 LaunchedEffect(Unit) {
     appViewModel.message.filterNotNull().collect { message ->
         appViewModel.dismissMessage()
-        toasts.show(message.text)   // sırayla gösterir; geri alma için actionLabel = "Geri al"
+        toasts.show(message.text)   // yenisi ekrandakinin yerini alır; geri alma için actionLabel = "Geri al"
     }
 }
 DesktopShell(…, toasts = toasts) { … }
@@ -118,6 +128,36 @@ DesktopShell(…, toasts = toasts) { … }
 
 Bildirim telefonda alt çubuğun ve oynatıcının, tablet ve DeX'te oynatıcının üstünde çıkar; parmakla yana
 kaydırınca kapanır, TalkBack açıkken sistemin önerdiği süre kadar kalır.
+
+## 0.1.3'ten gelince görünümde fark edecekleriniz
+
+Kod değişmeden derlenir ama 0.2.0 ve 1.0.0 bazı varsayılanları değiştirdi. Ayrıntılar CHANGELOG'da; eski
+görünümde kalmak istenen yerin anahtarı yanında.
+
+### Telefon
+
+- **Daha sıkı boyutlar:** alt çubuk 72 yerine 64 dp, dokunmatik satırlar 56 yerine 52 dp (hedefler yine en az
+  48 dp). Eskisi: `DesktopShell(compactSizes = false)`.
+- **Kaydırınca çekilen çubuklar:** içerik aşağı kaydırılınca alt gezinme çubuğu ve üstündeki şerit (oynatıcı,
+  durum) aşağı kayıp gizlenir, yukarı kaydırınca geri gelir. Kapatmak: `DesktopShell(hideBarsOnScroll = false)`.
+- **Cam çubuklar:** içerik pencerenin tamamını kaplar; alt çubuk ve oynatıcı şeridi buzlu cam olarak üstüne
+  biner, üst çubuk içerik altına kayınca cama döner ve altında ince bir çizgi belirir. Listesini camın altına
+  uzatmak isteyen ekran `rememberShellContentPadding()` ile çubuk yüksekliklerini alır; bunu çağırmayan ekran
+  eskisi gibi çubukların arasında kalır. Hepsini düz yapmak: `DesktopShell(glass = false)`.
+- **Ekran geçişleri:** ekranlar arasında Android'in fade-through geçişi (yeni ekran %96'dan büyüyerek belirir);
+  yer değiştiren ve parmakla sürüklenen her şey yaylarla hareket eder, öngörülü geri hareketi geçişi parmakla
+  oynatır. Geçişsiz: `DesktopShell(transitions = ShellTransitions.None)`.
+- **Çipler** tek satırda yana kayar; düğmeler ve simgeler basılıyken hafifçe küçülür.
+
+### Tablet ve DeX
+
+- **Yazılar 1 sp büyük:** ray ve kenar çubuklu düzende her yazı 1 sp büyür; yerleşim, boyut ve renkler aynı.
+  Eskisi: `DesktopShell(largeWindowTextStep = 0f)`. Uygulama `pointerStep = 1f` kullanıyorsa DeX'te toplam 2 sp
+  olur; birini kaldır.
+- **Ekran geçişleri:** tablette fade-through (%98'den), DeX'te 150 ms'lik sade geçiş; kenar çubuğu daraltılıp
+  genişletilirken 300 ms'de akıcı değişir, menüler köşelerinden büyüyerek açılır.
+- **Cam:** tablonun yapışkan başlığı satırlar altından geçerken buzlu cama döner (`DenseTable(glassHeader = false)`
+  düz bırakır); menüler, sağ tık menüleri ve yüzen oynatıcı camdır. Hepsi düz: `DesktopShell(glass = false)`.
 
 ## 1.0'dan 2.0'a
 
@@ -147,7 +187,9 @@ Hepsi isteğe bağlı; hiçbiri açılmadan uygulama 2.0'la eskisi gibi çalış
 
 - **Komut paleti (Ctrl+K):** `rememberCommandPaletteState()` ve `DesktopShell(overlays = { CommandPalette(state, items = { sorgu -> … }) })`;
   `shortcuts.paletteItems(resources) { perform(it) }` kısayol tablosunu palete ekler. Türkçe harfleri
-  katlayan bulanık arama, gruplar, Ctrl+Enter ile yeni pencere.
+  katlayan bulanık arama, gruplar, Ctrl+Enter ile yeni pencere. Kısayolları etkinliğin `dispatchKeyEvent`'inden
+  yönlendiriyorsan palet açıkken atla: `(!palet.isOpen && shortcuts.matchNative(event)?.let { … } == true) ||
+  super.dispatchKeyEvent(event)`; yoksa Ctrl+K yazılanı siler, öbür kısayollar paletin arkasında çalışır.
 - **Kapak ızgarası:** `DeskGrid(items, key, onItemClick) { CoverCell(başlık, …) { kapak } }` tablonun seçim
   kurallarıyla.
 - **Sürükle bırak:** satır ya da kapak için `DenseTable(rowDrag = …)`, `DeskGrid(itemDrag = …)`,
@@ -191,7 +233,24 @@ Kod değişmeden derlenir; sürümü `2.1.0` yapmak yeter. Testlerde ve kullanı
   Gönder) ve uygulamanın kendi `BasicTextField`'larına `Modifier.keepsKeyboardOpen()` ekle; işaretlenen alan
   kitinkiler gibi sayılır.
 - **Kısayollar dokunmatikte gizli:** menülerde ve "⋯" sayfasında kısayol yalnızca fare ya da donanım klavyesi
-  varken yazılır. Kendi kısayol listen için `hasHardwareKeyboard()`.
+  varken yazılır. Kendi kısayol listen için aynı koşul: 2.2.0'dan beri `showShortcutHints()` (2.1.0'da
+  `DeskTheme.inputMode == InputMode.Pointer || hasHardwareKeyboard()`).
 - **"⋯" sayfasında `checked`:** satır sonunda anahtar olur ve dokununca sayfa kapanmaz (menüde eskisi gibi kapanır).
 - **Paylaşılan kapak:** `detailSharedElement` öğeyi verilen biçimle kırpar; kapağı kendi `clip`'iyle yuvarlayan
   ekran `shape =` verirse uçarken de yuvarlak kalır (`CoverCell` içinde hücrenin biçimi varsayılan).
+
+## 2.1.0'dan 2.2.0'a
+
+Kod değişmeden derlenir; sürümü `2.2.0` yapmak yeter.
+
+- **Geri seçimi temizler:** `DenseTable` ve `DeskGrid`'de seçim varken sistemin Geri hareketi önce seçimi
+  temizler (Esc gibi, Android'in eylem kipindeki gibi); seçim yokken Geri'ye dokunmaz. Geri'yi uygulama kendisi
+  yönetecekse `clearSelectionOnBack = false`. Compose en son oluşturulan açık geri işleyicisini önce çağırır:
+  tablonunki genelde ekranın kendi `BackHandler`'ından sonra oluşturulur, yani tablonunki önce çalışır.
+- **İlerleme çubuğunun adı:** miktarı belli bir `DeskProgressBar`'a açıklama verilmezse TalkBack artık
+  "Yükleniyor" demez, yalnızca yüzdeyi okur. Ad istiyorsan `contentDescription` ver.
+- **Kısayol ipuçları tek kural:** bildirimlerdeki ve komut paletindeki tuşlar da `showShortcutHints()`'e uyar:
+  klavye kapağı bağlı dokunmatik yerleşimde görünür, elde tutulan telefonda paletin öğelerindeki kısayollar gizlenir.
+- **Komut paleti açıkken yönlendirme:** etkinliğin `dispatchKeyEvent`'indeki kısayol yönlendirmesine
+  `!palet.isOpen` koşulunu ekle (3. adımdaki örnek).
+- **Yeni:** `showShortcutHints()`, `DeskCard(verticalArrangement)`, `DenseTable`/`DeskGrid(clearSelectionOnBack)`.
