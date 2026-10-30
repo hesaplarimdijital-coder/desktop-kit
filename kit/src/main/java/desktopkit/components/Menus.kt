@@ -53,6 +53,9 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -274,6 +277,8 @@ internal fun MenuItemRow(item: MenuEntry.Item, onClick: () -> Unit) {
             .focusRing(state, shape)
             .background(if (item.enabled) animatedStateBackground(state).value else androidx.compose.ui.graphics.Color.Transparent, shape)
             .deskClickable(interaction, onClick, enabled = item.enabled, role = if (item.checked != null) Role.Checkbox else Role.Button)
+            // TalkBack says whether a check item is on, not only that it is one
+            .then(if (item.checked == null) Modifier else Modifier.semantics { toggleableState = ToggleableState(item.checked) })
             .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
