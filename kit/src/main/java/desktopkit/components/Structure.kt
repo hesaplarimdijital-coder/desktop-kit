@@ -84,8 +84,9 @@ import kotlin.math.roundToInt
 /**
  * A card: the surface colour, a 1 dp border and the card radius, with an optional [title] in the
  * title style. With [onClick] the whole card is a button (hover, press and focus states).
- * [verticalArrangement] spaces the content's items (`Arrangement.spacedBy(DeskTheme.dimens.gapS)`);
- * the title keeps its own spacing.
+ * [verticalArrangement] arranges the card's column as in any Column, the title included: with
+ * `Arrangement.spacedBy(DeskTheme.dimens.gapS)` the items are spaced and the title's gap grows by
+ * as much; alignments inside the content are the card's.
  */
 @Composable
 fun DeskCard(
@@ -109,13 +110,13 @@ fun DeskCard(
             .border(1.dp, colors.border, shape)
             .then(if (onClick != null) Modifier.deskClickable(interaction, onClick) else Modifier)
             .padding(contentPadding),
+        verticalArrangement = verticalArrangement,
     ) {
         if (title != null) {
             Text(title, style = DeskTheme.type.title, color = colors.text,
                 modifier = Modifier.padding(top = dimens.gapS, bottom = dimens.gapXs).semantics { heading() })
         }
-        // the items in a column of their own, so the spacing does not reach the title
-        if (verticalArrangement == Arrangement.Top) content() else Column(verticalArrangement = verticalArrangement, content = content)
+        content()
     }
 }
 
