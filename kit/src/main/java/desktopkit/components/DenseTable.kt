@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.State
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -137,6 +138,10 @@ data class TableSort(val column: Int, val ascending: Boolean)
  * - a tap with a finger or a pen only opens the row unless rows are being picked: in the select
  *   mode, or once some are selected, a tap adds or removes one. The pointer decides, not the
  *   layout: a mouse click selects in a touch layout too.
+ * - Back (the system's gesture or button) clears the selection, as Esc does, unless
+ *   [clearSelectionOnBack] is false; with nothing selected Back goes on as usual. Compose asks the
+ *   most recently composed back handler first: usually the table's, which sits inside the screen,
+ *   while a handler composed later (a dialog's, a sheet's) comes before it.
  * [onRowClick] runs for plain clicks and opening taps (not for Ctrl, Shift or [toggleOnClick] clicks).
  * [rowMenu] receives the row it was opened on; the selection it acts on is the app's
  * [selectedKeys], already updated when the menu opens.
@@ -166,6 +171,7 @@ fun <T> DenseTable(
     glassHeader: Boolean = true,
     loading: Boolean = false,
     rowDrag: ((T, Int) -> DeskDragPayload?)? = null,
+    clearSelectionOnBack: Boolean = true,
 ) {
     val dimens = DeskTheme.dimens
     val colors = DeskTheme.colors
@@ -200,6 +206,8 @@ fun <T> DenseTable(
         tracker.anchor = result.anchor
         if (result.selection != selection) onSelectionChange?.invoke(result.selection)
     }
+    // Back leaves the selection first, as in Android's action mode (Esc does the same from the keyboard)
+    BackHandler(enabled = multi && clearSelectionOnBack && selection.isNotEmpty()) { update(TableSelection.clear()) }
     Box(
         modifier
             .fillMaxSize()

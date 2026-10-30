@@ -21,6 +21,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import desktopkit.theme.DesktopKitTheme
 import desktopkit.theme.InputMode
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -29,9 +30,9 @@ import org.robolectric.annotation.Config
 /**
  * A finger's tap on a cover or a table row opens it and selects nothing (the S24 showed "1 of 18
  * selected" and check circles on every cover after opening an album); picking items is for the
- * select mode, or goes on once some are selected. A long press selects what its menu acts on. The
- * pointer decides, not the layout: a mouse click selects in a touch layout, a finger opens in a
- * pointer layout.
+ * select mode, or goes on once some are selected. A long press selects what its menu acts on, and
+ * Back clears a selection. The pointer decides, not the layout: a mouse click selects in a touch
+ * layout, a finger opens in a pointer layout.
  */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
@@ -127,8 +128,7 @@ class TouchSelectionTest {
         assertEquals(emptyList<String>(), opened)
     }
 
-    @Test
-    fun aTapOnATableRowOpensItAndSelectsNothing() {
+    private fun table(clearSelectionOnBack: Boolean = true) {
         compose.setContent {
             DesktopKitTheme(inputMode = InputMode.Touch) {
                 DenseTable(
@@ -138,10 +138,52 @@ class TouchSelectionTest {
                     onRowClick = { row, _ -> opened += row },
                     selectedKeys = selection,
                     onSelectionChange = { selection = it },
+                    clearSelectionOnBack = clearSelectionOnBack,
                 )
             }
         }
         compose.waitForIdle()
+    }
+
+    private fun back() {
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        compose.waitForIdle()
+    }
+
+    private fun backIsTaken(): Boolean {
+        var taken = false
+        compose.runOnIdle { taken = compose.activity.onBackPressedDispatcher.hasEnabledCallbacks() }
+        return taken
+    }
+
+    @Test
+    fun backClearsTheSelection() {
+        // a long press selected covers; without a "Done" button Back is the way out, as in Android's action mode
+        selection = setOf("Kış Bahçesi", "Mavi Hat")
+        grid()
+        back()
+        assertEquals(emptySet<Any>(), selection)
+        assertFalse("with nothing selected Back is not the grid's", backIsTaken())
+    }
+
+    @Test
+    fun backClearsATablesSelection() {
+        selection = setOf("Yedek.zip")
+        table()
+        back()
+        assertEquals(emptySet<Any>(), selection)
+    }
+
+    @Test
+    fun anAppCanKeepBackForItself() {
+        selection = setOf("Yedek.zip")
+        table(clearSelectionOnBack = false)
+        assertFalse(backIsTaken())
+    }
+
+    @Test
+    fun aTapOnATableRowOpensItAndSelectsNothing() {
+        table()
         tap("Kayıt 14.flac")
         assertEquals(listOf("Kayıt 14.flac"), opened)
         assertEquals(emptySet<Any>(), selection)
