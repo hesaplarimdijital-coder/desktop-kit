@@ -35,7 +35,7 @@ import desktopkit.components.MenuEntry
 import desktopkit.components.PaletteItem
 import desktopkit.components.ToastResult
 import desktopkit.components.paletteItems
-import desktopkit.components.rememberCommandPaletteState
+import desktopkit.components.CommandPaletteState
 import desktopkit.components.rememberExpandablePlayerState
 import desktopkit.components.rememberToastState
 import desktopkit.input.CommonShortcuts
@@ -89,8 +89,8 @@ class MainActivity : ComponentActivity() {
     /** Set by the composition; runs a shortcut's action. */
     private var perform: (String) -> Boolean = { false }
 
-    /** Set by the composition; while the command palette is open it takes the keys itself. */
-    private var paletteOpen: () -> Boolean = { false }
+    /** Ctrl+K: the command palette. Kept here so dispatchKeyEvent can see whether it is open. */
+    private val palette = CommandPaletteState()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -102,9 +102,7 @@ class MainActivity : ComponentActivity() {
             val navigator = remember(navController) { ShellNavigator(navController) }
             val context = LocalContext.current
             val scope = rememberCoroutineScope()
-            // Ctrl+K: the command palette over the screens, the albums and the shortcut table
-            val palette = rememberCommandPaletteState()
-            paletteOpen = { palette.isOpen }
+            // Ctrl+K: the command palette over the screens, the albums and the shortcut table (state above)
             val toasts = rememberToastState()
             val library = remember { LibraryState() }
             var openAlbum by rememberSaveable { mutableStateOf<String?>(null) }
@@ -284,7 +282,7 @@ class MainActivity : ComponentActivity() {
 
     // Not while the palette is open: Ctrl+K would clear what was typed, and F5 or Ctrl+B would act behind it.
     override fun dispatchKeyEvent(event: KeyEvent): Boolean =
-        (!paletteOpen() && shortcuts.matchNative(event)?.let { perform(it.id) } == true) || super.dispatchKeyEvent(event)
+        (!palette.isOpen && shortcuts.matchNative(event)?.let { perform(it.id) } == true) || super.dispatchKeyEvent(event)
 
     /** Meta+/ (or the system's keyboard shortcuts screen) lists the same table. */
     override fun onProvideKeyboardShortcuts(data: MutableList<KeyboardShortcutGroup>, menu: Menu?, deviceId: Int) {
