@@ -118,7 +118,9 @@ private class CellScope(
  * Esc none, Shift with the arrow keys extends (Up and Down by a row); the arrow keys move between
  * cells; right click, long press or the Menu key open [itemMenu]. Single selection with
  * [selectedKey], multi-selection with [selectedKeys] and [onSelectionChange]; [toggleOnClick] for a
- * touch "select" mode. [loading] shows breathing placeholder covers while [items] is empty.
+ * touch "select" mode. On touch a tap only opens the cover (and a long press only opens its menu)
+ * unless items are being picked: in the select mode, or once the app has selected some, a tap adds
+ * or removes one. [loading] shows breathing placeholder covers while [items] is empty.
  *
  * Columns are as many as fit [minCellWidth]. Draw each cell with [cell], usually a [CoverCell].
  * [itemDrag] lets covers be dragged with a mouse to a [dropZone], as [DenseTable]'s rowDrag.
@@ -144,6 +146,7 @@ fun <T> DeskGrid(
 ) {
     val multi = onSelectionChange != null
     val selection = selectedKeys ?: emptySet()
+    val touch = DeskTheme.inputMode == InputMode.Touch
     val tracker = remember { SelectionTracker() }
     val focusManager = LocalFocusManager.current
     val keysInOrder = { items.map(key) }
@@ -231,16 +234,25 @@ fun <T> DeskGrid(
             GridItem(
                 modifier = Modifier.dragSource(enabled = itemDrag != null) { itemDrag?.invoke(item, index) },
                 selected = itemKey in selection || (selectedKey != null && itemKey == selectedKey),
-                selecting = multi && (toggleOnClick || selection.isNotEmpty()),
+                // the check circles mark a selection being made: in the select mode, while a finger
+                // picks items, or with several picked by mouse (one clicked cover is just selected)
+                selecting = multi && (toggleOnClick || (if (touch) selection.isNotEmpty() else selection.size > 1)),
                 menu = itemMenu?.let { menu -> { menu(item, index) } },
                 menuLabel = itemMenuLabel,
-                onMenuOpen = if (!multi) null else ({ update(TableSelection.menu(selection, tracker.anchor, itemKey)) }),
+                onMenuOpen = if (!multi) null else ({
+                    // a finger's long press acts on the cover; it does not start a selection
+                    if (!touch || selection.isNotEmpty()) update(TableSelection.menu(selection, tracker.anchor, itemKey))
+                }),
                 onFocused = { focused -> if (focused) tracker.focused = itemKey else if (tracker.focused == itemKey) tracker.focused = null },
                 onClick = {
                     if (!multi) {
                         onItemClick(item, index)
+                    } else if (touch && !toggleOnClick && selection.isEmpty() && !tracker.toggle && !tracker.range) {
+                        // a tap opens; on touch, selecting is for the select mode
+                        onItemClick(item, index)
                     } else {
-                        val toggle = toggleOnClick || tracker.toggle
+                        // while a finger is picking items, a tap adds or removes one
+                        val toggle = toggleOnClick || tracker.toggle || touch
                         val range = !toggleOnClick && tracker.range
                         update(TableSelection.click(keysInOrder(), selection, tracker.anchor, itemKey, toggle = toggle, range = range))
                         if (!toggle && !range) onItemClick(item, index)

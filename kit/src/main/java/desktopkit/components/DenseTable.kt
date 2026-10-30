@@ -74,6 +74,7 @@ import desktopkit.shell.currentWidthClass
 import desktopkit.theme.DeskGlass
 import desktopkit.theme.DeskTheme
 import desktopkit.theme.GlassThickness
+import desktopkit.theme.InputMode
 import desktopkit.theme.glass
 import desktopkit.theme.glassSource
 import dev.chrisbanes.haze.HazeState
@@ -129,7 +130,9 @@ data class TableSort(val column: Int, val ascending: Boolean)
  * - Shift+click: selects the rows from the last clicked row to this one (Ctrl+Shift adds them);
  * - Ctrl+A on a focused row: selects every row; Shift+Up/Down extends from the focused row; Esc clears;
  * - [toggleOnClick]: every click or tap adds or removes its row, for an app's touch "select" mode;
- * - opening a row's menu on a selected row keeps the selection, on any other row selects just that row.
+ * - opening a row's menu on a selected row keeps the selection, on any other row selects just that row;
+ * - on touch a tap only opens the row (and a long press only opens its menu) unless rows are being
+ *   picked: in the select mode, or once the app has selected some, a tap adds or removes one.
  * [onRowClick] runs for plain clicks only (not for Ctrl, Shift or [toggleOnClick] clicks).
  * [rowMenu] receives the row it was opened on; the selection it acts on is the app's
  * [selectedKeys], already updated when the menu opens.
@@ -181,6 +184,7 @@ fun <T> DenseTable(
     )
     val multi = onSelectionChange != null
     val selection = selectedKeys ?: emptySet()
+    val touch = DeskTheme.inputMode == InputMode.Touch
     val tracker = remember { SelectionTracker() }
     val focusManager = LocalFocusManager.current
     val keysInOrder = { rows.map(key) }
@@ -258,8 +262,12 @@ fun <T> DenseTable(
                 val onClick = {
                     if (!multi) {
                         onRowClick(item, index)
+                    } else if (touch && !toggleOnClick && selection.isEmpty() && !tracker.toggle && !tracker.range) {
+                        // a tap opens; on touch, selecting is for the select mode
+                        onRowClick(item, index)
                     } else {
-                        val toggle = toggleOnClick || tracker.toggle
+                        // while a finger is picking rows, a tap adds or removes one
+                        val toggle = toggleOnClick || tracker.toggle || touch
                         val range = !toggleOnClick && tracker.range
                         update(TableSelection.click(keysInOrder(), selection, tracker.anchor, itemKey, toggle = toggle, range = range))
                         if (!toggle && !range) onRowClick(item, index)
@@ -282,7 +290,10 @@ fun <T> DenseTable(
                     ContextMenuArea(
                         entries = { rowMenu(item, index) },
                         accessibilityLabel = rowMenuLabel,
-                        onOpen = if (!multi) null else ({ update(TableSelection.menu(selection, tracker.anchor, itemKey)) }),
+                        onOpen = if (!multi) null else ({
+                            // a finger's long press acts on the row; it does not start a selection
+                            if (!touch || selection.isNotEmpty()) update(TableSelection.menu(selection, tracker.anchor, itemKey))
+                        }),
                     ) { row() }
                 } else {
                     row()
