@@ -43,7 +43,7 @@ import desktopkit.input.KeyChord
 import desktopkit.input.Shortcut
 import desktopkit.input.ShortcutGroup
 import desktopkit.input.ShortcutRegistry
-import desktopkit.input.hasHardwareKeyboard
+import desktopkit.input.showShortcutHints
 import desktopkit.screens.MessageScreen
 import desktopkit.screens.PageHeader
 import desktopkit.settings.AppearanceSection
@@ -62,7 +62,6 @@ import desktopkit.shell.ShellSpec
 import desktopkit.shell.WidthClass
 import desktopkit.theme.Accent
 import desktopkit.theme.DeskTheme
-import desktopkit.theme.InputMode
 import kotlinx.coroutines.launch
 
 // ------------------------------------------------------------------ 1. keyboard shortcuts
@@ -244,7 +243,7 @@ class MainActivity : ComponentActivity() {
                         "bin" -> BinScreen(library)
                         "settings" -> {
                             // the shortcut table only where there is a keyboard (or a mouse) to use it
-                            val keys = DeskTheme.inputMode == InputMode.Pointer || hasHardwareKeyboard()
+                            val keys = showShortcutHints()
                             LazyColumn(Modifier.fillMaxSize()) {
                                 item { PageHeader(stringResource(desktopkit.R.string.dk_settings)) }
                                 item { AppearanceSection(prefs, accentLabel = accentLabel) }

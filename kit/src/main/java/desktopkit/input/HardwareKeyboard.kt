@@ -9,8 +9,8 @@ import desktopkit.theme.InputMode
 
 /**
  * Whether a hardware keyboard is at hand: a keyboard cover, a Bluetooth keyboard or DeX's, not
- * folded away. Follows the system as keyboards come and go. Show keyboard shortcuts (a settings
- * card listing them, say) only when this or a mouse is in use.
+ * folded away. Follows the system as keyboards come and go. To decide whether to show keyboard
+ * shortcuts, use [showShortcutHints], which also counts the mouse.
  */
 @Composable
 @ReadOnlyComposable
@@ -19,7 +19,15 @@ fun hasHardwareKeyboard(): Boolean = LocalConfiguration.current.hasHardwareKeybo
 internal fun Configuration.hasHardwareKeyboard(): Boolean =
     keyboard == Configuration.KEYBOARD_QWERTY && hardKeyboardHidden != Configuration.HARDKEYBOARDHIDDEN_YES
 
-/** Keyboard shortcuts next to menu items: with a mouse or a hardware keyboard, not for a finger alone. */
+/**
+ * Whether to show keyboard shortcuts: with a mouse (the pointer layout) or a [hardware
+ * keyboard][hasHardwareKeyboard], not for a finger alone, where "Ctrl+K" is only noise. The kit's
+ * menus, the "⋯" sheet, the command palette and the toasts follow it; use it for the app's own hints
+ * too, a settings section listing the shortcuts say:
+ * ```
+ * if (showShortcutHints()) item { ShortcutListSection(shortcuts) }
+ * ```
+ */
 @Composable
 @ReadOnlyComposable
-internal fun showShortcutHints(): Boolean = DeskTheme.inputMode == InputMode.Pointer || hasHardwareKeyboard()
+fun showShortcutHints(): Boolean = DeskTheme.inputMode == InputMode.Pointer || hasHardwareKeyboard()

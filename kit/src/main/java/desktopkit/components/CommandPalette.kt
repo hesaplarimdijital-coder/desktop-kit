@@ -96,6 +96,7 @@ import desktopkit.theme.DeskGlass
 import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
 import desktopkit.theme.GlassThickness
+import desktopkit.input.showShortcutHints
 import desktopkit.theme.InputMode
 import desktopkit.theme.LocalMotionTier
 import desktopkit.theme.MotionTier
@@ -499,7 +500,7 @@ private fun PalettePanel(
             if (state.query.isNotEmpty() && compact) {
                 DeskIconButton(DeskIcons.Close, stringResource(R.string.dk_clear), onClick = { state.query = "" })
             }
-            if (!touch) KeyCap(stringResource(R.string.dk_key_esc))
+            if (showShortcutHints()) KeyCap(stringResource(R.string.dk_key_esc))
         }
         HorizontalRule()
         if (chips.isNotEmpty()) {
@@ -543,6 +544,8 @@ private fun PaletteResultRow(row: PaletteRow.Result, chosen: Boolean, onHover: (
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
     val touch = DeskTheme.inputMode == InputMode.Touch
+    // keys and shortcuts only where a keyboard or a mouse can use them
+    val keys = showShortcutHints()
     val interaction = remember { MutableInteractionSource() }
     val state = interaction.collectState()
     val latestHover by rememberUpdatedState(onHover)
@@ -582,15 +585,15 @@ private fun PaletteResultRow(row: PaletteRow.Result, chosen: Boolean, onHover: (
             }
         }
         if (item.hint != null) Text(item.hint, style = DeskTheme.type.labelSmall, color = if (chosen) colors.onSelection else colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        if (chosen && !touch && item.actionLabel != null) {
+        if (chosen && keys && item.actionLabel != null) {
             KeyCap("Enter")
             Text(item.actionLabel, style = DeskTheme.type.mono, color = colors.onSelection, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        if (chosen && !touch && item.onOpenInNewWindow != null) {
+        if (chosen && keys && item.onOpenInNewWindow != null) {
             KeyCap("Ctrl+Enter")
             Text(stringResource(R.string.dk_palette_new_window), style = DeskTheme.type.mono, color = colors.onSelection, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        if (item.shortcut != null) KeyCap(item.shortcut)
+        if (item.shortcut != null && keys) KeyCap(item.shortcut)
         Spacer(Modifier.width(0.dp))
     }
 }
