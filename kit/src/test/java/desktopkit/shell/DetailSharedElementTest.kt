@@ -46,13 +46,13 @@ class DetailSharedElementTest {
                         onBack = { detail = null },
                         list = {
                             Column {
-                                Box(Modifier.size(40.dp).background(Color.Red).detailSharedElement("cover").testTag("small"))
+                                Box(Modifier.detailSharedElement("cover").size(40.dp).background(Color.Red).testTag("small"))
                                 Text("Gece Yarısı Treni", Modifier.detailSharedBounds("title"))
                             }
                         },
                     ) {
                         Column {
-                            Box(Modifier.size(232.dp).background(Color.Red).detailSharedElement("cover").testTag("large"))
+                            Box(Modifier.detailSharedElement("cover").size(232.dp).background(Color.Red).testTag("large"))
                             Text("Gece Yarısı Treni", Modifier.detailSharedBounds("title"))
                         }
                     }
@@ -61,9 +61,11 @@ class DetailSharedElementTest {
         }
         compose.waitForIdle()
         compose.mainClock.autoAdvance = false
-        detail = "album"
+        compose.runOnIdle { detail = "album" }
+        // one frame composes the detail, the next starts the flight
         compose.mainClock.advanceTimeByFrame()
-        compose.mainClock.advanceTimeBy(120)
+        compose.mainClock.advanceTimeByFrame()
+        compose.mainClock.advanceTimeBy(100)
         // half way: the cover is somewhere between the row's 40 dp and the detail's 232 dp
         val flying = compose.onNodeWithTag("large", useUnmergedTree = true).getBoundsInRoot()
         val width = flying.right - flying.left

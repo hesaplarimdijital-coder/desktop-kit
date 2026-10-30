@@ -216,7 +216,8 @@ private fun boundsTransform(tier: MotionTier) = BoundsTransform { _, _ ->
  * Inside a [DetailTransition], this element and the element with the same [key] on the other side
  * (the list's row and the detail) are one: opening the detail moves it from the row to its place in
  * the detail, closing moves it back. For things that look the same at both sizes: a cover, an
- * icon. Outside a [DetailTransition], or with reduced motion, nothing changes.
+ * icon. Put it first in the element's modifiers, before its size and shape, so all of it flies.
+ * Outside a [DetailTransition], or with reduced motion, nothing changes.
  */
 @Composable
 fun Modifier.detailSharedElement(key: Any): Modifier {
