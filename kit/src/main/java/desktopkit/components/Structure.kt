@@ -149,9 +149,11 @@ fun KeyValueRow(
  * a [leading] icon or [leadingContent] (artwork), trailing text ([trailing], in the monospace face,
  * with [trailingSub] under it) or [trailingContent], and a thin [progress] bar under the subtitle.
  *
- * Tapping runs [onClick]. A long press runs [onLongClick] (usually: start selecting) or, without
- * it, opens [menu]; a right click and the Menu key open [menu] too. In [selectionMode] a check box
- * leads the row and shows [selected]. [drag] lets the row be dragged with a mouse to a [dropZone].
+ * Tapping runs [onClick], or opens [menu] with [openMenuOnTap] (rows whose only use is their
+ * actions; not in [selectionMode]). A long press runs [onLongClick] (usually: start selecting) or,
+ * without it, opens [menu]; a right click and the Menu key open [menu] too. In [selectionMode] a
+ * check box leads the row and shows [selected]. [drag] lets the row be dragged with a mouse to a
+ * [dropZone].
  */
 @Composable
 fun DeskListRow(
@@ -179,6 +181,7 @@ fun DeskListRow(
     onLongClick: (() -> Unit)? = null,
     menu: (() -> List<MenuEntry>)? = null,
     drag: (() -> DeskDragPayload?)? = null,
+    openMenuOnTap: Boolean = false,
 ) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
@@ -214,7 +217,7 @@ fun DeskListRow(
                         menu != null -> { { menuAt = IntOffset(0, rowHeight) } }
                         else -> null
                     },
-                    onClick = onClick,
+                    onClick = if (openMenuOnTap && !selectionMode && menu != null) { { menuAt = IntOffset(0, rowHeight) } } else onClick,
                 )
                 .onKeyEvent { event ->
                     val opens = event.type == KeyEventType.KeyDown && latestMenu != null &&

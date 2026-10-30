@@ -306,7 +306,8 @@ private fun GridItem(
  * A cover with its title and a second line, as in the design study: the cover rounds its corners;
  * the pointer over it (or the keyboard focus, or the selection) rings it in the accent colour and,
  * with a mouse, darkens it and shows [onPlay] at the bottom and "⋯" at the top (the item's menu).
- * While items are being selected a check mark in the corner shows the choice.
+ * While items are being selected a check mark in the corner shows the choice. [titleModifier] goes
+ * on the title, e.g. [desktopkit.shell.detailSharedBounds] so it flies into the album's page.
  */
 @Composable
 fun GridCellScope.CoverCell(
@@ -316,6 +317,7 @@ fun GridCellScope.CoverCell(
     onPlay: (() -> Unit)? = null,
     playLabel: String? = null,
     showMore: Boolean = true,
+    titleModifier: Modifier = Modifier,
     cover: @Composable BoxScope.() -> Unit,
 ) {
     val colors = DeskTheme.colors
@@ -373,7 +375,7 @@ fun GridCellScope.CoverCell(
         }
         Spacer(Modifier.height(dimens.gapS - 4.dp))
         Text(title, style = DeskTheme.type.label.copy(fontWeight = FontWeight.Medium), color = if (selected) colors.accentText else colors.text,
-            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 4.dp))
+            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 4.dp).then(titleModifier))
         if (subtitle != null) {
             Text(subtitle, style = DeskTheme.type.labelSmall, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(horizontal = 4.dp))

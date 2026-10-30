@@ -86,23 +86,25 @@ import desktopkit.theme.glass
 typealias NavBadges = Map<String, String>
 
 /**
- * Lets the sidebar's and the rail's entries take drops: tracks dragged onto "Playlists", files
- * onto "Downloads". [kinds] are the drag kinds they take ([desktopkit.components.DeskDragPayload.kind]),
- * [accepts] which entries (by route) take them, [onDrop] gets the route and what was dropped and says
- * whether it was taken. An entry under a fitting drag is highlighted.
+ * Lets the sidebar's and the rail's entries take drops: tracks and albums dragged onto
+ * "Playlists", files onto "Bin". [kinds] says which drag kinds ([desktopkit.components.DeskDragPayload.kind])
+ * each entry takes, by route; entries left out take none. [onDrop] gets the route and what was
+ * dropped and says whether it was taken. While a fitting drag is in the air its entries are tinted;
+ * the one under the pointer is highlighted.
  */
 @Immutable
 class NavDrop(
-    val kinds: Set<String>,
-    val accepts: (route: String) -> Boolean = { true },
+    val kinds: Map<String, Set<String>>,
     val onDrop: (route: String, payload: DeskDragPayload) -> Boolean,
 )
 
 /** The drop target of a navigation entry, when [navDrop] takes drops on [route]. */
 @Composable
-private fun Modifier.navDropZone(navDrop: NavDrop?, route: String, shape: androidx.compose.ui.graphics.Shape): Modifier =
-    if (navDrop == null || !navDrop.accepts(route)) this
-    else dropZone(navDrop.kinds, onDrop = { payload -> navDrop.onDrop(route, payload) }, shape = shape)
+private fun Modifier.navDropZone(navDrop: NavDrop?, route: String, shape: androidx.compose.ui.graphics.Shape): Modifier {
+    val kinds = navDrop?.kinds?.get(route)
+    return if (navDrop == null || kinds.isNullOrEmpty()) this
+    else dropZone(kinds, onDrop = { payload -> navDrop.onDrop(route, payload) }, shape = shape)
+}
 
 /** The kit's "More" entry; it lists [ShellSpec.overflow] for the current chrome. */
 @Composable
