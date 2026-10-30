@@ -211,6 +211,14 @@ class AccessibilityTest {
             }
 
     /**
+     * Whether the text runs on past its box or its last line. Not hasVisualOverflow: for plain
+     * strings the semantics lay the text out again, and the new lines can be a fraction of a pixel
+     * taller or wider than the box of the first layout.
+     */
+    private fun TextLayoutResult.runsOn(): Boolean =
+        multiParagraph.didExceedMaxLines || size.width + 1 < multiParagraph.width
+
+    /**
      * Text that is cut off: its box is lower than its lines (a fixed height), or it runs on past
      * its box or its last line with nothing to show it (no ellipsis).
      */
@@ -219,14 +227,15 @@ class AccessibilityTest {
         val text = result.layoutInput.text
         when {
             result.size.height + 1 < lines -> "“$text” ${result.size.height} px < $lines px"
-            result.hasVisualOverflow && result.layoutInput.overflow == TextOverflow.Clip -> "“$text” clipped without an ellipsis"
+            result.runsOn() && result.layoutInput.overflow == TextOverflow.Clip ->
+                "“$text” clipped without an ellipsis (${result.size}, ${result.multiParagraph.width} × $lines px)"
             else -> null
         }
     }
 
     /** One-line text shortened with an ellipsis (a long title in a row): allowed, and listed in the test's output. */
     private fun shortenedText(): List<String> = textLayouts()
-        .filter { it.hasVisualOverflow && it.layoutInput.overflow != TextOverflow.Clip && it.layoutInput.overflow != TextOverflow.Visible }
+        .filter { it.runsOn() && it.layoutInput.overflow != TextOverflow.Clip && it.layoutInput.overflow != TextOverflow.Visible }
         .map { it.layoutInput.text.text }
 
     private fun checkText(name: String) {
