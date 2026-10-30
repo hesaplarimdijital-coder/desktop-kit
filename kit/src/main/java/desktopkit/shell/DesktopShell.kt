@@ -130,6 +130,9 @@ class ShellNavigator(private val navController: NavHostController) {
  * it does not ride up on top of the keyboard; the content then reaches down to the keyboard. The
  * content ends above the keyboard because [desktopkit.DesktopKitRoot] pads the whole app with
  * `WindowInsets.safeDrawing` (IME included); a shell used without it needs the same padding around it.
+ * With a finger, scrolling the content or a tap outside the kit's text fields takes the focus from
+ * the field, and the keyboard closes; a control that should leave it open (a Send button beside a
+ * message field) carries [keepsKeyboardOpen].
  *
  * On compact windows the chrome follows the content's scrolling (see [hideBarsOnScroll]); tablet and
  * DeX windows keep their chrome in place. Text is [largeWindowTextStep] sp larger on rail and sidebar

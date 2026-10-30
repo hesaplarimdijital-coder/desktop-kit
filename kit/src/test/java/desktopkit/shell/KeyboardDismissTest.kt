@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -16,7 +17,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
-import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -31,6 +31,7 @@ import desktopkit.components.DeskButton
 import desktopkit.components.DeskTextField
 import desktopkit.theme.DesktopKitTheme
 import desktopkit.theme.InputMode
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -41,8 +42,8 @@ import org.robolectric.annotation.Config
 
 /**
  * With a finger the keyboard steps aside when the user moves on: a scroll or a tap outside the text
- * fields takes the focus from the field. A tap on another field moves it there; a mouse click
- * elsewhere leaves it where it is.
+ * fields takes the focus from the field. A tap on another field moves it there, a tap on a control
+ * that keeps the keyboard leaves it where it is, and so does a mouse wheel.
  */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
@@ -62,6 +63,8 @@ class KeyboardDismissTest {
 
     private var text by mutableStateOf("Kış")
     private var other by mutableStateOf("")
+    private var sent = 0
+    private val list = LazyListState()
     private lateinit var host: ShellOverlayHost
 
     private fun screen() {
@@ -74,7 +77,8 @@ class KeyboardDismissTest {
                         DeskTextField(text, { text = it }, Modifier.fillMaxWidth().padding(16.dp).testTag("field"), hint = "Ara")
                         DeskTextField(other, { other = it }, Modifier.fillMaxWidth().padding(16.dp).testTag("other"), hint = "Not")
                         DeskButton("Kaydet", {}, Modifier.padding(16.dp).testTag("button"))
-                        LazyColumn(Modifier.fillMaxSize().testTag("list")) {
+                        DeskButton("Gönder", { sent++ }, Modifier.padding(16.dp).keepsKeyboardOpen().testTag("send"))
+                        LazyColumn(Modifier.fillMaxSize().testTag("list"), state = list) {
                             items(80) { Text("Satır $it", Modifier.padding(16.dp)) }
                         }
                     }
@@ -123,10 +127,24 @@ class KeyboardDismissTest {
     }
 
     @Test
-    fun aMouseClickElsewhereKeepsTheField() {
+    fun aTapOnASendButtonKeepsTheKeyboard() {
         screen()
-        compose.onNodeWithTag("button").performMouseInput { click() }
+        compose.onNodeWithTag("send").performClick()
         compose.waitForIdle()
+        assertEquals("the button did its job", 1, sent)
+        compose.onNodeWithTag("field").assertIsFocused()
+    }
+
+    @Test
+    fun aMouseWheelKeepsTheField() {
+        // a mouse click is Compose's own business (it takes the focus from a field clicked outside)
+        screen()
+        compose.onNodeWithTag("list").performMouseInput {
+            moveTo(center)
+            scroll(6f)
+        }
+        compose.waitForIdle()
+        compose.runOnIdle { assertTrue("the wheel scrolled the list", list.firstVisibleItemIndex > 0) }
         compose.onNodeWithTag("field").assertIsFocused()
     }
 }
