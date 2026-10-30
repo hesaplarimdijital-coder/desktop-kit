@@ -343,7 +343,6 @@ private fun SheetSurface(
     val settleSpec = DeskMotion.spatial(tier, tween<Float>(DeskMotion.MEDIUM_MS, easing = DeskMotion.Emphasized))
     SideEffect {
         pull.scope = scope
-        pull.height = sheetHeight
         pull.flingPx = with(density) { 800.dp.toPx() }
         pull.settleSpec = settleSpec
         pull.onThreshold = { haptics.threshold() }
@@ -367,7 +366,11 @@ private fun SheetSurface(
                 .align(Alignment.BottomCenter)
                 .widthIn(max = 640.dp)
                 .fillMaxWidth()
-                .onSizeChanged { sheetHeight = it.height }
+                // the pull reads the height here: nothing recomposes the surface when it is measured
+                .onSizeChanged {
+                    sheetHeight = it.height
+                    pull.height = it.height
+                }
                 .graphicsLayer {
                     val hidden = (1f - progress.value) * (if (sheetHeight > 0) sheetHeight.toFloat() else 2000f)
                     translationY = hidden + drag.value
@@ -387,7 +390,9 @@ private fun SheetSurface(
                     awaitPointerEventScope {
                         while (true) {
                             val event = awaitPointerEvent(PointerEventPass.Initial)
-                            pull.pressed = event.changes.any { it.pressed }
+                            val pressed = event.changes.any { it.pressed }
+                            if (pressed && !pull.pressed) pull.grab()
+                            pull.pressed = pressed
                         }
                     }
                 }
@@ -432,6 +437,15 @@ private class SheetPull(private val drag: Animatable<Float, AnimationVector1D>) 
     /** Where the sheet is: set at once, while the animatable catches up on the next frame. */
     private var offset = 0f
     private var armed = false
+
+    /**
+     * A finger or button went down: the pull starts from where the sheet is drawn (back at the top
+     * after the sheet was reopened, or partway while it springs back).
+     */
+    fun grab() {
+        offset = drag.value.coerceAtLeast(0f)
+        armed = height > 0 && offset > height / 3f
+    }
 
     /** Moves the sheet by [delta] px (down is positive), never above its place; returns what it used. */
     fun by(delta: Float): Float {

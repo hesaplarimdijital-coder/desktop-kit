@@ -35,7 +35,8 @@ import org.robolectric.annotation.GraphicsMode
 
 /**
  * The phone's bottom sheets: pulled down anywhere on their list they close (not only on the
- * handle), a short pull springs back, and an on/off action is a switch that leaves the sheet open.
+ * handle), slowly past a third of their height or with a fling; a short pull springs back, and an
+ * on/off action is a switch that leaves the sheet open.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -66,6 +67,15 @@ class SheetGestureTest {
     fun aPullDownOnTheListClosesTheSheet() {
         sheet()
         compose.onNodeWithTag("row1").performTouchInput { swipe(center, center + Offset(0f, 700f), durationMillis = 250) }
+        compose.waitForIdle()
+        assertEquals(1, dismissed)
+    }
+
+    @Test
+    fun aSlowPullPastAThirdClosesTheSheet() {
+        // far slower than a fling: only the distance can close it
+        sheet()
+        compose.onNodeWithTag("row1").performTouchInput { swipe(center, center + Offset(0f, 500f), durationMillis = 2500) }
         compose.waitForIdle()
         assertEquals(1, dismissed)
     }
