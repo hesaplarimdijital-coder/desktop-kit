@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
@@ -343,7 +344,8 @@ fun SampleStatusBar(kind: NavKind) {
     Column(Modifier.fillMaxWidth().background(colors.chrome)) {
         HorizontalRule()
         Row(
-            Modifier.fillMaxWidth().height(if (kind == NavKind.Sidebar) 40.dp else 48.dp).padding(horizontal = 16.dp),
+            // grows with large text instead of cutting it
+            Modifier.fillMaxWidth().heightIn(min = if (kind == NavKind.Sidebar) 40.dp else 48.dp).padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("Kopyalanıyor: Yedek.zip", style = DeskTheme.type.labelSmall, color = colors.textSecondary, modifier = Modifier.weight(1f))

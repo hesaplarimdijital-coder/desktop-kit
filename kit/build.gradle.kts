@@ -60,7 +60,10 @@ android {
 // change shows up in the pull request.
 kotlin {
     @OptIn(org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation::class)
-    abiValidation()
+    abiValidation {
+        // AGP's built-in Kotlin leaves the default ("api") unset
+        referenceDumpDir.set(layout.projectDirectory.dir("api"))
+    }
 }
 
 dependencies {
