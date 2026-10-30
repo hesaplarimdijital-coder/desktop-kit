@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.components.DragAndDropTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-30T14:28:46.661Z" hostname="runnervmnwato" time="0.105">
+  <properties/>
+  <testcase name="otherAppsSeeOnlyTheLabel" classname="desktopkit.components.DragAndDropTest" time="0.041"/>
+  <testcase name="theAppsOtherWindowsGetAllOfIt" classname="desktopkit.components.DragAndDropTest" time="0.032"/>
+  <testcase name="withinTheWindowOnly" classname="desktopkit.components.DragAndDropTest" time="0.028"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
