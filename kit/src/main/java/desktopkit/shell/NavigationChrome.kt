@@ -81,6 +81,7 @@ import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
 import desktopkit.theme.GlassThickness
 import desktopkit.theme.glass
+import desktopkit.input.showShortcutHints
 
 /** Item counts and badges shown next to sidebar entries ("4 812", "4 new"), by route. */
 typealias NavBadges = Map<String, String>
@@ -620,7 +621,8 @@ fun SearchField(onClick: () -> Unit, shortcut: String?, modifier: Modifier = Mod
         Spacer(Modifier.width(8.dp))
         Text(hint ?: stringResource(R.string.dk_search_hint), style = DeskTheme.type.body, color = colors.textTertiary, maxLines = 1,
             overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-        if (shortcut != null) KeyCap(shortcut)
+        // the key only where a keyboard or a mouse can press it (a tablet's sidebar layout may have neither)
+        if (shortcut != null && showShortcutHints()) KeyCap(shortcut)
     }
 }
 

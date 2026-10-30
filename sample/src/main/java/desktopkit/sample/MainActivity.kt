@@ -35,7 +35,7 @@ import desktopkit.components.MenuEntry
 import desktopkit.components.PaletteItem
 import desktopkit.components.ToastResult
 import desktopkit.components.paletteItems
-import desktopkit.components.rememberCommandPaletteState
+import desktopkit.components.CommandPaletteState
 import desktopkit.components.rememberExpandablePlayerState
 import desktopkit.components.rememberToastState
 import desktopkit.input.CommonShortcuts
@@ -43,7 +43,7 @@ import desktopkit.input.KeyChord
 import desktopkit.input.Shortcut
 import desktopkit.input.ShortcutGroup
 import desktopkit.input.ShortcutRegistry
-import desktopkit.input.hasHardwareKeyboard
+import desktopkit.input.showShortcutHints
 import desktopkit.screens.MessageScreen
 import desktopkit.screens.PageHeader
 import desktopkit.settings.AppearanceSection
@@ -62,7 +62,6 @@ import desktopkit.shell.ShellSpec
 import desktopkit.shell.WidthClass
 import desktopkit.theme.Accent
 import desktopkit.theme.DeskTheme
-import desktopkit.theme.InputMode
 import kotlinx.coroutines.launch
 
 // ------------------------------------------------------------------ 1. keyboard shortcuts
@@ -90,6 +89,9 @@ class MainActivity : ComponentActivity() {
     /** Set by the composition; runs a shortcut's action. */
     private var perform: (String) -> Boolean = { false }
 
+    /** Ctrl+K: the command palette. Kept here so dispatchKeyEvent can see whether it is open. */
+    private val palette = CommandPaletteState()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -100,8 +102,7 @@ class MainActivity : ComponentActivity() {
             val navigator = remember(navController) { ShellNavigator(navController) }
             val context = LocalContext.current
             val scope = rememberCoroutineScope()
-            // Ctrl+K: the command palette over the screens, the albums and the shortcut table
-            val palette = rememberCommandPaletteState()
+            // Ctrl+K: the command palette over the screens, the albums and the shortcut table (state above)
             val toasts = rememberToastState()
             val library = remember { LibraryState() }
             var openAlbum by rememberSaveable { mutableStateOf<String?>(null) }
@@ -244,7 +245,7 @@ class MainActivity : ComponentActivity() {
                         "bin" -> BinScreen(library)
                         "settings" -> {
                             // the shortcut table only where there is a keyboard (or a mouse) to use it
-                            val keys = DeskTheme.inputMode == InputMode.Pointer || hasHardwareKeyboard()
+                            val keys = showShortcutHints()
                             LazyColumn(Modifier.fillMaxSize()) {
                                 item { PageHeader(stringResource(desktopkit.R.string.dk_settings)) }
                                 item { AppearanceSection(prefs, accentLabel = accentLabel) }
@@ -279,8 +280,9 @@ class MainActivity : ComponentActivity() {
 
     // ------------------------------------------------------------------ 2. route keys to the table
 
+    // Not while the palette is open: Ctrl+K would clear what was typed, and F5 or Ctrl+B would act behind it.
     override fun dispatchKeyEvent(event: KeyEvent): Boolean =
-        shortcuts.matchNative(event)?.let { perform(it.id) } == true || super.dispatchKeyEvent(event)
+        (!palette.isOpen && shortcuts.matchNative(event)?.let { perform(it.id) } == true) || super.dispatchKeyEvent(event)
 
     /** Meta+/ (or the system's keyboard shortcuts screen) lists the same table. */
     override fun onProvideKeyboardShortcuts(data: MutableList<KeyboardShortcutGroup>, menu: Menu?, deviceId: Int) {

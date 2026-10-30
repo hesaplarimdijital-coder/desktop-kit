@@ -65,7 +65,7 @@ Uygulama modülünün `build.gradle.kts` dosyası:
 
 ```kotlin
 dependencies {
-    implementation("com.github.hesaplarimdijital-coder:desktop-kit:2.1.0")
+    implementation("com.github.hesaplarimdijital-coder:desktop-kit:2.2.0")
     implementation("androidx.activity:activity-compose:1.13.0")
 }
 ```
@@ -149,16 +149,21 @@ val shortcuts = ShortcutRegistry(
 - Tuşları etkinlikten yönlendirmek odak nerede olursa olsun çalışır:
 
   ```kotlin
+  private val palet = CommandPaletteState()   // etkinlikte; CommandPalette(palet, …) de bunu alır
+
   override fun dispatchKeyEvent(event: KeyEvent) =
-      shortcuts.matchNative(event)?.let { run(it.id) } == true || super.dispatchKeyEvent(event)
+      (!palet.isOpen && shortcuts.matchNative(event)?.let { run(it.id) } == true) || super.dispatchKeyEvent(event)
   ```
 
-  Ctrl/Alt/Meta'sız tek tuşlar (Boşluk, M) metin kutusuna yazmayı bozmasın diye burada
-  atlanır. Onları sahibi olan ekranda `shortcuts.match(event, scopes)` ile yakala.
+  Etkinlik tuşları Compose'dan önce görür; komut paleti açıkken yönlendirmeyi atla, yoksa Ctrl+K yazılanı
+  siler, öbür kısayollar paletin arkasında çalışır, Ctrl+Enter'a ya da düz tuşa bağlı bir kısayol paletin
+  kendi tuşunu alır. Bunun için paletin durumu `rememberCommandPaletteState()` yerine etkinlikte durur.
+  Ctrl/Alt/Meta'sız tek tuşlar (Boşluk, M) metin kutusuna yazmayı bozmasın diye burada atlanır. Onları sahibi
+  olan ekranda `shortcuts.match(event, scopes)` ile yakala.
 - Meta+/ sistem listesi: `onProvideKeyboardShortcuts` içinde `shortcuts.keyboardShortcutGroups(resources)`.
-- Ayarlardaki liste: `ShortcutListSection(shortcuts)`. Yalnızca klavye ya da fare varken göstermek için
-  `if (DeskTheme.inputMode == InputMode.Pointer || hasHardwareKeyboard())`. Menüler ve "⋯" sayfası kısayolları
-  zaten yalnızca o zaman yazar.
+- Ayarlardaki liste: `ShortcutListSection(shortcuts)`. Yalnızca fare ya da donanım klavyesi varken göstermek
+  için `if (showShortcutHints())`. Menüler, "⋯" sayfası, komut paleti ve bildirimler kısayolları zaten yalnızca
+  o zaman yazar.
 - Bir birim testinde `assertTrue(shortcuts.conflicts().isEmpty())` ile aynı tuşa iki iş bağlanmadığını denetle.
 
 ## Görünümü uygulamaya göre değiştirmek
@@ -199,9 +204,9 @@ Değerlere doğrudan erişim için `DeskTheme.colors.text`, `DeskTheme.type.body
 | `DeskDialog`, `DialogFrame`, `DialogDismissButton` | İletişim kutusu; klavye varsa "Esc", yoksa × |
 | `DeskTextField`, `DeskSearchField`, `NumberField`, `OptionalNumberField` | Metin, arama ve sayı alanları (aşağıya bak) |
 | `DeskCheckbox`, `DeskSwitch`, `CheckboxRow`, `SwitchRow` | Onay kutusu (ara durum dahil) ve anahtar; satır hâlleri TalkBack'e adını söyler |
-| `DeskProgressBar`, `StatusBanner`, `CountBadge` | İlerleme (belirli, belirsiz), dört tonlu durum şeridi, sayı rozeti |
+| `DeskProgressBar`, `StatusBanner`, `CountBadge` | İlerleme (belirli, belirsiz; adı verilmezse TalkBack belirliyi yüzdesiyle, belirsizi "Yükleniyor" diye okur), dört tonlu durum şeridi, sayı rozeti |
 | `rememberToastState`, `ToastState`, `ToastHost` | Bildirimler; kabuk `DesktopShell(toasts = …)` ile yerleştirir (aşağıya bak) |
-| `DeskCard`, `KeyValueRow`, `DeskListRow`, `SelectionBar` | Kart, etiket–değer satırı, telefon listesi satırı, seçim çubuğu |
+| `DeskCard`, `KeyValueRow`, `DeskListRow`, `SelectionBar` | Kart (`verticalArrangement` öğeleri aralar), etiket–değer satırı, telefon listesi satırı, seçim çubuğu |
 | `MenuButton`, `IconMenuButton` | Altında menü açan düğmeler |
 | `TabStrip`, `DeskTab` | Sekmeler: rozet, meşgul noktası, kapatma, orta tık, sürükleme |
 | `DeskGrid`, `CoverCell` | Kapak ızgarası (aşağıya bak) |
@@ -210,7 +215,7 @@ Değerlere doğrudan erişim için `DeskTheme.colors.text`, `DeskTheme.type.body
 | `SkeletonList`, `SkeletonListRow`, `SkeletonBlock` | Yükleniyor yer tutucuları; tablo ve ızgarada `loading = true` |
 | `rememberDeskHaptics` | Dokunmada titreşim: aç/kapa, tık, eşik, onay, ret |
 | `DeskWindows`, `rememberNewWindow` | Uygulamayı yeni pencerede açmak (aşağıya bak) |
-| `hasHardwareKeyboard` | Donanım klavyesi bağlı ve açık mı (klavye kapağı, Bluetooth, DeX) |
+| `hasHardwareKeyboard`, `showShortcutHints` | Donanım klavyesi bağlı ve açık mı (klavye kapağı, Bluetooth, DeX); kısayollar gösterilsin mi (fare ya da donanım klavyesi) |
 | `Modifier.keepsKeyboardOpen` | Dokununca ekran klavyesini kapatmayan denetim (aşağıya bak: Ekran klavyesi) |
 
 ### Buzlu cam
@@ -427,6 +432,12 @@ DenseTable(
 - Sağ tık ya da uzun basma seçili bir satırdaysa seçim korunur, başka satırdaysa yalnızca o satır seçilir: menü
   üzerinde çalıştığı satırları seçili bulur.
   `rowMenu` uygulamanın `secili` durumunu okuyarak "3 kitabı sil" gibi menü kurar.
+- Süren bir seçim varken (dokunmatik yerleşimde ya da seçim modunda her seçim, farede birden çok satır) sistemin
+  Geri hareketi önce seçimi temizler, Esc gibi; farenin tıklayıp seçtiği tek satırda ve seçim yokken Geri'ye
+  dokunmaz. Uygulama temizlemeyi almazsa sonraki Geri uygulamanındır; Geri'yi baştan uygulama yönetecekse
+  `clearSelectionOnBack = false`. Compose en son oluşturulan açık geri işleyicisini önce çağırır: bir
+  `DetailTransition` ayrıntısının içindeki tabloda önce ayrıntı kapanır; ekranın kendi `BackHandler`'ı tablonunkinden
+  önce de sonra da çalışabilir, onunki önce gelmeliyse bunu kapatıp seçimi orada temizle.
 - `onSelectionChange` verilmezse tablo eskisi gibi tek seçimlidir (`selectedKey`).
 
 ### Ekran klavyesi
@@ -559,7 +570,9 @@ DesktopShell(…, navController = navController, onSearch = { palet.open() }, ov
 
 Arama Türkçe harfleri katlar ("sarki" "Şarkı"yı bulur), eşleşen harfleri vurgular ve sonuçları gruplar. Klavye
 odağı alanda kalır: ↑/↓, Enter, Ctrl+Enter (`onOpenInNewWindow` varsa yeni pencerede), Tab ile grup süzgeçleri,
-Esc. Palet kapanınca odak açılmadan önceki yerine döner.
+Esc. Palet kapanınca odak açılmadan önceki yerine döner. Kısayolları etkinlikten yönlendiriyorsan paletin
+durumunu etkinlikte tut (`private val palet = CommandPaletteState()`) ve palet açıkken yönlendirmeyi atla
+(yukarıdaki Klavye kısayolları bölümü).
 
 ### Kapak ızgarası
 
@@ -572,7 +585,7 @@ DeskGrid(albümler, key = { it.id }, onItemClick = { albüm, _ -> aç(albüm) },
 ```
 
 Seçim kuralları tablonunkiyle aynı (Ctrl/Shift ile tıklama, Shift ile oklar, Ctrl+A, Esc; parmak dokunuşu açar,
-seçim modunda ya da seçim varken ekler/çıkarır; uzun basma menüyü açar ve kapağı seçer). Oynat düğmesi
+seçim modunda ya da seçim varken ekler/çıkarır; uzun basma menüyü açar ve kapağı seçer; Geri seçimi temizler). Oynat düğmesi
 farenin altında çıkar; TalkBack onu hücrenin eylemlerinde bulur, klavye için `itemMenu`'ye de "Oynat" koy (Menu
 tuşu menüyü açar).
 
@@ -620,9 +633,9 @@ uçarken de yuvarlak kalsın diye biçimini ver: `detailSharedElement("kapak-$id
 ## Sürüm yayınlamak
 
 1. `CHANGELOG.md` dosyasına ne değiştiğini yaz, `gradle.properties` içindeki `VERSION_NAME`'i güncelle.
-2. GitHub'da **Releases → Draft a new release** ile etiketi (`2.1.0`) `main` üzerinde oluştur; ya da
-   `git tag 2.1.0 && git push origin 2.1.0`.
-3. JitPack ilk istekte derler (`jitpack.yml`, Java 17). Uygulamada sürümü `2.1.0` yapman yeterli.
+2. Önce PR'ı birleştir, sonra GitHub'da **Releases → Draft a new release** ile etiketi (`2.2.0`) `main` üzerinde
+   oluştur; ya da `git tag 2.2.0 && git push origin 2.2.0`. Etiket birleştirmeden önce açılırsa eski kodu gösterir.
+3. JitPack ilk istekte derler (`jitpack.yml`, Java 17). Uygulamada sürümü `2.2.0` yapman yeterli.
 
 Sürüm numaraları [SemVer](https://semver.org/lang/tr/) kuralına uyar: uyumu bozan değişiklik
 ana sürümü, yeni özellik ikinci sayıyı, düzeltme üçüncüyü artırır.

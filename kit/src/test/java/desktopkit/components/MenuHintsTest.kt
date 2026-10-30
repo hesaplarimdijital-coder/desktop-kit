@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import desktopkit.TestShell
+import desktopkit.input.showShortcutHints
 import desktopkit.shell.WidthClass
 import desktopkit.theme.DesktopKitTheme
 import desktopkit.theme.InputMode
@@ -63,11 +64,13 @@ class MenuHintsTest {
         assertEquals(button.bottom + 2, position.y)
     }
 
+    private fun configuration(keyboard: Boolean) = Configuration(compose.activity.resources.configuration).apply {
+        this.keyboard = if (keyboard) Configuration.KEYBOARD_QWERTY else Configuration.KEYBOARD_NOKEYS
+        hardKeyboardHidden = if (keyboard) Configuration.HARDKEYBOARDHIDDEN_NO else Configuration.HARDKEYBOARDHIDDEN_YES
+    }
+
     private fun sheet(keyboard: Boolean) {
-        val configuration = Configuration(compose.activity.resources.configuration).apply {
-            this.keyboard = if (keyboard) Configuration.KEYBOARD_QWERTY else Configuration.KEYBOARD_NOKEYS
-            hardKeyboardHidden = if (keyboard) Configuration.HARDKEYBOARDHIDDEN_NO else Configuration.HARDKEYBOARDHIDDEN_YES
-        }
+        val configuration = configuration(keyboard)
         compose.setContent {
             CompositionLocalProvider(LocalConfiguration provides configuration) {
                 DesktopKitTheme(inputMode = InputMode.Touch) {
@@ -95,5 +98,27 @@ class MenuHintsTest {
     fun aKeyboardBringsTheShortcutsBack() {
         sheet(keyboard = true)
         compose.onNodeWithText("Ctrl+K").assertExists()
+    }
+
+    @Test
+    fun hintsFollowAMouseOrAKeyboard() {
+        var fingerOnly: Boolean? = null
+        var mouse: Boolean? = null
+        var keyboardCover: Boolean? = null
+        val plain = configuration(keyboard = false)
+        val cover = configuration(keyboard = true)
+        compose.setContent {
+            CompositionLocalProvider(LocalConfiguration provides plain) {
+                DesktopKitTheme(inputMode = InputMode.Touch) { fingerOnly = showShortcutHints() }
+                DesktopKitTheme(inputMode = InputMode.Pointer) { mouse = showShortcutHints() }
+            }
+            CompositionLocalProvider(LocalConfiguration provides cover) {
+                DesktopKitTheme(inputMode = InputMode.Touch) { keyboardCover = showShortcutHints() }
+            }
+        }
+        compose.waitForIdle()
+        assertEquals("a finger alone", false, fingerOnly)
+        assertEquals("a mouse", true, mouse)
+        assertEquals("a keyboard cover on a touch layout", true, keyboardCover)
     }
 }

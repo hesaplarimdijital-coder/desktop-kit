@@ -146,9 +146,17 @@ class ShortcutRegistry(val groups: List<ShortcutGroup>, val shortcuts: List<Shor
      * Same as [match] for an Android key event, for routing keys from `Activity.dispatchKeyEvent`
      * (this works whatever has focus, also before any composable is focused):
      * ```
+     * private val palette = CommandPaletteState()   // the activity holds it, so it can look here
+     *
      * override fun dispatchKeyEvent(event: KeyEvent) =
-     *     shortcuts.matchNative(event)?.let { actions.perform(it.id) } == true || super.dispatchKeyEvent(event)
+     *     (!palette.isOpen && shortcuts.matchNative(event)?.let { actions.perform(it.id) } == true) ||
+     *         super.dispatchKeyEvent(event)
      * ```
+     * The activity sees the keys before Compose, so skip the routing while a layer that takes keys
+     * itself is open: the [desktopkit.components.CommandPalette] (its field, Up and Down, Enter,
+     * Ctrl+Enter, Tab, Esc), or the shortcuts act behind it. Give the palette the same state
+     * (`CommandPalette(palette, …)`) instead of one from `rememberCommandPaletteState()`.
+     *
      * Plain keys (Space, M, ←) are skipped unless [allowPlainKeys], so typing in a text field
      * never triggers a shortcut; handle them in the screen that owns them (e.g. the player). Function
      * keys (F1–F12) always count as chords.

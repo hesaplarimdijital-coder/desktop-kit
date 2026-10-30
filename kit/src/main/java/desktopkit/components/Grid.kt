@@ -121,7 +121,10 @@ private class CellScope(
  * touch "select" mode. A tap with a finger or a pen only opens the cover unless items are being
  * picked: in the select mode, or once some are selected, a tap adds or removes one (a mouse click
  * selects, whatever the layout). Opening a cover's menu selects it unless it is selected already, so
- * the menu acts on it. [loading] shows breathing placeholder covers while [items] is empty.
+ * the menu acts on it. Back clears a selection being made (the one the check circles show) as Esc
+ * does, unless [clearSelectionOnBack] is false; [DenseTable] says when Back goes on to the app and in
+ * which order the back handlers run. [loading] shows breathing placeholder covers while [items] is
+ * empty.
  *
  * Columns are as many as fit [minCellWidth]. Draw each cell with [cell], usually a [CoverCell].
  * [itemDrag] lets covers be dragged with a mouse to a [dropZone], as [DenseTable]'s rowDrag.
@@ -143,6 +146,7 @@ fun <T> DeskGrid(
     itemMenuLabel: String? = null,
     loading: Boolean = false,
     itemDrag: ((T, Int) -> DeskDragPayload?)? = null,
+    clearSelectionOnBack: Boolean = true,
     cell: @Composable GridCellScope.(item: T) -> Unit,
 ) {
     val multi = onSelectionChange != null
@@ -155,6 +159,7 @@ fun <T> DeskGrid(
         tracker.anchor = result.anchor
         if (result.selection != selection) onSelectionChange?.invoke(result.selection)
     }
+    if (multi && clearSelectionOnBack) ClearSelectionOnBack(selection, touch, toggleOnClick) { update(TableSelection.clear()) }
     val columns = {
         state.layoutInfo.visibleItemsInfo.maxOfOrNull { it.column }?.plus(1) ?: 1
     }

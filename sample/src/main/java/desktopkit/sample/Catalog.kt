@@ -122,9 +122,9 @@ private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) 
             .padding(horizontal = DeskTheme.dimens.pagePadding, vertical = DeskTheme.dimens.gapS),
         title = title,
         contentPadding = PaddingValues(DeskTheme.dimens.gapL),
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(DeskTheme.dimens.gapL), content = content)
-    }
+        verticalArrangement = Arrangement.spacedBy(DeskTheme.dimens.gapL),
+        content = content,
+    )
 }
 
 /** A row of examples that wraps on narrow windows. */

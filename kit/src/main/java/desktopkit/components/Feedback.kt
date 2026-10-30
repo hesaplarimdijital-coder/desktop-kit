@@ -67,6 +67,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import desktopkit.R
+import desktopkit.input.showShortcutHints
 import desktopkit.shell.KeyCap
 import desktopkit.shell.WidthClass
 import desktopkit.shell.currentWidthClass
@@ -95,6 +96,10 @@ import kotlinx.coroutines.sync.withLock
  * sweeps along the track; with reduced motion it rests as a faint full bar). Changes of [fraction]
  * ease over 300 ms. 6 dp tall on touch, 4 dp with a mouse; [height] overrides it (3 dp under a list
  * row's subtitle).
+ *
+ * TalkBack reads [contentDescription] ("Copying") and then the amount. Without one, a bar with a
+ * [fraction] says only its percentage (the text next to it usually says what is going on), and a
+ * bar without one says "Loading".
  */
 @Composable
 fun DeskProgressBar(
@@ -110,7 +115,8 @@ fun DeskProgressBar(
         label = "progress")
     val loading = stringResource(R.string.dk_loading)
     val semantics = Modifier.semantics {
-        this.contentDescription = contentDescription ?: loading
+        val name = contentDescription ?: if (fraction == null) loading else null
+        if (name != null) this.contentDescription = name
         progressBarRangeInfo = if (fraction == null) ProgressBarRangeInfo.Indeterminate else ProgressBarRangeInfo(fraction.coerceIn(0f, 1f), 0f..1f)
     }
     val bar = modifier.fillMaxWidth().height(height).then(semantics)
@@ -435,7 +441,7 @@ private fun ToastCard(toast: DeskToast) {
             modifier = Modifier.weight(1f, fill = false).padding(vertical = dimens.gapS))
         if (toast.actionLabel != null) {
             TextAction(toast.actionLabel, onClick = { toast.performAction() })
-            if (toast.shortcut != null && !touch) KeyCap(toast.shortcut)
+            if (toast.shortcut != null && showShortcutHints()) KeyCap(toast.shortcut)
         }
         DeskIconButton(DeskIcons.Close, stringResource(R.string.dk_close), onClick = { toast.dismiss() },
             size = if (touch) 40.dp else 28.dp, iconSize = if (touch) 18.dp else 14.dp)
