@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.components.FormsTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-10-30T09:26:39.807Z" hostname="runnervmnwato" time="1.338">
+  <properties/>
+  <testcase name="numberFieldKeepsItsPlaceWhenTheRangeShows" classname="desktopkit.components.FormsTest" time="0.162"/>
+  <testcase name="threeStateCheckbox" classname="desktopkit.components.FormsTest" time="0.087"/>
+  <testcase name="enterAndTheKeyboardsActionKeyRunTheAction" classname="desktopkit.components.FormsTest" time="0.092"/>
+  <testcase name="numberFieldReportsOnlyNumbersInRange" classname="desktopkit.components.FormsTest" time="0.121"/>
+  <testcase name="aFingerReachesAFieldButtonAroundIt" classname="desktopkit.components.FormsTest" time="0.091"/>
+  <testcase name="optionalNumberFieldKeepsWhatIsTypedWhileTheValueComesBackLate" classname="desktopkit.components.FormsTest" time="0.139"/>
+  <testcase name="aNewToastTakesThePlaceOfTheOneShown" classname="desktopkit.components.FormsTest" time="0.049"/>
+  <testcase name="checkboxAndSwitchToggle" classname="desktopkit.components.FormsTest" time="0.082"/>
+  <testcase name="withoutAnActionTheKeyboardsKeyDoesItsOwnJob" classname="desktopkit.components.FormsTest" time="0.108"/>
+  <testcase name="toastActionButton" classname="desktopkit.components.FormsTest" time="0.086"/>
+  <testcase name="textFieldClearsAndRevealsPasswords" classname="desktopkit.components.FormsTest" time="0.076"/>
+  <testcase name="numberFieldKeepsWhatIsTypedWhileTheValueComesBackLate" classname="desktopkit.components.FormsTest" time="0.111"/>
+  <testcase name="numberFieldStepsWithTheArrowKeys" classname="desktopkit.components.FormsTest" time="0.126"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

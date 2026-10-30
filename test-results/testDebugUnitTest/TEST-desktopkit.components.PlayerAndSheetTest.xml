@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.components.PlayerAndSheetTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-30T09:26:42.953Z" hostname="runnervmnwato" time="1.286">
+  <properties/>
+  <testcase name="theBottomBarIsUncoveredOnceTheMiniPlayerIsBack" classname="desktopkit.components.PlayerAndSheetTest" time="0.365"/>
+  <testcase name="moreTabOpensTheSheetWithScreensAndActions" classname="desktopkit.components.PlayerAndSheetTest" time="0.219"/>
+  <testcase name="tapExpandsAndBackCollapses" classname="desktopkit.components.PlayerAndSheetTest" time="0.14"/>
+  <testcase name="sidewaysSwipeSkipsPastTheThreshold" classname="desktopkit.components.PlayerAndSheetTest" time="0.184"/>
+  <testcase name="dismissStyleFollowsTheHardwareKeyboard" classname="desktopkit.components.PlayerAndSheetTest" time="0.044"/>
+  <testcase name="dragSettlesOnTheNearerSide" classname="desktopkit.components.PlayerAndSheetTest" time="0.274"/>
+  <testcase name="dialogShowsEscWithAKeyboardAndACrossWithout" classname="desktopkit.components.PlayerAndSheetTest" time="0.057"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

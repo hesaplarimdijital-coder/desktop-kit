@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.components.RulesTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-30T09:26:44.245Z" hostname="runnervmnwato" time="0.015">
+  <properties/>
+  <testcase name="swipeResistsTowardsADirectionWithoutHandler" classname="desktopkit.components.RulesTest" time="0.001"/>
+  <testcase name="swipeCommitsPastTheThresholdOrOnAFling" classname="desktopkit.components.RulesTest" time="0.0"/>
+  <testcase name="columnsStateArrangesAndReportsChanges" classname="desktopkit.components.RulesTest" time="0.012"/>
+  <testcase name="escapeClearsTheSelection" classname="desktopkit.components.RulesTest" time="0.0"/>
+  <testcase name="normalizeKeepsStoredOrderAndAppendsNewColumns" classname="desktopkit.components.RulesTest" time="0.0"/>
+  <testcase name="moveSkipsHiddenColumns" classname="desktopkit.components.RulesTest" time="0.0"/>
+  <testcase name="aColumnAlwaysStaysVisible" classname="desktopkit.components.RulesTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
