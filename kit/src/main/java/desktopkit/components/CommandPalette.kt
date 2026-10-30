@@ -318,9 +318,11 @@ fun rememberCommandPaletteState(): CommandPaletteState = remember { CommandPalet
  *
  * - On tablets and DeX a glass panel near the top over a scrim; on a phone the whole window, with
  *   a back arrow.
- * - Up and Down choose, Enter runs, Ctrl+Enter opens in a new window (when the item can), Tab and
- *   Shift+Tab move between the [filters] (group names; "All" comes first), Esc, Back or a click on
- *   the scrim closes. The mouse chooses by hovering.
+ * - The keyboard focus stays in the field: Up and Down choose, Enter runs, Ctrl+Enter opens in a
+ *   new window (when the item can), Tab and Shift+Tab move between the [filters] (group names; "All"
+ *   comes first), Esc, Back or a click on the scrim closes. The mouse chooses by hovering. Inside
+ *   the shell, the focus goes back where it was when the palette closes.
+ * - [hint] is the grey text of the empty field.
  *
  * Inside [desktopkit.shell.DesktopShell] put it in the shell's `overlays`, so it is drawn over the
  * bars and blurs them; elsewhere it opens in a pop-up window.
@@ -331,13 +333,13 @@ fun CommandPalette(
     items: (query: String) -> List<PaletteItem>,
     modifier: Modifier = Modifier,
     filters: List<String> = emptyList(),
-    placeholder: String = stringResource(R.string.dk_search_hint),
+    hint: String = stringResource(R.string.dk_search_hint),
 ) {
     val visible = remember { MutableTransitionState(false) }
     visible.targetState = state.isOpen
     if (!visible.currentState && !visible.targetState) return
     val compact = currentWidthClass() == WidthClass.Compact
-    val content: @Composable () -> Unit = { PaletteFrame(state, visible, compact, items, filters, placeholder, modifier) }
+    val content: @Composable () -> Unit = { PaletteFrame(state, visible, compact, items, filters, hint, modifier) }
     val host = LocalShellOverlayHost.current
     if (host != null) {
         OverlayLayer(host, content)
@@ -355,7 +357,7 @@ private fun PaletteFrame(
     compact: Boolean,
     items: (String) -> List<PaletteItem>,
     filters: List<String>,
-    placeholder: String,
+    hint: String,
     modifier: Modifier,
 ) {
     val colors = DeskTheme.colors
@@ -387,7 +389,7 @@ private fun PaletteFrame(
             enter = enter,
             exit = exit,
         ) {
-            PalettePanel(state, compact, items, filters, placeholder, modifier)
+            PalettePanel(state, compact, items, filters, hint, modifier)
         }
     }
 }
@@ -398,7 +400,7 @@ private fun PalettePanel(
     compact: Boolean,
     items: (String) -> List<PaletteItem>,
     filters: List<String>,
-    placeholder: String,
+    hint: String,
     modifier: Modifier,
 ) {
     val colors = DeskTheme.colors
@@ -476,7 +478,7 @@ private fun PalettePanel(
             }
             Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                 val style = DeskTheme.type.title.copy(fontWeight = FontWeight.Normal, fontSize = if (compact) DeskTheme.type.body.fontSize else 17.sp)
-                if (state.query.isEmpty()) Text(placeholder, style = style, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (state.query.isEmpty()) Text(hint, style = style, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 // the typed text with the cursor; a query set from outside (open("…"), clear) puts the cursor at its end
                 var field by remember { mutableStateOf(TextFieldValue(state.query, TextRange(state.query.length))) }
                 val shown = if (field.text == state.query) field else TextFieldValue(state.query, TextRange(state.query.length))

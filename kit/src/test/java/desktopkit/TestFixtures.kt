@@ -152,7 +152,7 @@ fun TestShell(
     floatingPlayer: Boolean = false,
     glassMode: GlassMode? = GlassMode.Translucent,
     moreActions: List<ActionGroup> = emptyList(),
-    toasts: desktopkit.components.DeskToastState? = null,
+    toasts: desktopkit.components.ToastState? = null,
     overlays: @Composable () -> Unit = {},
     content: @Composable (String, ShellNavigator) -> Unit = { route, _ -> SampleScreen(route) },
 ) {

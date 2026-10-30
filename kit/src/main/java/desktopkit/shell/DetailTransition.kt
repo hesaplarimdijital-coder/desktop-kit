@@ -78,9 +78,10 @@ fun <T : Any> DetailTransition(
     modifier: Modifier = Modifier,
     handleBack: Boolean = true,
     animate: Boolean = true,
-    sharedElements: Boolean = true,
     detailKey: (T) -> Any = { it },
     list: @Composable () -> Unit,
+    // after list, so that 1.0's positional calls still compile
+    sharedElements: Boolean = true,
     detailContent: @Composable (T) -> Unit,
 ) {
     val colors = DeskTheme.colors

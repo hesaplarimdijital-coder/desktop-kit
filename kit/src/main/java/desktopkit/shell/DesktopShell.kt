@@ -52,7 +52,7 @@ import androidx.navigation.compose.rememberNavController
 import desktopkit.LocalRootInsets
 import desktopkit.components.ActionGroup
 import desktopkit.components.ActionGroupList
-import desktopkit.components.DeskToastState
+import desktopkit.components.ToastState
 import desktopkit.components.ToastHost
 import desktopkit.components.GlassBottomSheet
 import desktopkit.components.MenuBarMenus
@@ -157,7 +157,7 @@ class ShellNavigator(private val navController: NavHostController) {
  * @param floatingPlayer on tablet and DeX, the [bottomBar] floats over the content's bottom edge as a
  *   rounded glass bar (the content scrolls beneath it) instead of being stacked under the content.
  * @param glass false draws every bar, sheet and menu as a solid surface.
- * @param toasts short messages ([desktopkit.components.DeskToastState.show]) shown above the bottom bar
+ * @param toasts short messages ([desktopkit.components.ToastState.show]) shown above the bottom bar
  *   and the player on a phone, above the player on tablet and DeX.
  * @param overlays drawn over the whole shell, bars included, with the shell's glass: the place for the
  *   [desktopkit.components.CommandPalette].
@@ -190,7 +190,7 @@ fun DesktopShell(
     moreActions: List<ActionGroup> = emptyList(),
     floatingPlayer: Boolean = false,
     glass: Boolean = true,
-    toasts: DeskToastState? = null,
+    toasts: ToastState? = null,
     overlays: @Composable () -> Unit = {},
     navDrop: NavDrop? = null,
     content: @Composable (route: String, navigator: ShellNavigator) -> Unit,
@@ -269,7 +269,7 @@ private fun ShellContent(
     floatingPlayer: Boolean,
     tier: MotionTier,
     glassMode: GlassMode,
-    toasts: DeskToastState?,
+    toasts: ToastState?,
     overlays: @Composable () -> Unit,
     navDrop: NavDrop?,
     content: @Composable (route: String, navigator: ShellNavigator) -> Unit,

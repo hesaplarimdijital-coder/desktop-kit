@@ -267,7 +267,7 @@ class FormsTest {
 
     @Test
     fun toastsWaitTheirTurn() = runTest {
-        val toasts = DeskToastState()
+        val toasts = ToastState()
         val first = async { toasts.show("Pencere sıraya eklendi", actionLabel = "Geri al") }
         runCurrent()
         assertEquals("Pencere sıraya eklendi", toasts.current?.message)
@@ -287,7 +287,7 @@ class FormsTest {
 
     @Test
     fun toastActionButton() {
-        val toasts = DeskToastState()
+        val toasts = ToastState()
         var result: ToastResult? = null
         compose.setContent {
             DesktopKitTheme(inputMode = InputMode.Pointer) {

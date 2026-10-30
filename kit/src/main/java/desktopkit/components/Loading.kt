@@ -101,7 +101,7 @@ fun SkeletonListRow(
 
 /** [count] placeholder rows for a list that is loading; TalkBack hears "Loading". */
 @Composable
-fun SkeletonList(count: Int = 8, modifier: Modifier = Modifier, leading: Boolean = true, lines: Int = 2) {
+fun SkeletonList(modifier: Modifier = Modifier, count: Int = 8, leading: Boolean = true, lines: Int = 2) {
     val pulse = rememberSkeletonPulse()
     val label = stringResource(R.string.dk_loading)
     Column(modifier.semantics {

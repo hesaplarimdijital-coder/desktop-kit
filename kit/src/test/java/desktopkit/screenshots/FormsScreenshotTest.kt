@@ -38,7 +38,7 @@ import desktopkit.components.DeskProgressBar
 import desktopkit.components.DeskSearchField
 import desktopkit.components.DeskTab
 import desktopkit.components.DeskTextField
-import desktopkit.components.DeskToastState
+import desktopkit.components.ToastState
 import desktopkit.components.HorizontalRule
 import desktopkit.components.IconMenuButton
 import desktopkit.components.KeyValueRow
@@ -145,7 +145,7 @@ class FormsScreenshotTest {
     /** DeX: tabs over a list, a search field, a count badge, an "undo" toast at the bottom. */
     @Test @Config(qualifiers = "tr-w1000dp-h640dp-mdpi")
     fun tabsAndToastDarkPointer() = capture("tabs-toast-dark-pointer", ThemeMode.Dark, InputMode.Pointer) {
-        val toasts = remember { DeskToastState() }
+        val toasts = remember { ToastState() }
         LaunchedEffect(Unit) {
             toasts.show("“Pencere” sıranın sonuna eklendi · 9 parça", actionLabel = "Geri al", tone = BannerTone.Success,
                 shortcut = "Ctrl+Z", duration = ToastDuration.Indefinite)

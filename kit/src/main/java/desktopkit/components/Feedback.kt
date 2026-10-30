@@ -246,7 +246,7 @@ enum class ToastDuration { Short, Long, Indefinite }
 /** How a toast ended. */
 enum class ToastResult { Dismissed, ActionPerformed }
 
-/** One toast on screen; see [DeskToastState.show]. */
+/** One toast on screen; see [ToastState.show]. (Named apart from the platform's `android.widget.Toast`.) */
 @Stable
 class DeskToast internal constructor(
     val message: String,
@@ -284,7 +284,7 @@ class DeskToast internal constructor(
  * [show] waits until the toast is gone and says how it ended; toasts shown meanwhile wait their turn.
  */
 @Stable
-class DeskToastState {
+class ToastState {
     private val mutex = Mutex()
 
     /** The toast on screen, if any. */
@@ -319,7 +319,7 @@ class DeskToastState {
 }
 
 @Composable
-fun rememberToastState(): DeskToastState = remember { DeskToastState() }
+fun rememberToastState(): ToastState = remember { ToastState() }
 
 /**
  * Draws the toasts of [state]: a glass card (solid where glass is off) with the message, the action
@@ -328,7 +328,7 @@ fun rememberToastState(): DeskToastState = remember { DeskToastState() }
  * `toasts`; elsewhere put it at the bottom of the window.
  */
 @Composable
-fun ToastHost(state: DeskToastState, modifier: Modifier = Modifier) {
+fun ToastHost(state: ToastState, modifier: Modifier = Modifier) {
     val current = state.current
     val accessibility = LocalAccessibilityManager.current
     LaunchedEffect(current) {

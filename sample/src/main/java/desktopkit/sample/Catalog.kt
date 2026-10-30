@@ -51,7 +51,7 @@ import desktopkit.components.DeskSlider
 import desktopkit.components.DeskSwitch
 import desktopkit.components.DeskTab
 import desktopkit.components.DeskTextField
-import desktopkit.components.DeskToastState
+import desktopkit.components.ToastState
 import desktopkit.components.FilterChips
 import desktopkit.components.GlassBottomSheet
 import desktopkit.components.HorizontalRule
@@ -90,7 +90,7 @@ import kotlinx.coroutines.launch
  * to see the interaction states; the disabled, error and selected states are shown side by side.
  */
 @Composable
-fun CatalogScreen(prefs: DeskPreferences, toasts: DeskToastState, onDialog: () -> Unit, accentLabel: @Composable (Accent) -> String) {
+fun CatalogScreen(prefs: DeskPreferences, toasts: ToastState, onDialog: () -> Unit, accentLabel: @Composable (Accent) -> String) {
     val padding = rememberShellContentPadding()
     LazyColumn(Modifier.fillMaxSize(), contentPadding = padding) {
         item { PageHeader("Components", subtitle = "hover, Tab, press; disabled, error and selected side by side") }
@@ -262,7 +262,7 @@ private fun Toggles() {
 // ------------------------------------------------------------------ feedback
 
 @Composable
-private fun Feedback(toasts: DeskToastState) {
+private fun Feedback(toasts: ToastState) {
     val scope = rememberCoroutineScope()
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         DeskProgressBar(0.64f, contentDescription = "Scanning")
@@ -299,7 +299,7 @@ private fun Feedback(toasts: DeskToastState) {
 // ------------------------------------------------------------------ structure
 
 @Composable
-private fun Structure(toasts: DeskToastState) {
+private fun Structure(toasts: ToastState) {
     val scope = rememberCoroutineScope()
     var tab by remember { mutableStateOf("albums") }
     val tabs = remember { mutableStateListOf("Artists", "Albums", "Tracks", "Search: winter") }
@@ -375,7 +375,7 @@ private fun Loading() {
 // ------------------------------------------------------------------ drag and drop, windows
 
 @Composable
-private fun DragAndWindows(toasts: DeskToastState) {
+private fun DragAndWindows(toasts: ToastState) {
     val scope = rememberCoroutineScope()
     var dropped by remember { mutableStateOf<String?>(null) }
     val newWindow = rememberNewWindow()
