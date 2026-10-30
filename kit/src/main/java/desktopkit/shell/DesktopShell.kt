@@ -58,6 +58,7 @@ import desktopkit.components.GlassBottomSheet
 import desktopkit.components.MenuBarMenus
 import desktopkit.components.MenuEntry
 import desktopkit.components.MenuSpec
+import desktopkit.input.hasHardwareKeyboard
 import desktopkit.screens.OverflowScreen
 import desktopkit.theme.DeskGlass
 import desktopkit.theme.DeskMotion
@@ -130,9 +131,10 @@ class ShellNavigator(private val navController: NavHostController) {
  * it does not ride up on top of the keyboard; the content then reaches down to the keyboard. The
  * content ends above the keyboard because [desktopkit.DesktopKitRoot] pads the whole app with
  * `WindowInsets.safeDrawing` (IME included); a shell used without it needs the same padding around it.
- * With a finger, scrolling the content or a tap outside the kit's text fields takes the focus from
- * the field, and the keyboard closes; a control that should leave it open (a Send button beside a
- * message field) carries [keepsKeyboardOpen].
+ * While the on-screen keyboard is up, a finger scrolling the content or tapping outside the text
+ * fields takes the focus from the field, and the keyboard closes; a control that should leave it
+ * open (a Send button beside a message field) or an app's own text field carries [keepsKeyboardOpen].
+ * With a hardware keyboard typing, the field keeps the focus.
  *
  * On compact windows the chrome follows the content's scrolling (see [hideBarsOnScroll]); tablet and
  * DeX windows keep their chrome in place. Text is [largeWindowTextStep] sp larger on rail and sidebar
@@ -291,6 +293,8 @@ private fun ShellContent(
     val ime = WindowInsets.ime
     val imeTakesSpace by remember(ime, density) { derivedStateOf { ime.getBottom(density) > 0 } }
     val showBottomNav = !(hideNavigationWithKeyboard && imeVisible && imeTakesSpace)
+    // a finger closes the on-screen keyboard only while it is there (and no keyboard cover is typing)
+    val keyboardUp by rememberUpdatedState(imeVisible && imeTakesSpace && !hasHardwareKeyboard())
     // The graph builder below must not capture changing values, or NavHost would rebuild the graph.
     val currentContent by rememberUpdatedState(content)
     val currentSpec by rememberUpdatedState(spec)
@@ -439,7 +443,7 @@ private fun ShellContent(
                             .glassSource(glassSource, glassMode)
                             .background(colors.background)
                             .nestedScroll(scroll.connection)
-                            .dismissKeyboardOnTouch(overlayHost.textFields),
+                            .dismissKeyboardOnTouch(overlayHost.textFields, keyboardUp = { keyboardUp }),
                     ) {
                         NavHost(
                             navController = navController,
