@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -37,8 +38,9 @@ import kotlin.math.roundToInt
 
 /**
  * K6 as in Samsung's My Files: a drag starts only after the pointer has rested on the element for
- * the touch and hold delay, never from a quick press and move; and a row that can be dragged keeps
- * showing its hover and selection (the ready-made drag source drew it through a picture taken once).
+ * the touch and hold delay, never from a quick press and move; a mouse held still starts it as it
+ * then moves, so a slow click stays a click. A row that can be dragged keeps showing its hover and
+ * selection (the ready-made drag source drew it through a picture taken once).
  */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
@@ -79,7 +81,7 @@ class DragStartTest {
     }
 
     @Test
-    fun holdingTheMouseButtonStillStartsTheDrag() {
+    fun aMouseHeldStillThenMovedStartsTheDrag() {
         source()
         compose.onNodeWithTag("source").performMouseInput {
             moveTo(center)
@@ -90,8 +92,34 @@ class DragStartTest {
         assertEquals("not before the delay", 0, asked)
         compose.mainClock.advanceTimeBy(1000)
         compose.waitForIdle()
+        assertEquals("held still: not until it moves", 0, asked)
+        compose.onNodeWithTag("source").performMouseInput { moveBy(Offset(30f, 0f)) }
+        compose.waitForIdle()
         assertEquals(1, asked)
         compose.onNodeWithTag("source").performMouseInput { release() }
+    }
+
+    @Test
+    fun aSlowClickStaysAClick() {
+        var clicks = 0
+        compose.setContent {
+            DesktopKitTheme(inputMode = InputMode.Pointer) {
+                Box(Modifier.size(200.dp).testTag("source").dragSource { asked++; null }.clickable { clicks++ })
+            }
+        }
+        compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithTag("source").performMouseInput {
+            moveTo(center)
+            press()
+        }
+        compose.mainClock.advanceTimeBy(1200)
+        compose.waitForIdle()
+        compose.onNodeWithTag("source").performMouseInput { release() }
+        compose.mainClock.advanceTimeBy(100)
+        compose.waitForIdle()
+        assertEquals("no drag", 0, asked)
+        assertEquals("the click ran", 1, clicks)
     }
 
     @Test

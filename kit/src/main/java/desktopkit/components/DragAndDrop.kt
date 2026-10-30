@@ -39,6 +39,7 @@ import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.SuspendingPointerInputModifierNode
 import androidx.compose.ui.input.pointer.isPrimaryPressed
+import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.node.CompositionLocalConsumerModifierNode
 import androidx.compose.ui.node.DelegatingNode
 import androidx.compose.ui.node.ModifierNodeElement
@@ -121,11 +122,13 @@ internal object DragsInFlight {
 
 /**
  * Lets this element be dragged to a [dropZone] (of this window or, with [acrossWindows], of the
- * app's other windows; other apps get the label as text). As in Samsung's My Files, a drag starts
- * once the pointer has been held still on the element for the system's touch and hold delay
- * (Settings › Accessibility, half a second by default): with a mouse or touchpad always, with a
- * finger only when [touch] is true (otherwise a long press keeps opening the element's menu).
- * Moving earlier starts nothing, so a quick drag across a list never picks up a row by accident.
+ * app's other windows; other apps get the label as text). As in Samsung's My Files, the pointer
+ * must first rest on the element for the system's touch and hold delay (Settings › Accessibility,
+ * half a second by default); moving earlier starts nothing, so a quick drag across a list never
+ * picks up a row by accident. With a mouse, touchpad or pen the drag then starts as the pointer
+ * moves, so a slow click (on the element or a button in it) stays a click. With a finger it starts
+ * at the end of the delay, as Android's long press does, and only when [touch] is true (otherwise a
+ * long press keeps opening the element's menu).
  *
  * Under the pointer the drag shows a small card with [DeskDragPayload.label] and, for several items,
  * their number. The element itself keeps drawing as usual while it can be dragged (its hover and
@@ -183,10 +186,12 @@ private class DragSourceNode(
     private suspend fun PointerInputScope.awaitHold() {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-            val mouse = down.type == PointerType.Mouse
-            // with a finger only where asked; with a mouse only the main button (the other opens menus)
-            if (!mouse && !touch) return@awaitEachGesture
-            if (mouse && !currentEvent.buttons.isPrimaryPressed) return@awaitEachGesture
+            val precise = down.type == PointerType.Mouse || down.type == PointerType.Stylus || down.type == PointerType.Eraser
+            // a finger only where asked; a mouse only with its main button, nothing with the button
+            // that opens menus
+            if (!precise && !touch) return@awaitEachGesture
+            if (down.type == PointerType.Mouse && !currentEvent.buttons.isPrimaryPressed) return@awaitEachGesture
+            if (currentEvent.buttons.isSecondaryPressed) return@awaitEachGesture
             val slop = viewConfiguration.touchSlop
             val ledEarly = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
                 // lifted or moved away before the delay: no drag this time
@@ -196,7 +201,21 @@ private class DragSourceNode(
                 }
                 true
             }
-            if (ledEarly == null) source.requestDragAndDropTransfer(down.position)
+            if (ledEarly != null) return@awaitEachGesture
+            if (!precise) {
+                // a finger held still: the drag starts now, as with Android's long press
+                source.requestDragAndDropTransfer(down.position)
+                return@awaitEachGesture
+            }
+            // a mouse or a pen held still: the drag starts as it moves; let go first and it was a click
+            while (true) {
+                val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id }
+                if (change == null || !change.pressed) return@awaitEachGesture
+                if ((change.position - down.position).getDistance() > slop) {
+                    source.requestDragAndDropTransfer(change.position)
+                    return@awaitEachGesture
+                }
+            }
         }
     }
 
