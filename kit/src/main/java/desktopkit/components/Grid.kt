@@ -77,6 +77,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import desktopkit.R
 import desktopkit.input.contextMenuGesture
+import desktopkit.shell.LocalSharedElementShape
 import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
 import desktopkit.theme.InputMode
@@ -323,7 +324,8 @@ private fun GridItem(
  * the pointer over it (or the keyboard focus, or the selection) rings it in the accent colour and,
  * with a mouse, darkens it and shows [onPlay] at the bottom and "⋯" at the top (the item's menu).
  * While items are being selected a check mark in the corner shows the choice. [titleModifier] goes
- * on the title, e.g. [desktopkit.shell.detailSharedBounds] so it flies into the album's page.
+ * on the title, e.g. [desktopkit.shell.detailSharedBounds] so it flies into the album's page; a
+ * [desktopkit.shell.detailSharedElement] in [cover] keeps the cover's rounded corners in flight.
  *
  * TalkBack finds [onPlay] among the cell's actions ([playLabel], "Play" by default). The Play
  * button itself shows only under a mouse: from the keyboard, put Play in the grid's itemMenu too
@@ -366,8 +368,10 @@ fun GridCellScope.CoverCell(
                 .padding(4.dp)
                 .pressScale(pressed, 0.97f),
         ) {
-            Box(Modifier.fillMaxSize().clip(RoundedCornerShape(radius)).background(colors.surfaceRaised)) {
-                cover()
+            val coverShape = RoundedCornerShape(radius)
+            Box(Modifier.fillMaxSize().clip(coverShape).background(colors.surfaceRaised)) {
+                // a cover that flies to its detail page keeps these corners on the way
+                CompositionLocalProvider(LocalSharedElementShape provides coverShape) { cover() }
                 if (overlay > 0f) Box(Modifier.fillMaxSize().alpha(overlay).background(Color.Black.copy(alpha = 0.35f)))
             }
             if (overlay > 0f && onPlay != null) {

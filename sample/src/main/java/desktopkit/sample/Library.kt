@@ -24,7 +24,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import desktopkit.components.CoverCell
 import desktopkit.components.DeskButton
@@ -125,7 +124,7 @@ private fun AlbumPage(album: Album, onBack: () -> Unit, onPlay: (Int) -> Unit) {
     LazyColumn(Modifier.fillMaxSize()) {
         item {
             val cover = @Composable { size: androidx.compose.ui.unit.Dp ->
-                Box(Modifier.detailSharedElement("cover-${album.id}").size(size).clip(RoundedCornerShape(12.dp)).background(album.artwork))
+                Box(Modifier.detailSharedElement("cover-${album.id}", shape = RoundedCornerShape(12.dp)).size(size).background(album.artwork))
             }
             val about = @Composable {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {

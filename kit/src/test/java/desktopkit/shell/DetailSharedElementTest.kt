@@ -1,10 +1,13 @@
 package desktopkit.shell
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,14 +25,18 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import desktopkit.theme.DesktopKitTheme
 import desktopkit.theme.LocalMotionTier
 import desktopkit.theme.MotionTier
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import kotlin.math.roundToInt
 
-/** M3: a cover marked on both sides flies from the list row to the detail. */
+/** M3: a cover marked on both sides flies from the list row to the detail, and back with its corners. */
 @RunWith(AndroidJUnit4::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = "tr-w411dp-h891dp-hdpi")
 class DetailSharedElementTest {
 
@@ -79,5 +86,60 @@ class DetailSharedElementTest {
         val landed = compose.onNodeWithTag("large", useUnmergedTree = true).getBoundsInRoot()
         assertTrue("cover lands at 232 dp: ${landed.right - landed.left}", (landed.right - landed.left) >= 231.dp)
         compose.onNodeWithText("Gece Yarısı Treni").assertExists()
+    }
+
+    @Test
+    fun coverKeepsItsRoundedCornersFlyingBack() {
+        var detail by mutableStateOf<String?>("album")
+        compose.runOnUiThread { compose.activity.actionBar?.hide() }
+        compose.setContent {
+            DesktopKitTheme {
+                androidx.compose.runtime.CompositionLocalProvider(LocalMotionTier provides MotionTier.Timed) {
+                    DetailTransition(
+                        detail = detail,
+                        onBack = { detail = null },
+                        list = {
+                            // as inside a CoverCell: the cell's shape comes from the cell, no clipping
+                            // parent to lean on in flight
+                            androidx.compose.runtime.CompositionLocalProvider(LocalSharedElementShape provides RoundedCornerShape(16.dp)) {
+                                Box(Modifier.detailSharedElement("cover").size(96.dp).background(Color.Red).testTag("small"))
+                            }
+                        },
+                    ) {
+                        Box(Modifier.detailSharedElement("cover", shape = RoundedCornerShape(16.dp)).size(232.dp)
+                            .background(Color.Red).testTag("large"))
+                    }
+                }
+            }
+        }
+        compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+        compose.runOnIdle { detail = null }
+        val window = compose.activity.window.decorView
+        val bitmap = Bitmap.createBitmap(window.width, window.height, Bitmap.Config.ARGB_8888)
+        var checked = 0
+        repeat(30) {
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+            val nodes = compose.onAllNodesWithTag("small", useUnmergedTree = true).fetchSemanticsNodes()
+            if (nodes.isEmpty()) return@repeat
+            val bounds = nodes.first().boundsInWindow
+            if (bounds.width < 40f) return@repeat
+            compose.runOnIdle { window.draw(Canvas(bitmap)) }
+            val corner = bitmap.getPixel(bounds.left.roundToInt() + 1, bounds.top.roundToInt() + 1)
+            val middle = bitmap.getPixel(bounds.center.x.roundToInt(), bounds.center.y.roundToInt())
+            assertTrue("frame $it: the middle of the cover is red (${Integer.toHexString(middle)})", red(middle))
+            assertFalse("frame $it: the corner of the flying cover is square (${Integer.toHexString(corner)})", red(corner))
+            checked++
+        }
+        assertTrue("no frame of the flight was checked", checked > 0)
+        compose.mainClock.autoAdvance = true
+    }
+
+    private fun red(pixel: Int): Boolean {
+        val r = pixel shr 16 and 0xff
+        val g = pixel shr 8 and 0xff
+        val b = pixel and 0xff
+        return r - maxOf(g, b) > 100
     }
 }

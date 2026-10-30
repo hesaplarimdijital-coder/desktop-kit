@@ -35,9 +35,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
@@ -217,22 +219,31 @@ private fun boundsTransform(tier: MotionTier) = BoundsTransform { _, _ ->
 }
 
 /**
+ * The shape a [desktopkit.components.CoverCell] gives its cover. A [detailSharedElement] inside the
+ * cover takes it, so the cover keeps its rounded corners while it flies (in flight the element is
+ * drawn above everything, outside the cell that rounds it in place).
+ */
+internal val LocalSharedElementShape = staticCompositionLocalOf<Shape?> { null }
+
+/**
  * Inside a [DetailTransition], this element and the element with the same [key] on the other side
  * (the list's row and the detail) are one: opening the detail moves it from the row to its place in
  * the detail, closing moves it back. For things that look the same at both sizes: a cover, an
- * icon. Put it first in the element's modifiers, before its size and shape, so all of it flies.
- * Outside a [DetailTransition], or with reduced motion, nothing changes.
+ * icon. Put it first in the element's modifiers, before its size, so all of it flies. [shape]
+ * rounds the element, in place and in flight; inside a [desktopkit.components.CoverCell] it is the
+ * cell's own shape. Outside a [DetailTransition], or with reduced motion, nothing flies.
  */
 @Composable
-fun Modifier.detailSharedElement(key: Any): Modifier {
-    val scopes = LocalDetailSharedScopes.current ?: return this
+fun Modifier.detailSharedElement(key: Any, shape: Shape? = LocalSharedElementShape.current): Modifier {
+    val clip = if (shape == null) Modifier else Modifier.clip(shape)
+    val scopes = LocalDetailSharedScopes.current ?: return this.then(clip)
     return with(scopes.transition) {
         this@detailSharedElement.sharedElement(
             sharedContentState = rememberSharedContentState(key),
             animatedVisibilityScope = scopes.visibility,
             boundsTransform = boundsTransform(scopes.tier),
         )
-    }
+    }.then(clip)
 }
 
 /**
