@@ -6,6 +6,9 @@ import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
@@ -14,6 +17,8 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.Insets
@@ -88,5 +93,35 @@ class ShellImeTest {
 
         keyboard(0)
         compose.onNodeWithText("Müzik").assertExists()
+    }
+
+    @Test
+    fun thePlayerStaysAboveTheKeyboardAfterTheBarsSlidAway() {
+        compose.runOnUiThread { compose.activity.actionBar?.hide() }
+        compose.setContent {
+            view = LocalView.current
+            DesktopKitRoot(rememberDeskPreferences(defaultTheme = ThemeMode.Dark)) { widthClass ->
+                TestShell(widthClass, content = { _, _ ->
+                    LazyColumn(Modifier.fillMaxSize().testTag("list"), contentPadding = rememberShellContentPadding()) {
+                        items(80) { Text("Satır $it", Modifier.padding(16.dp)) }
+                    }
+                })
+            }
+        }
+        compose.waitForIdle()
+        val root = compose.onRoot().getBoundsInRoot()
+        val shown = compose.onNodeWithText("Kopyalanıyor: Yedek.zip").getBoundsInRoot()
+        // scrolling down slides the bars and the strip above them away
+        compose.onNodeWithTag("list").performTouchInput { swipeUp(durationMillis = 600) }
+        compose.waitForIdle()
+        val slid = compose.onNodeWithText("Kopyalanıyor: Yedek.zip").getBoundsInRoot()
+        assertTrue("the strip slid down: ${shown.top} → ${slid.top}", slid.top > shown.top + 20.dp)
+
+        val keyboardPx = 600
+        keyboard(keyboardPx)
+        val keyboardTop: Dp = root.bottom - with(compose.density) { keyboardPx.toDp() }
+        val status = compose.onNodeWithText("Kopyalanıyor: Yedek.zip").getBoundsInRoot()
+        assertTrue("status strip ends at ${status.bottom}, keyboard starts at $keyboardTop", status.bottom <= keyboardTop + 1.dp)
+        assertTrue("status strip sits on the keyboard: ${status.bottom} vs $keyboardTop", status.bottom >= keyboardTop - 1.dp)
     }
 }

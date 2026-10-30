@@ -211,7 +211,7 @@ fun ExpandablePlayer(
             }
             .glass(DeskGlass.chrome(colors, GlassThickness.Regular))
             // hidden while the sheet (which starts with the same strip) is out
-            .graphicsLayer { alpha = if (state.progress > 0.001f) 0f else 1f }
+            .graphicsLayer { alpha = if (state.progress > SHEET_OUT) 0f else 1f }
             .anchoredDraggable(
                 state.draggable, Orientation.Vertical,
                 enabled = host != null && state.collapsedTop > 0f,
@@ -230,7 +230,9 @@ fun ExpandablePlayer(
     }
 
     if (host != null) {
-        val open by remember(state) { derivedStateOf { state.progress > 0f || state.targetValue == PlayerValue.Expanded } }
+        // gone as soon as the mini player is back: the spring's last fraction of a pixel took half a
+        // second, while the sheet's background hid the bottom navigation bar under the mini player
+        val open by remember(state) { derivedStateOf { state.progress > SHEET_OUT || state.targetValue == PlayerValue.Expanded } }
         if (open) {
             // the collapse runs in this scope: the Back handler's own one ends once the player is no longer expanded
             OverlayLayer(host) {
@@ -239,6 +241,9 @@ fun ExpandablePlayer(
         }
     }
 }
+
+/** Below this progress the sheet is back at the mini player: the mini player shows and the sheet goes. */
+private const val SHEET_OUT = 0.001f
 
 /** The full-screen part, drawn in the shell's overlay from the mini player's place to the top. */
 @OptIn(ExperimentalFoundationApi::class)

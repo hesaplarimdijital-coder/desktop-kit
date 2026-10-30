@@ -435,7 +435,8 @@ private fun ShellContent(
                             .fillMaxSize()
                             .glassSource(glassSource, glassMode)
                             .background(colors.background)
-                            .nestedScroll(scroll.connection),
+                            .nestedScroll(scroll.connection)
+                            .dismissKeyboardOnTouch(overlayHost.textFields),
                     ) {
                         NavHost(
                             navController = navController,
@@ -477,7 +478,9 @@ private fun ShellContent(
                     overlayHost.layers.forEach { layer -> key(layer) { layer.content() } }
                 }
             },
-            navigationOffset = { if (navKind == NavKind.BottomBar) scroll.offsetPx.roundToInt() else 0 },
+            // while the keyboard is up the bar is gone and the player sits right on the keyboard: bars
+            // hidden by an earlier scroll must not push it down behind the keyboard
+            navigationOffset = { if (navKind == NavKind.BottomBar && showBottomNav) scroll.offsetPx.roundToInt() else 0 },
             floatingPlayer = floating,
             floatingMargin = floatingMargin,
             systemBottom = systemBottom,

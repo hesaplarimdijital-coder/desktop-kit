@@ -93,6 +93,27 @@ class PlayerAndSheetTest {
     }
 
     @Test
+    fun theBottomBarIsUncoveredOnceTheMiniPlayerIsBack() {
+        phone()
+        compose.onNodeWithTag("mini").performClick()
+        compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        var miniFrames = 0
+        repeat(120) {
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+            if (player.progress <= 0.001f) {
+                miniFrames++
+                // the sheet's background covered the bottom bar for the spring's last half second
+                compose.onNodeWithTag("full-player").assertDoesNotExist()
+            }
+        }
+        compose.mainClock.autoAdvance = true
+        assertTrue("the mini player never came back", miniFrames > 0)
+    }
+
+    @Test
     fun dragSettlesOnTheNearerSide() {
         phone()
         val root = compose.onRoot().getBoundsInRoot()

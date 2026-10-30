@@ -1,6 +1,5 @@
 package desktopkit.components
 
-import desktopkit.theme.rememberDeskHaptics
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -31,12 +30,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.input.key.isMetaPressed
-import androidx.compose.ui.input.key.isCtrlPressed
-import androidx.compose.ui.input.key.isAltPressed
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.layout.Layout
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,14 +52,20 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.state.ToggleableState
@@ -74,11 +74,15 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import desktopkit.R
+import desktopkit.shell.LocalShellOverlayHost
+import desktopkit.shell.TextFields
 import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
 import desktopkit.theme.LocalMotionTier
+import desktopkit.theme.rememberDeskHaptics
 import java.text.NumberFormat
 
 // ---------------------------------------------------------------- text fields
@@ -186,10 +190,21 @@ internal fun TextFieldImpl(
         .copy(color = if (enabled) colors.text else colors.textTertiary)
     val clearLabel = stringResource(R.string.dk_clear)
     val hasEnd = suffix != null || (clearable && value.isNotEmpty() && enabled && !readOnly) || password || trailing != null
+    // known to the shell, which closes the keyboard on a tap elsewhere or a scroll (touch)
+    val host = LocalShellOverlayHost.current
+    val field = remember { TextFields.Field() }
+    if (host != null) {
+        DisposableEffect(host, field) {
+            host.textFields.add(field)
+            onDispose { host.textFields.remove(field) }
+        }
+    }
+    SideEffect { field.focused = focused }
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
         modifier = modifier
+            .onGloballyPositioned { field.coordinates = it }
             .focusMemory()
             .hoverable(interaction, enabled)
             .then(
