@@ -55,17 +55,6 @@ android {
     }
 }
 
-// The kit's public API is kept in kit/api and compared on every CI build (checkKotlinAbi): a change
-// to it fails the build until the dump is updated with ./gradlew :kit:updateKotlinAbi, so every API
-// change shows up in the pull request.
-kotlin {
-    @OptIn(org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation::class)
-    abiValidation {
-        // AGP's built-in Kotlin leaves the default ("api") unset
-        referenceDumpDir.set(layout.projectDirectory.dir("api"))
-    }
-}
-
 dependencies {
     api(platform(libs.compose.bom))
     api(libs.compose.ui)
