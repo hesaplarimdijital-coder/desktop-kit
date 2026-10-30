@@ -435,7 +435,7 @@ private fun SidebarItem(item: NavItem, selected: Boolean, collapsed: Boolean, ba
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                if (badge != null) Text(badge, style = DeskTheme.type.caption, color = colors.textTertiary, maxLines = 1)
+                if (badge != null) Text(badge, style = DeskTheme.type.caption, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -576,7 +576,7 @@ fun MenuBarChrome(
                     brand(Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                 }
-                Text(title, style = DeskTheme.type.bodyStrong, color = colors.text, maxLines = 1)
+                Text(title, style = DeskTheme.type.bodyStrong, color = colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.width(14.dp))
             }
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
@@ -627,7 +627,7 @@ fun KeyCap(text: String, modifier: Modifier = Modifier) {
             .border(1.dp, colors.border, shape)
             .padding(horizontal = 6.dp, vertical = 1.dp),
     ) {
-        Text(text, style = DeskTheme.type.mono, color = colors.textSecondary, maxLines = 1)
+        Text(text, style = DeskTheme.type.mono, color = colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

@@ -247,7 +247,7 @@ internal fun TextFieldImpl(
                         }
                         field()
                     }
-                    if (suffix != null) Text(suffix, style = DeskTheme.type.label, color = colors.textTertiary, maxLines = 1)
+                    if (suffix != null) Text(suffix, style = DeskTheme.type.label, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (clearable && value.isNotEmpty() && enabled && !readOnly) {
                         FieldButton(DeskIcons.Close, clearLabel) { onValueChange("") }
                     }

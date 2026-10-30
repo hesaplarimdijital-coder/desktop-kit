@@ -234,7 +234,7 @@ fun CountBadge(
         contentAlignment = Alignment.Center,
     ) {
         Text(if (count > max) "$max+" else count.toString(), style = DeskTheme.type.mono.copy(fontWeight = FontWeight.Medium),
-            color = onColor, maxLines = 1)
+            color = onColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -438,6 +438,6 @@ internal fun TextAction(text: String, onClick: () -> Unit, modifier: Modifier = 
             .padding(horizontal = dimens.gapS),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = DeskTheme.type.label.copy(fontWeight = FontWeight.Medium), color = colors.accentText, maxLines = 1)
+        Text(text, style = DeskTheme.type.label.copy(fontWeight = FontWeight.Medium), color = colors.accentText, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }

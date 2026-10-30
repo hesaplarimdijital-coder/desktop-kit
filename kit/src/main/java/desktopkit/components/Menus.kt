@@ -287,7 +287,7 @@ internal fun MenuItemRow(item: MenuEntry.Item, onClick: () -> Unit) {
             modifier = Modifier.weight(1f))
         if (item.shortcut != null) {
             Spacer(Modifier.width(24.dp))
-            Text(item.shortcut, style = DeskTheme.type.mono, color = colors.textTertiary, maxLines = 1)
+            Text(item.shortcut, style = DeskTheme.type.mono, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -383,6 +383,6 @@ fun MenuTitle(text: String, open: Boolean, onClick: () -> Unit, modifier: Modifi
             .padding(horizontal = 9.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = DeskTheme.type.body, color = if (open) colors.text else colors.textSecondary, maxLines = 1)
+        Text(text, style = DeskTheme.type.body, color = if (open) colors.text else colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }

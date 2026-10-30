@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
@@ -73,7 +74,7 @@ fun <T> SegmentedChoice(options: List<Pair<T, String>>, selected: T, onSelect: (
                     .padding(horizontal = dimens.gapM),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(label, style = DeskTheme.type.label, color = labelColor, maxLines = 1)
+                Text(label, style = DeskTheme.type.label, color = labelColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }

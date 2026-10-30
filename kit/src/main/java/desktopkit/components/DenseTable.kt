@@ -410,7 +410,7 @@ private fun <T> HeaderCell(column: TableColumn<T>, index: Int, sort: TableSort?,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (column.alignEnd) Spacer(Modifier.weight(1f))
-        Text(column.title, style = DeskTheme.type.labelSmall, color = if (active) colors.text else colors.textTertiary, maxLines = 1)
+        Text(column.title, style = DeskTheme.type.labelSmall, color = if (active) colors.text else colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (active) {
             Spacer(Modifier.width(4.dp))
             Icon(if (sort.ascending) DeskIcons.ChevronUp else DeskIcons.ChevronDown, contentDescription = null,

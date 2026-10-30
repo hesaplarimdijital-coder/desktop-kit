@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerType
@@ -111,7 +112,7 @@ internal fun TooltipBubble(text: String, shortcut: String?) {
         Text(text, style = DeskTheme.type.labelSmall, color = colors.text, maxLines = 2)
         if (shortcut != null) {
             Spacer(Modifier.width(8.dp))
-            Text(shortcut, style = DeskTheme.type.mono, color = colors.textTertiary, maxLines = 1)
+            Text(shortcut, style = DeskTheme.type.mono, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }

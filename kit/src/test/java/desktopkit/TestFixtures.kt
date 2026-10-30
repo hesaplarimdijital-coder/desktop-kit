@@ -23,6 +23,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -197,8 +198,8 @@ fun SampleTrackList(state: LazyListState = rememberLazyListState(), count: Int =
                 )
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(sampleTracks[i % sampleTracks.size].first, style = DeskTheme.type.bodyStrong, color = DeskTheme.colors.text, maxLines = 1)
-                    Text(sampleTracks[i % sampleTracks.size].second, style = DeskTheme.type.labelSmall, color = DeskTheme.colors.textTertiary, maxLines = 1)
+                    Text(sampleTracks[i % sampleTracks.size].first, style = DeskTheme.type.bodyStrong, color = DeskTheme.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(sampleTracks[i % sampleTracks.size].second, style = DeskTheme.type.labelSmall, color = DeskTheme.colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 Text("%d:%02d".format(3 + i % 4, (17 + i * 7) % 60), style = DeskTheme.type.mono, color = DeskTheme.colors.textTertiary)
             }
@@ -229,8 +230,8 @@ fun SampleMiniPlayer(track: Int = 0) {
         )
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(sampleTracks[track % sampleTracks.size].first, style = DeskTheme.type.bodyStrong, color = DeskTheme.colors.text, maxLines = 1)
-            Text(sampleTracks[track % sampleTracks.size].second, style = DeskTheme.type.labelSmall, color = DeskTheme.colors.textSecondary, maxLines = 1)
+            Text(sampleTracks[track % sampleTracks.size].first, style = DeskTheme.type.bodyStrong, color = DeskTheme.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(sampleTracks[track % sampleTracks.size].second, style = DeskTheme.type.labelSmall, color = DeskTheme.colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         DeskIconButton(DeskIcons.Pause, "Duraklat", {})
         DeskIconButton(DeskIcons.Next, "Sonraki", {})
@@ -271,8 +272,8 @@ fun SampleTransportBar(track: Int = 0) {
         )
         Spacer(Modifier.width(12.dp))
         Column(Modifier.width(220.dp)) {
-            Text(sampleTracks[track % sampleTracks.size].first, style = DeskTheme.type.bodyStrong, color = DeskTheme.colors.text, maxLines = 1)
-            Text(sampleTracks[track % sampleTracks.size].second, style = DeskTheme.type.labelSmall, color = DeskTheme.colors.textSecondary, maxLines = 1)
+            Text(sampleTracks[track % sampleTracks.size].first, style = DeskTheme.type.bodyStrong, color = DeskTheme.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(sampleTracks[track % sampleTracks.size].second, style = DeskTheme.type.labelSmall, color = DeskTheme.colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         DeskIconButton(DeskIcons.Previous, "Önceki", {})
         DeskIconButton(DeskIcons.Pause, "Duraklat", {})

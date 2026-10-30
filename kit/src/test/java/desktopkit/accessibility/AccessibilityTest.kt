@@ -36,6 +36,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import desktopkit.DesktopKitRoot
@@ -200,44 +201,60 @@ class AccessibilityTest {
 
     // ------------------------------------------------------------------ 200 % text
 
-    /** Text that is cut off at the bottom: its box is lower than its lines. */
-    private fun cutText(): List<String> {
-        val nodes = compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.GetTextLayoutResult), useUnmergedTree = true)
+    private fun textLayouts(): List<TextLayoutResult> =
+        compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.GetTextLayoutResult), useUnmergedTree = true)
             .fetchSemanticsNodes()
-        return nodes.mapNotNull { node ->
-            val results = mutableListOf<TextLayoutResult>()
-            node.config[SemanticsActions.GetTextLayoutResult].action?.invoke(results)
-            val result = results.firstOrNull() ?: return@mapNotNull null
-            val lines = result.multiParagraph.height
-            if (result.size.height + 1 < lines) "“${result.layoutInput.text}” ${result.size.height} px < $lines px" else null
+            .mapNotNull { node ->
+                val results = mutableListOf<TextLayoutResult>()
+                node.config[SemanticsActions.GetTextLayoutResult].action?.invoke(results)
+                results.firstOrNull()
+            }
+
+    /**
+     * Text that is cut off: its box is lower than its lines (a fixed height), or it runs on past
+     * its box or its last line with nothing to show it (no ellipsis).
+     */
+    private fun cutText(): List<String> = textLayouts().mapNotNull { result ->
+        val lines = result.multiParagraph.height
+        val text = result.layoutInput.text
+        when {
+            result.size.height + 1 < lines -> "“$text” ${result.size.height} px < $lines px"
+            result.hasVisualOverflow && result.layoutInput.overflow == TextOverflow.Clip -> "“$text” clipped without an ellipsis"
+            else -> null
         }
+    }
+
+    /** One-line text shortened with an ellipsis (a long title in a row): allowed, and listed in the test's output. */
+    private fun shortenedText(): List<String> = textLayouts()
+        .filter { it.hasVisualOverflow && it.layoutInput.overflow != TextOverflow.Clip && it.layoutInput.overflow != TextOverflow.Visible }
+        .map { it.layoutInput.text.text }
+
+    private fun checkText(name: String) {
+        val cut = cutText()
+        println("$name, shortened at 200 %: ${shortenedText()}")
+        screenshot(name)
+        assertTrue("cut off at 200 %: $cut", cut.isEmpty())
     }
 
     @Test
     @Config(qualifiers = "tr-w411dp-h891dp-hdpi", fontScale = 2f)
     fun phoneAtTwiceTheTextSize() {
         shell(pointer = false) { Controls() }
-        val cut = cutText()
-        screenshot("a11y-phone-text-200")
-        assertTrue("cut off at 200 %: $cut", cut.isEmpty())
+        checkText("a11y-phone-text-200")
     }
 
     @Test
     @Config(qualifiers = "tr-w1280dp-h800dp-mdpi", fontScale = 2f)
     fun dexAtTwiceTheTextSize() {
         shell(pointer = true) { Controls() }
-        val cut = cutText()
-        screenshot("a11y-dex-text-200")
-        assertTrue("cut off at 200 %: $cut", cut.isEmpty())
+        checkText("a11y-dex-text-200")
     }
 
     @Test
     @Config(qualifiers = "tr-w700dp-h1600dp-mdpi", fontScale = 2f)
     fun controlsAtTwiceTheTextSize() {
         controls(InputMode.Touch)
-        val cut = cutText()
-        screenshot("a11y-controls-text-200")
-        assertTrue("cut off at 200 %: $cut", cut.isEmpty())
+        checkText("a11y-controls-text-200")
     }
 
     // ------------------------------------------------------------------ names for TalkBack

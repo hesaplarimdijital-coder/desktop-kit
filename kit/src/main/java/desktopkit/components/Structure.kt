@@ -258,8 +258,8 @@ fun DeskListRow(
             }
             if (trailing != null || trailingSub != null) {
                 Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.widthIn(max = 120.dp)) {
-                    if (trailing != null) Text(trailing, style = DeskTheme.type.mono, color = trailingColor, maxLines = 1)
-                    if (trailingSub != null) Text(trailingSub, style = DeskTheme.type.caption, color = trailingSubColor, maxLines = 1)
+                    if (trailing != null) Text(trailing, style = DeskTheme.type.mono, color = trailingColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (trailingSub != null) Text(trailingSub, style = DeskTheme.type.caption, color = trailingSubColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
             trailingContent?.invoke(this)

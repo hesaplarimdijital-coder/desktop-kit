@@ -581,14 +581,14 @@ private fun PaletteResultRow(row: PaletteRow.Result, chosen: Boolean, onHover: (
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
-        if (item.hint != null) Text(item.hint, style = DeskTheme.type.labelSmall, color = if (chosen) colors.onSelection else colors.textTertiary, maxLines = 1)
+        if (item.hint != null) Text(item.hint, style = DeskTheme.type.labelSmall, color = if (chosen) colors.onSelection else colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (chosen && !touch && item.actionLabel != null) {
             KeyCap("Enter")
-            Text(item.actionLabel, style = DeskTheme.type.mono, color = colors.onSelection, maxLines = 1)
+            Text(item.actionLabel, style = DeskTheme.type.mono, color = colors.onSelection, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (chosen && !touch && item.onOpenInNewWindow != null) {
             KeyCap("Ctrl+Enter")
-            Text(stringResource(R.string.dk_palette_new_window), style = DeskTheme.type.mono, color = colors.onSelection, maxLines = 1)
+            Text(stringResource(R.string.dk_palette_new_window), style = DeskTheme.type.mono, color = colors.onSelection, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (item.shortcut != null) KeyCap(item.shortcut)
         Spacer(Modifier.width(0.dp))

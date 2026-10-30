@@ -124,7 +124,7 @@ fun DeskChip(
         Text(text, style = DeskTheme.type.label, color = content, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (count != null) {
             Spacer(Modifier.width(6.dp))
-            Text(count, style = DeskTheme.type.mono, color = if (selected) content else colors.textTertiary, maxLines = 1)
+            Text(count, style = DeskTheme.type.mono, color = if (selected) content else colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
