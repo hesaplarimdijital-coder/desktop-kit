@@ -1,5 +1,6 @@
 package desktopkit.components
 
+import desktopkit.theme.rememberDeskHaptics
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -72,6 +74,7 @@ fun DeskChip(
     val state = interaction.collectState()
     val colors = DeskTheme.colors
     val touch = DeskTheme.inputMode == InputMode.Touch
+    val haptics = rememberDeskHaptics()
     val shape = RoundedCornerShape(50)
     val iconSize = if (touch) 18.dp else 14.dp
     val background by animatedStateBackground(state, selected, rest = colors.surface)
@@ -80,7 +83,8 @@ fun DeskChip(
     Row(
         modifier = modifier
             .then(if (touch) Modifier.minimumInteractiveComponentSize() else Modifier)
-            .height(if (touch) 36.dp else 28.dp)
+            // grows with larger text instead of cutting it
+            .heightIn(min = if (touch) 36.dp else 28.dp)
             .pressScale(state.pressed)
             .focusRing(state, shape)
             .background(background, shape)
@@ -93,7 +97,10 @@ fun DeskChip(
                 indication = null,
                 enabled = enabled,
                 role = Role.Checkbox,
-                onValueChange = { onClick() },
+                onValueChange = { on ->
+                    haptics.toggle(on)
+                    onClick()
+                },
             )
             .padding(start = if (touch) 12.dp else 10.dp, end = if (touch) 14.dp else 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -117,7 +124,7 @@ fun DeskChip(
         Text(text, style = DeskTheme.type.label, color = content, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (count != null) {
             Spacer(Modifier.width(6.dp))
-            Text(count, style = DeskTheme.type.mono, color = if (selected) content else colors.textTertiary, maxLines = 1)
+            Text(count, style = DeskTheme.type.mono, color = if (selected) content else colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }

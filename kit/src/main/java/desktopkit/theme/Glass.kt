@@ -26,10 +26,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.HazeStyle
-import dev.chrisbanes.haze.HazeTint
-import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.blur.HazeBlurStyle
+import dev.chrisbanes.haze.blur.HazeColorEffect
+import dev.chrisbanes.haze.blur.hazeBlur
 import dev.chrisbanes.haze.hazeSource
 
 /**
@@ -41,10 +42,11 @@ enum class GlassThickness { UltraThin, Thin, Regular }
 
 /**
  * What glass looks like on this device right now:
- * - [Blur]: Android 12+ (API 31) with hardware rendering: the content behind is blurred (Haze).
+ * - [Blur]: hardware rendering: the content behind is blurred (Haze).
  *   A blur source cannot be drawn into a software canvas (`View.draw(Canvas(bitmap))`); to capture
  *   a window as a picture use `PixelCopy`, or provide [LocalGlassMode] = [Translucent] while drawing it;
- * - [Translucent]: Android 11 and older: a translucent tint, no blur;
+ * - [Translucent]: software rendering (and Android 11 and older, which the kit no longer runs on):
+ *   a translucent tint, no blur;
  * - [Solid]: battery saver or "Remove animations" (animator scale 0) is on: an opaque surface,
  *   nothing is recorded or blurred.
  */
@@ -184,7 +186,7 @@ fun rememberSystemGlassMode(): GlassMode {
 
 /**
  * Robolectric draws into software canvases, which cannot draw the blur's render nodes; tests get
- * the translucent look instead (as on Android 11).
+ * the translucent look instead.
  */
 private val isTestRenderer: Boolean = Build.FINGERPRINT == "robolectric"
 
@@ -216,18 +218,26 @@ fun Modifier.glass(
     rest: Color = Color.Transparent,
 ): Modifier = when {
     !enabled -> if (rest == Color.Transparent) this else background(rest, shape)
-    mode == GlassMode.Blur && source != null -> this
-        .clip(shape)
-        .hazeEffect(
-            state = source,
-            style = HazeStyle(
-                backgroundColor = material.solid,
-                tint = HazeTint(material.tint),
-                blurRadius = material.blurRadius,
-                noiseFactor = material.noise,
-                fallbackTint = HazeTint(material.translucent),
-            ),
-        )
+    mode == GlassMode.Blur && source != null -> {
+        // a Haze 2 style is a replayable program: one per material, not one per frame
+        val style = remember(material) { material.blurStyle() }
+        val input = remember(source) { HazeInput.Sources(source) }
+        this
+            .clip(shape)
+            .hazeBlur(input = input, style = style)
+    }
     mode == GlassMode.Translucent && source != null -> background(material.translucent, shape)
     else -> background(material.solid, shape)
+}
+
+/** The Haze blur of this material: its tint over the blurred content, the radius, a little noise. */
+internal fun GlassMaterial.blurStyle(): HazeBlurStyle {
+    val material = this
+    return HazeBlurStyle {
+        backgroundColor(material.solid)
+        colorEffects(listOf(HazeColorEffect.tint(material.tint)))
+        blurRadius(material.blurRadius)
+        noiseFactor(material.noise)
+        fallbackColorEffect(HazeColorEffect.tint(material.translucent))
+    }
 }

@@ -73,6 +73,7 @@ import desktopkit.R
 import desktopkit.shell.LocalShellOverlayHost
 import desktopkit.shell.ShellOverlayHost
 import desktopkit.shell.WidthClass
+import desktopkit.shell.bottomInsetPadding
 import desktopkit.shell.currentWidthClass
 import desktopkit.theme.DeskGlass
 import desktopkit.theme.DeskMotion
@@ -81,6 +82,7 @@ import desktopkit.theme.GlassThickness
 import desktopkit.theme.LocalMotionTier
 import desktopkit.theme.MotionTier
 import desktopkit.theme.glass
+import desktopkit.theme.rememberDeskHaptics
 import kotlinx.coroutines.launch
 
 /** A titled group of actions for [MoreSheet] and menus ("Play", "Edit", "Share"); a null [title] draws a plain gap. */
@@ -190,7 +192,7 @@ private fun SheetActionRow(item: MenuEntry.Item, onClick: () -> Unit) {
         Text(item.label, style = DeskTheme.type.body, color = content, maxLines = 1, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f))
         if (item.shortcut != null) {
-            Text(item.shortcut, style = DeskTheme.type.mono, color = colors.textTertiary, maxLines = 1)
+            Text(item.shortcut, style = DeskTheme.type.mono, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -230,7 +232,8 @@ fun GlassBottomSheet(
     }
     val host = LocalShellOverlayHost.current
     if (host != null) {
-        OverlayLayer(host, sheet)
+        OverlayLayer(host) { SheetSurface(progress, drag, tier, title, modifier, { latestDismiss() }, content, host.systemBottomPx) }
+        ReturnFocusOnClose(host, visible)
         BackHandler(enabled = visible) { latestDismiss() }
     } else {
         val view = LocalView.current
@@ -244,6 +247,20 @@ fun GlassBottomSheet(
             onDismissRequest = { latestDismiss() },
             properties = PopupProperties(focusable = true),
         ) { sheet() }
+    }
+}
+
+/**
+ * While a layer is [open], remembers the element that had the keyboard focus when it opened; when
+ * the layer closes the focus goes back there, so Tab goes on from where it was (a layer in the
+ * shell's window would otherwise leave the focus nowhere).
+ */
+@Composable
+internal fun ReturnFocusOnClose(host: ShellOverlayHost, open: Boolean) {
+    val scope = rememberCoroutineScope()
+    DisposableEffect(host, open) {
+        val previous = if (open) host.focusMemory.current() else null
+        onDispose { if (previous != null) scope.launch { previous.restore() } }
     }
 }
 
@@ -270,6 +287,7 @@ private fun SheetSurface(
     modifier: Modifier,
     onDismiss: () -> Unit,
     content: @Composable ColumnScope.() -> Unit,
+    bottomInset: () -> Int = { 0 },
 ) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
@@ -279,6 +297,9 @@ private fun SheetSurface(
     val focus = remember { FocusRequester() }
     val shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
     val label = title ?: stringResource(R.string.dk_more_options)
+    val haptics = rememberDeskHaptics()
+    // dragged past the point where letting go closes the sheet: one tick on the way there
+    var armed by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     Box(Modifier.fillMaxSize()) {
         // the scrim darkens with the sheet and lightens while it is dragged down
@@ -314,9 +335,16 @@ private fun SheetSurface(
                 .draggable(
                     orientation = Orientation.Vertical,
                     state = rememberDraggableState { delta ->
-                        scope.launch { drag.snapTo((drag.value + delta).coerceAtLeast(0f)) }
+                        val next = (drag.value + delta).coerceAtLeast(0f)
+                        val past = sheetHeight > 0 && next > sheetHeight / 3f
+                        if (past != armed) {
+                            armed = past
+                            if (past) haptics.threshold()
+                        }
+                        scope.launch { drag.snapTo(next) }
                     },
                     onDragStopped = { velocity ->
+                        armed = false
                         val far = sheetHeight > 0 && drag.value > sheetHeight / 3f
                         val flung = velocity > with(density) { 800.dp.toPx() }
                         if (far || flung) {
@@ -327,7 +355,9 @@ private fun SheetSurface(
                         }
                     },
                 )
-                .padding(bottom = dimens.gapM),
+                .padding(bottom = dimens.gapM)
+                // the glass reaches behind the system navigation bar, the last row stays above it
+                .bottomInsetPadding(bottomInset),
         ) {
             // the handle says "drag me"
             Box(Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 6.dp), contentAlignment = Alignment.Center) {

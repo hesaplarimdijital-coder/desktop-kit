@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
@@ -22,6 +23,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -151,6 +153,8 @@ fun TestShell(
     floatingPlayer: Boolean = false,
     glassMode: GlassMode? = GlassMode.Translucent,
     moreActions: List<ActionGroup> = emptyList(),
+    toasts: desktopkit.components.ToastState? = null,
+    overlays: @Composable () -> Unit = {},
     content: @Composable (String, ShellNavigator) -> Unit = { route, _ -> SampleScreen(route) },
 ) {
     val navController = rememberNavController()
@@ -172,6 +176,8 @@ fun TestShell(
             transitions = transitions,
             floatingPlayer = floatingPlayer,
             moreActions = moreActions,
+            toasts = toasts,
+            overlays = overlays,
             content = content,
         )
     }
@@ -192,8 +198,8 @@ fun SampleTrackList(state: LazyListState = rememberLazyListState(), count: Int =
                 )
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(sampleTracks[i % sampleTracks.size].first, style = DeskTheme.type.bodyStrong, color = DeskTheme.colors.text, maxLines = 1)
-                    Text(sampleTracks[i % sampleTracks.size].second, style = DeskTheme.type.labelSmall, color = DeskTheme.colors.textTertiary, maxLines = 1)
+                    Text(sampleTracks[i % sampleTracks.size].first, style = DeskTheme.type.bodyStrong, color = DeskTheme.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(sampleTracks[i % sampleTracks.size].second, style = DeskTheme.type.labelSmall, color = DeskTheme.colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 Text("%d:%02d".format(3 + i % 4, (17 + i * 7) % 60), style = DeskTheme.type.mono, color = DeskTheme.colors.textTertiary)
             }
@@ -224,8 +230,8 @@ fun SampleMiniPlayer(track: Int = 0) {
         )
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(sampleTracks[track % sampleTracks.size].first, style = DeskTheme.type.bodyStrong, color = DeskTheme.colors.text, maxLines = 1)
-            Text(sampleTracks[track % sampleTracks.size].second, style = DeskTheme.type.labelSmall, color = DeskTheme.colors.textSecondary, maxLines = 1)
+            Text(sampleTracks[track % sampleTracks.size].first, style = DeskTheme.type.bodyStrong, color = DeskTheme.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(sampleTracks[track % sampleTracks.size].second, style = DeskTheme.type.labelSmall, color = DeskTheme.colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         DeskIconButton(DeskIcons.Pause, "Duraklat", {})
         DeskIconButton(DeskIcons.Next, "Sonraki", {})
@@ -266,14 +272,14 @@ fun SampleTransportBar(track: Int = 0) {
         )
         Spacer(Modifier.width(12.dp))
         Column(Modifier.width(220.dp)) {
-            Text(sampleTracks[track % sampleTracks.size].first, style = DeskTheme.type.bodyStrong, color = DeskTheme.colors.text, maxLines = 1)
-            Text(sampleTracks[track % sampleTracks.size].second, style = DeskTheme.type.labelSmall, color = DeskTheme.colors.textSecondary, maxLines = 1)
+            Text(sampleTracks[track % sampleTracks.size].first, style = DeskTheme.type.bodyStrong, color = DeskTheme.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(sampleTracks[track % sampleTracks.size].second, style = DeskTheme.type.labelSmall, color = DeskTheme.colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         DeskIconButton(DeskIcons.Previous, "Önceki", {})
         DeskIconButton(DeskIcons.Pause, "Duraklat", {})
         DeskIconButton(DeskIcons.Next, "Sonraki", {})
         Spacer(Modifier.width(12.dp))
-        DeskSlider(value = 0.35f, onValueChange = {}, modifier = Modifier.weight(1f))
+        DeskSlider(value = 0.35f, onValueChange = {}, modifier = Modifier.weight(1f), label = "Konum")
     }
 }
 
@@ -339,11 +345,12 @@ fun SampleStatusBar(kind: NavKind) {
     Column(Modifier.fillMaxWidth().background(colors.chrome)) {
         HorizontalRule()
         Row(
-            Modifier.fillMaxWidth().height(if (kind == NavKind.Sidebar) 40.dp else 48.dp).padding(horizontal = 16.dp),
+            // grows with large text instead of cutting it
+            Modifier.fillMaxWidth().heightIn(min = if (kind == NavKind.Sidebar) 40.dp else 48.dp).padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("Kopyalanıyor: Yedek.zip", style = DeskTheme.type.labelSmall, color = colors.textSecondary, modifier = Modifier.weight(1f))
-            DeskSlider(value = 0.42f, onValueChange = {}, modifier = Modifier.width(160.dp))
+            DeskSlider(value = 0.42f, onValueChange = {}, modifier = Modifier.width(160.dp), label = "Kopyalama")
             DeskIconButton(DeskIcons.Close, "İptal", {})
         }
     }

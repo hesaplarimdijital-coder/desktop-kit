@@ -18,6 +18,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import java.lang.ref.WeakReference
+import desktopkit.shell.LocalShellOverlayHost
+import androidx.compose.ui.node.currentValueOf
+import androidx.compose.ui.node.ModifierNodeElement
+import androidx.compose.ui.node.CompositionLocalConsumerModifierNode
+import androidx.compose.ui.focus.requestFocus
+import androidx.compose.ui.focus.FocusState
+import androidx.compose.ui.focus.FocusRequesterModifierNode
+import androidx.compose.ui.focus.FocusEventModifierNode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
@@ -65,6 +74,7 @@ fun Modifier.deskClickable(
 ): Modifier = this
     .pointerHoverIcon(PointerIcon.Hand)
     .hoverable(interactionSource, enabled)
+    .focusMemory()
     .clickable(
         interactionSource = interactionSource,
         indication = null,
@@ -73,6 +83,45 @@ fun Modifier.deskClickable(
         role = role,
         onClick = onClick,
     )
+
+/**
+ * Remembers which of the kit's elements has the keyboard focus, so that a layer drawn over the
+ * shell (the command palette, a sheet) can give the focus back where it was when it closes. Kept
+ * by the shell's overlay host; elements outside a shell remember nothing.
+ */
+internal class FocusMemory {
+    private var last: WeakReference<FocusMemoryNode>? = null
+
+    fun focused(node: FocusMemoryNode) {
+        last = WeakReference(node)
+    }
+
+    /** The element that has the keyboard focus now, if it is one of the kit's. */
+    fun current(): FocusMemoryNode? = last?.get()?.takeIf { it.isAttached && it.isFocused }
+}
+
+internal class FocusMemoryNode : Modifier.Node(), FocusEventModifierNode, FocusRequesterModifierNode, CompositionLocalConsumerModifierNode {
+    var isFocused = false
+        private set
+
+    override fun onFocusEvent(focusState: FocusState) {
+        isFocused = focusState.isFocused
+        if (isFocused) currentValueOf(LocalShellOverlayHost)?.focusMemory?.focused(this)
+    }
+
+    /** Gives the keyboard focus back to the element; false when it has gone. */
+    fun restore(): Boolean = isAttached && requestFocus()
+}
+
+private object FocusMemoryElement : ModifierNodeElement<FocusMemoryNode>() {
+    override fun create() = FocusMemoryNode()
+    override fun update(node: FocusMemoryNode) = Unit
+    override fun hashCode(): Int = 0x6d656d6f
+    override fun equals(other: Any?): Boolean = other === this
+}
+
+/** Lets the shell give the keyboard focus back to the focus target after this modifier. */
+internal fun Modifier.focusMemory(): Modifier = this then FocusMemoryElement
 
 /** 2 dp focus ring in the accent colour, drawn only while the element has keyboard focus. */
 @Composable

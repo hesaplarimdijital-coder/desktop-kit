@@ -1,10 +1,8 @@
 package desktopkit.components
 
-import android.os.Build
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
-import androidx.annotation.RequiresApi
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
@@ -144,10 +142,10 @@ fun MenuPopup(
         DisposableEffect(popupView, anchorView) {
             val root = popupView.rootView
             root.setOnTouchListener(OutsidePressHandler(anchorView, dismiss))
-            val escape = if (Build.VERSION.SDK_INT >= 28) EscapeListener(dismiss).also(root::addOnUnhandledKeyEventListener) else null
+            val escape = EscapeListener(dismiss).also(root::addOnUnhandledKeyEventListener)
             onDispose {
                 root.setOnTouchListener(null)
-                if (Build.VERSION.SDK_INT >= 28 && escape != null) root.removeOnUnhandledKeyEventListener(escape)
+                root.removeOnUnhandledKeyEventListener(escape)
             }
         }
         AnimatedVisibility(
@@ -249,7 +247,6 @@ private class OutsidePressHandler(private val anchor: View, private val dismiss:
  * Esc when no menu item has the focus (the menu was opened with the mouse): the pop-up window has
  * the focus but no view in it does, so the key reaches only unhandled-key listeners.
  */
-@RequiresApi(28)
 private class EscapeListener(private val dismiss: () -> Unit) : View.OnUnhandledKeyEventListener {
     override fun onUnhandledKeyEvent(view: View, event: KeyEvent): Boolean {
         val escape = event.keyCode == KeyEvent.KEYCODE_ESCAPE
@@ -290,7 +287,7 @@ internal fun MenuItemRow(item: MenuEntry.Item, onClick: () -> Unit) {
             modifier = Modifier.weight(1f))
         if (item.shortcut != null) {
             Spacer(Modifier.width(24.dp))
-            Text(item.shortcut, style = DeskTheme.type.mono, color = colors.textTertiary, maxLines = 1)
+            Text(item.shortcut, style = DeskTheme.type.mono, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -386,6 +383,6 @@ fun MenuTitle(text: String, open: Boolean, onClick: () -> Unit, modifier: Modifi
             .padding(horizontal = 9.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = DeskTheme.type.body, color = if (open) colors.text else colors.textSecondary, maxLines = 1)
+        Text(text, style = DeskTheme.type.body, color = if (open) colors.text else colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }

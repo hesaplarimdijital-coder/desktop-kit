@@ -1,5 +1,6 @@
 package desktopkit.components
 
+import desktopkit.theme.rememberDeskHaptics
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
@@ -41,6 +43,7 @@ fun <T> SegmentedChoice(options: List<Pair<T, String>>, selected: T, onSelect: (
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
     val outer = RoundedCornerShape(dimens.radiusControl + 2.dp)
+    val haptics = rememberDeskHaptics()
     Row(
         modifier = modifier
             .background(colors.surface, outer)
@@ -65,12 +68,13 @@ fun <T> SegmentedChoice(options: List<Pair<T, String>>, selected: T, onSelect: (
                     .background(background, shape)
                     .pointerHoverIcon(PointerIcon.Hand)
                     .selectable(selected = isSelected, interactionSource = interaction, indication = null, role = Role.RadioButton) {
+                        if (!isSelected) haptics.tick()
                         onSelect(value)
                     }
                     .padding(horizontal = dimens.gapM),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(label, style = DeskTheme.type.label, color = labelColor, maxLines = 1)
+                Text(label, style = DeskTheme.type.label, color = labelColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }

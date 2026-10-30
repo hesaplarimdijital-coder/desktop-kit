@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.derivedStateOf
@@ -31,7 +32,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -45,8 +49,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import desktopkit.LocalRootInsets
 import desktopkit.components.ActionGroup
 import desktopkit.components.ActionGroupList
+import desktopkit.components.ToastState
+import desktopkit.components.ToastHost
 import desktopkit.components.GlassBottomSheet
 import desktopkit.components.MenuBarMenus
 import desktopkit.components.MenuEntry
@@ -141,12 +148,20 @@ class ShellNavigator(private val navController: NavHostController) {
  * @param compactSizes on phones, a 64 dp bottom bar and 52 dp touch rows instead of 72 and 56 dp;
  *   targets stay at least 48 dp. False keeps the touch sizes as they are.
  * @param menus menu bar menus, shown in the sidebar layout; [desktopkit.input.ShortcutRegistry.menus] builds them.
+ *   In a desktop window (DeX, Android 15+ desktop windowing) the menu bar fills the window's caption bar
+ *   inside a [desktopkit.DesktopKitRoot]: the menus and the search field sit between the system's app chip
+ *   and window buttons, and the rest of the bar still moves the window.
  * @param onSearch shows a search field (sidebar layout) or a search button (smaller windows) when set.
  * @param moreActions the app's own entries in the phone's "⋯" sheet ([MoreStyle.Sheet]), after the
  *   screens that do not fit the bottom bar.
  * @param floatingPlayer on tablet and DeX, the [bottomBar] floats over the content's bottom edge as a
  *   rounded glass bar (the content scrolls beneath it) instead of being stacked under the content.
  * @param glass false draws every bar, sheet and menu as a solid surface.
+ * @param toasts short messages ([desktopkit.components.ToastState.show]) shown above the bottom bar
+ *   and the player on a phone, above the player on tablet and DeX.
+ * @param overlays drawn over the whole shell, bars included, with the shell's glass: the place for the
+ *   [desktopkit.components.CommandPalette].
+ * @param navDrop lets the sidebar's and the rail's entries take drops ([desktopkit.components.dragSource]).
  * @param content the screen for a route of [spec]. The "More" route is handled by the shell. On
  *   compact windows a screen can change the top bar with [CompactTopBar]; [LocalWidthClass] and
  *   [currentWidthClass] tell it the width class in use.
@@ -175,6 +190,9 @@ fun DesktopShell(
     moreActions: List<ActionGroup> = emptyList(),
     floatingPlayer: Boolean = false,
     glass: Boolean = true,
+    toasts: ToastState? = null,
+    overlays: @Composable () -> Unit = {},
+    navDrop: NavDrop? = null,
     content: @Composable (route: String, navigator: ShellNavigator) -> Unit,
 ) {
     // tablet and DeX read one size larger; phones get the tighter compact sizes
@@ -219,6 +237,9 @@ fun DesktopShell(
                 floatingPlayer = floatingPlayer,
                 tier = tier,
                 glassMode = glassMode,
+                toasts = toasts,
+                overlays = overlays,
+                navDrop = navDrop,
                 content = content,
             )
         }
@@ -248,6 +269,9 @@ private fun ShellContent(
     floatingPlayer: Boolean,
     tier: MotionTier,
     glassMode: GlassMode,
+    toasts: ToastState?,
+    overlays: @Composable () -> Unit,
+    navDrop: NavDrop?,
     content: @Composable (route: String, navigator: ShellNavigator) -> Unit,
 ) {
     val navigator = remember(navController) { ShellNavigator(navController) }
@@ -281,6 +305,20 @@ private fun ShellContent(
     val overlayHost = remember { ShellOverlayHost() }
     val glassSource = remember { HazeState() }
     val padding = remember(metrics, density) { shellPaddingValues(metrics, density) }
+    // the root leaves the system navigation bar at the bottom to the shell, which draws its chrome behind it
+    val rootInsets = LocalRootInsets.current
+    DisposableEffect(rootInsets) {
+        rootInsets?.let { it.shells++ }
+        onDispose { rootInsets?.let { it.shells-- } }
+    }
+    val systemBottom: () -> Int = remember(rootInsets, density) { { rootInsets?.navigationBottom?.getBottom(density) ?: 0 } }
+    // DeX and desktop windows: the menu bar fills the window's caption bar, between the system's elements
+    val claimsCaption = navKind == NavKind.Sidebar
+    DisposableEffect(rootInsets, claimsCaption) {
+        if (claimsCaption) rootInsets?.let { it.captionClaims++ }
+        onDispose { if (claimsCaption) rootInsets?.let { it.captionClaims-- } }
+    }
+    val captionArea = if (claimsCaption && rootInsets?.captionInUse(density) == true) rootInsets.caption else null
     val floating = floatingPlayer && navKind != NavKind.BottomBar
     val floatingMargin = 12.dp
     var moreOpen by remember { mutableStateOf(false) }
@@ -293,6 +331,8 @@ private fun ShellContent(
         metrics.underFloatingPlayer = floating
         metrics.floatingMarginPx = with(density) { floatingMargin.roundToPx() }
         if (!showBottomNav || navKind != NavKind.BottomBar) metrics.navPx = 0
+        metrics.systemBottomPx = systemBottom
+        overlayHost.systemBottomPx = systemBottom
         overlayHost.onExpandStart = { scroll.showBars() }
     }
     // every screen starts with the bars shown and a flat top bar
@@ -325,12 +365,14 @@ private fun ShellContent(
             modifier = modifier.fillMaxSize().background(colors.background),
             topBar = {
                 if (navKind == NavKind.Sidebar) {
-                    MenuBarChrome(
-                        title = spec.appTitle,
-                        brand = brand,
-                        menus = { MenuBarMenus(menus) },
-                        search = searchSlot,
-                    )
+                    CompositionLocalProvider(LocalCaptionArea provides captionArea) {
+                        MenuBarChrome(
+                            title = spec.appTitle,
+                            brand = brand,
+                            menus = { MenuBarMenus(menus) },
+                            search = searchSlot,
+                        )
+                    }
                 } else {
                     val title = if (currentRoute == ShellSpec.MORE_ROUTE) more.label else spec.item(currentRoute)?.label ?: spec.appTitle
                     // CompactTopBar registers nothing on wider windows; checked here as well
@@ -362,7 +404,7 @@ private fun ShellContent(
                                 .graphicsLayer { translationY = overlayHost.expandProgress() * size.height },
                         )
                     }
-                    NavKind.Rail -> NavRail(spec, currentRoute, navigator::navigate, brand = brand)
+                    NavKind.Rail -> NavRail(spec, currentRoute, navigator::navigate, brand = brand, navDrop = navDrop)
                     NavKind.Sidebar -> Sidebar(
                         spec = spec,
                         currentRoute = currentRoute,
@@ -370,6 +412,7 @@ private fun ShellContent(
                         collapsed = sidebarCollapsed,
                         onToggleCollapsed = { onSidebarCollapsedChange(!sidebarCollapsed) },
                         badges = badges,
+                        navDrop = navDrop,
                     )
                 }
             },
@@ -418,12 +461,27 @@ private fun ShellContent(
             },
             overlay = {
                 Box(Modifier.fillMaxSize().onGloballyPositioned { overlayHost.coordinates = it }) {
+                    // toasts sit above the bars and the player, under sheets and the expanded player
+                    if (toasts != null) {
+                        val toastBottom: () -> Int = {
+                            val system = systemBottom()
+                            when {
+                                navKind == NavKind.BottomBar ->
+                                    metrics.navPx + metrics.playerPx + system - scroll.offsetPx.roundToInt().coerceIn(0, metrics.navPx)
+                                floating -> metrics.playerPx + metrics.floatingMarginPx + system
+                                else -> metrics.playerPx + system
+                            }
+                        }
+                        ToastHost(toasts, Modifier.align(Alignment.BottomCenter).bottomInsetPadding(toastBottom))
+                    }
                     overlayHost.layers.forEach { layer -> key(layer) { layer.content() } }
                 }
             },
             navigationOffset = { if (navKind == NavKind.BottomBar) scroll.offsetPx.roundToInt() else 0 },
             floatingPlayer = floating,
             floatingMargin = floatingMargin,
+            systemBottom = systemBottom,
+            systemBand = { SystemBand(navKind, scroll) },
         )
 
         if (spec.moreStyle == MoreStyle.Sheet) {
@@ -431,6 +489,31 @@ private fun ShellContent(
                 ActionGroupList(moreSheetGroups(spec, navKind, navigator) + moreActions, onDismiss = { moreOpen = false })
             }
         }
+        CompositionLocalProvider(LocalNavKind provides navKind) { overlays() }
+    }
+}
+
+/**
+ * What lies behind the system navigation bar (three buttons or the gesture handle): on a phone the
+ * glass of the bottom bar, which stays when the bars slide away beneath it and then shows a rule along
+ * its top; on tablets the chrome colour, continuing the rail or sidebar.
+ */
+@Composable
+private fun SystemBand(navKind: NavKind, scroll: ShellScrollState) {
+    val colors = DeskTheme.colors
+    if (navKind == NavKind.BottomBar) {
+        val rule = colors.border
+        Box(
+            Modifier
+                .fillMaxSize()
+                .glass(DeskGlass.chrome(colors, GlassThickness.Regular))
+                .drawBehind {
+                    val hidden = if (scroll.maxOffsetPx > 0f) (scroll.offsetPx / scroll.maxOffsetPx).coerceIn(0f, 1f) else 0f
+                    if (hidden > 0f) drawRect(rule.copy(alpha = rule.alpha * hidden), size = Size(size.width, 1.dp.toPx()))
+                },
+        )
+    } else {
+        Box(Modifier.fillMaxSize().background(colors.chrome))
     }
 }
 

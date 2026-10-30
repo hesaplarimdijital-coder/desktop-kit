@@ -72,6 +72,17 @@ object DeskIcons {
     val Waveform: ImageVector by lazy { icon("Waveform", stroke("M2.5 7v2M5 5v6M7.5 3v10M10 5.5v5M12.5 7v2")) }
     val Keyboard: ImageVector by lazy { icon("Keyboard", stroke("M3,4H13A1.5,1.5 0 0 1 14.5,5.5V10.5A1.5,1.5 0 0 1 13,12H3A1.5,1.5 0 0 1 1.5,10.5V5.5A1.5,1.5 0 0 1 3,4Z"), stroke("M4 6.5h.5M6.5 6.5h.5M9 6.5h.5M11.5 6.5h.5M5 9.5h6")) }
     val SidebarToggle: ImageVector by lazy { icon("SidebarToggle", stroke("M3.5,2.5H12.5A1.5,1.5 0 0 1 14,4V12A1.5,1.5 0 0 1 12.5,13.5H3.5A1.5,1.5 0 0 1 2,12V4A1.5,1.5 0 0 1 3.5,2.5Z"), stroke("M6 2.5v11")) }
+    // 2.0: forms, feedback, structure
+    val Minus: ImageVector by lazy { icon("Minus", stroke("M3.5 8h9")) }
+    val Warning: ImageVector by lazy { icon("Warning", stroke("M8 2.5 14.2 13.2H1.8Z"), stroke("M8 6.5v3M8 11.4v.1")) }
+    val Error: ImageVector by lazy { icon("Error", stroke("M2.5,8a5.5,5.5 0 1 0 11,0a5.5,5.5 0 1 0 -11,0Z"), stroke("m6 6 4 4M10 6l-4 4")) }
+    val CheckCircle: ImageVector by lazy { icon("CheckCircle", stroke("M2.5,8a5.5,5.5 0 1 0 11,0a5.5,5.5 0 1 0 -11,0Z"), stroke("m5.5 8.2 1.8 1.8 3.4-3.8")) }
+    val Eye: ImageVector by lazy { icon("Eye", stroke("M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8s-2.4 4.5-6.5 4.5S1.5 8 1.5 8Z"), stroke("M6,8a2,2 0 1 0 4,0a2,2 0 1 0 -4,0Z")) }
+    val EyeOff: ImageVector by lazy { icon("EyeOff", stroke("M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8s-2.4 4.5-6.5 4.5S1.5 8 1.5 8Z"), stroke("M6,8a2,2 0 1 0 4,0a2,2 0 1 0 -4,0Z"), stroke("m2.5 2.5 11 11")) }
+    val Undo: ImageVector by lazy { icon("Undo", stroke("M5.5 4 2.5 7l3 3"), stroke("M2.5 7h7a3.5 3.5 0 0 1 0 7H7")) }
+    val Command: ImageVector by lazy { icon("Command", stroke("M6 6h4v4H6z"), stroke("M6 6V4.5A1.5 1.5 0 1 0 4.5 6H6M10 6V4.5A1.5 1.5 0 1 1 11.5 6H10M6 10v1.5A1.5 1.5 0 1 1 4.5 10H6M10 10v1.5a1.5 1.5 0 1 0 1.5-1.5H10")) }
+    val DragHandle: ImageVector by lazy { icon("DragHandle", fill("M5.3,4a1.1,1.1 0 1 0 2.2,0a1.1,1.1 0 1 0 -2.2,0Z"), fill("M8.5,4a1.1,1.1 0 1 0 2.2,0a1.1,1.1 0 1 0 -2.2,0Z"), fill("M5.3,8a1.1,1.1 0 1 0 2.2,0a1.1,1.1 0 1 0 -2.2,0Z"), fill("M8.5,8a1.1,1.1 0 1 0 2.2,0a1.1,1.1 0 1 0 -2.2,0Z"), fill("M5.3,12a1.1,1.1 0 1 0 2.2,0a1.1,1.1 0 1 0 -2.2,0Z"), fill("M8.5,12a1.1,1.1 0 1 0 2.2,0a1.1,1.1 0 1 0 -2.2,0Z")) }
+    val NewWindow: ImageVector by lazy { icon("NewWindow", stroke("M3.5,3H12.5A1.5,1.5 0 0 1 14,4.5V11.5A1.5,1.5 0 0 1 12.5,13H3.5A1.5,1.5 0 0 1 2,11.5V4.5A1.5,1.5 0 0 1 3.5,3Z"), stroke("M2 6h12M8 8.5v3M6.5 10h3")) }
 
     /** Builds an icon in the kit's style from SVG path data on a 16 x 16 grid. */
     fun build(name: String, vararg parts: IconPart): ImageVector = icon(name, *parts)

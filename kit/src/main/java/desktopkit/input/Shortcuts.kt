@@ -4,7 +4,6 @@ import android.content.res.Resources
 import android.view.KeyEvent as AndroidKeyEvent
 import android.view.KeyboardShortcutGroup
 import android.view.KeyboardShortcutInfo
-import androidx.annotation.RequiresApi
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.input.key.Key
@@ -195,7 +194,6 @@ class ShortcutRegistry(val groups: List<ShortcutGroup>, val shortcuts: List<Shor
      * The keyboard shortcut helper list (Meta+/ or the system's keyboard shortcuts screen).
      * Return it from `Activity.onProvideKeyboardShortcuts`.
      */
-    @RequiresApi(24)
     fun keyboardShortcutGroups(resources: Resources): List<KeyboardShortcutGroup> =
         groups.mapNotNull { group ->
             val items = inGroup(group).map { shortcut ->
@@ -214,11 +212,18 @@ object CommonShortcuts {
     const val SETTINGS = "dk.settings"
     const val TOGGLE_SIDEBAR = "dk.toggle_sidebar"
     const val SHORTCUT_LIST = "dk.shortcut_list"
+    const val NEW_WINDOW = "dk.new_window"
 
     val Search = Shortcut(SEARCH, ViewGroup, R.string.dk_search, KeyChord(Key.K, ctrl = true))
     val Settings = Shortcut(SETTINGS, ViewGroup, R.string.dk_settings, KeyChord(Key.Comma, ctrl = true))
     val ToggleSidebar = Shortcut(TOGGLE_SIDEBAR, ViewGroup, R.string.dk_toggle_sidebar, KeyChord(Key.B, ctrl = true))
     val ShortcutList = Shortcut(SHORTCUT_LIST, HelpGroup, R.string.dk_shortcut_list, KeyChord(Key.Slash, ctrl = true))
+
+    /**
+     * Ctrl+N opens another window of the app ([desktopkit.shell.DeskWindows.openNewWindow]). Not part
+     * of [all]: many apps use Ctrl+N for a new item; add it to the registry when the app has windows.
+     */
+    val NewWindow = Shortcut(NEW_WINDOW, ViewGroup, R.string.dk_new_window, KeyChord(Key.N, ctrl = true))
 
     val all: List<Shortcut> = listOf(Search, Settings, ToggleSidebar, ShortcutList)
 }

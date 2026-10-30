@@ -1,15 +1,14 @@
 package desktopkit.components
 
-import android.os.Build
 import android.view.HapticFeedbackConstants
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
-import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.AnchoredDraggableDefaults
 import androidx.compose.foundation.gestures.AnchoredDraggableState
 import androidx.compose.foundation.gestures.DraggableAnchors
 import androidx.compose.foundation.gestures.Orientation
@@ -62,6 +61,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import desktopkit.R
 import desktopkit.shell.LocalShellOverlayHost
+import desktopkit.shell.bottomInsetPadding
 import desktopkit.theme.DeskGlass
 import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
@@ -82,18 +82,12 @@ enum class PlayerValue { Collapsed, Expanded }
  * State of an [ExpandablePlayer]: the full-screen player's top edge, dragged between the mini
  * player's place ([PlayerValue.Collapsed]) and the top of the window ([PlayerValue.Expanded]).
  * [progress] runs from 0 to 1 with it; read it while drawing (`graphicsLayer { alpha = progress }`)
- * to fade things along. Survives configuration changes.
+ * to fade things along. Survives configuration changes. ([density] is kept for compatibility; the
+ * fling rules now come from the drag itself, see [ExpandablePlayer].)
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Stable
-class ExpandablePlayerState(initialValue: PlayerValue, density: Density) {
-    internal val draggable = AnchoredDraggableState(
-        initialValue = initialValue,
-        positionalThreshold = { distance -> distance * 0.5f },
-        velocityThreshold = { with(density) { 400.dp.toPx() } },
-        snapAnimationSpec = DeskMotion.gesture(),
-        decayAnimationSpec = exponentialDecay(),
-    )
+class ExpandablePlayerState(initialValue: PlayerValue, @Suppress("unused") density: Density) {
+    internal val draggable = AnchoredDraggableState(initialValue)
 
     /** Distance from the window top to the mini player; the collapsed anchor. */
     internal var collapsedTop by mutableFloatStateOf(0f)
@@ -115,11 +109,11 @@ class ExpandablePlayerState(initialValue: PlayerValue, density: Density) {
             else (1f - top / collapsedTop).coerceIn(0f, 1f)
         }
 
-    /** Opens the full-screen player on a spring (instantly with reduced motion). */
-    suspend fun expand() = draggable.animateTo(PlayerValue.Expanded)
+    /** Opens the full-screen player on a spring. */
+    suspend fun expand() = draggable.animateTo(PlayerValue.Expanded, DeskMotion.gesture())
 
     /** Back to the mini player. */
-    suspend fun collapse() = draggable.animateTo(PlayerValue.Collapsed)
+    suspend fun collapse() = draggable.animateTo(PlayerValue.Collapsed, DeskMotion.gesture())
 
     /** Jumps to [value] without animation. */
     suspend fun snapTo(value: PlayerValue) = draggable.snapTo(value)
@@ -218,7 +212,11 @@ fun ExpandablePlayer(
             .glass(DeskGlass.chrome(colors, GlassThickness.Regular))
             // hidden while the sheet (which starts with the same strip) is out
             .graphicsLayer { alpha = if (state.progress > 0.001f) 0f else 1f }
-            .anchoredDraggable(state.draggable, Orientation.Vertical, enabled = host != null && state.collapsedTop > 0f)
+            .anchoredDraggable(
+                state.draggable, Orientation.Vertical,
+                enabled = host != null && state.collapsedTop > 0f,
+                flingBehavior = playerFlingBehavior(state),
+            )
             .semantics {
                 customActions = listOf(CustomAccessibilityAction(expandLabel) { scope.launch { state.expand() }; true })
             }
@@ -235,7 +233,9 @@ fun ExpandablePlayer(
         val open by remember(state) { derivedStateOf { state.progress > 0f || state.targetValue == PlayerValue.Expanded } }
         if (open) {
             // the collapse runs in this scope: the Back handler's own one ends once the player is no longer expanded
-            OverlayLayer(host) { PlayerSheet(state, miniHeight, mini, full, collapse = { scope.launch { state.collapse() } }) }
+            OverlayLayer(host) {
+                PlayerSheet(state, miniHeight, mini, full, collapse = { scope.launch { state.collapse() } }, bottomInset = host.systemBottomPx)
+            }
         }
     }
 }
@@ -249,6 +249,7 @@ private fun PlayerSheet(
     mini: @Composable () -> Unit,
     full: @Composable () -> Unit,
     collapse: () -> Unit,
+    bottomInset: () -> Int,
 ) {
     val colors = DeskTheme.colors
     val scope = rememberCoroutineScope()
@@ -277,7 +278,7 @@ private fun PlayerSheet(
                     clip = true
                 }
                 .background(colors.background)
-                .anchoredDraggable(state.draggable, Orientation.Vertical)
+                .anchoredDraggable(state.draggable, Orientation.Vertical, flingBehavior = playerFlingBehavior(state))
                 .semantics { paneTitle = label },
         ) {
             Box(
@@ -289,7 +290,9 @@ private fun PlayerSheet(
             Box(
                 Modifier
                     .fillMaxSize()
-                    .graphicsLayer { alpha = ((state.progress - 0.15f) / 0.85f).coerceIn(0f, 1f) },
+                    .graphicsLayer { alpha = ((state.progress - 0.15f) / 0.85f).coerceIn(0f, 1f) }
+                    // the player's background reaches behind the system navigation bar, its controls stay above it
+                    .bottomInsetPadding(bottomInset),
             ) { full() }
         }
     }
@@ -306,6 +309,11 @@ private fun PlayerSheet(
         }
     }
 }
+
+/** Letting go of the player: half way decides, a fling decides sooner; settles on the gesture spring. */
+@Composable
+private fun playerFlingBehavior(state: ExpandablePlayerState) =
+    AnchoredDraggableDefaults.flingBehavior(state.draggable, positionalThreshold = { distance -> distance * 0.5f }, animationSpec = DeskMotion.gesture())
 
 /** What a sideways swipe on the mini player does. */
 enum class MiniSwipeAction { None, Previous, Next }
@@ -434,5 +442,4 @@ private suspend fun finishSwipe(
     offset.animateTo(0f, spring)
 }
 
-private fun thresholdHaptic(): Int =
-    if (Build.VERSION.SDK_INT >= 34) HapticFeedbackConstants.GESTURE_THRESHOLD_ACTIVATE else HapticFeedbackConstants.CLOCK_TICK
+private fun thresholdHaptic(): Int = HapticFeedbackConstants.GESTURE_THRESHOLD_ACTIVATE

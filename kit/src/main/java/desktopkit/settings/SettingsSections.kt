@@ -145,5 +145,5 @@ private fun presetAccentLabel(accent: Accent): String = when (accent) {
     Accent.Amber -> stringResource(R.string.dk_accent_amber)
     Accent.Green -> stringResource(R.string.dk_accent_green)
     Accent.Coral -> stringResource(R.string.dk_accent_coral)
-    else -> accent.name
+    else -> if (accent.name == Accent.DYNAMIC) stringResource(R.string.dk_accent_system) else accent.name
 }

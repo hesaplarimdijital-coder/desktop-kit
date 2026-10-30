@@ -1,5 +1,141 @@
 # Değişiklikler
 
+## 2.0.0 (2026-10-30)
+
+Kitin kendi çizdiği form, geri bildirim ve yapı bileşenleri; Ctrl+K komut paleti, kapak ızgarası ve sürükle
+bırak; DeX'te başlık çubuğundaki menü çubuğu ve birden çok pencere; telefonda üç düğmeli gezinmenin arkasına
+uzanan cam çubuklar. Android 14 ve sonrası, AGP 9 ve Kotlin 2.4 ile. Uygulamaları taşımak için
+[MIGRATION.md](MIGRATION.md).
+
+**Uyumu bozan:** `minSdk` 34 (Android 14), `compileSdk` 37, Kotlin 2.3 ve üstü, AGP 9.1.1 ve üstü. Kod tarafında
+1.0 API'si değişmeden derlenir (1.0'ın bütün genel imzaları 2.0'ınkilerle karşılaştırıldı); davranış
+değişiklikleri aşağıda ve rehberde.
+
+### Platform
+
+- AGP 9.4.1 (Kotlin'i kendisi derler), Gradle 9.8.2, Kotlin 2.4.20, Compose BOM 2026.09.00 (Compose 1.12.1),
+  activity 1.13.0, navigation 2.10.2, lifecycle 2.11.0, coroutines 1.11.0, [Haze](https://github.com/chrisbanes/haze)
+  2.0.1 (`haze-materials` artık gelmiyor). Örnek uygulama Android 16'yı (API 36) hedefler.
+- Android 14 öncesi için yazılmış bütün dallar ve geri dönüşler silindi: öngörülü geri, başlık çubuğu insetleri,
+  titreşim sabitleri ve bulanık cam doğrudan kullanılır.
+- Testler Robolectric 4.17 ile API 36'da (Java 21) çalışır; yeni testler öngörülü geri hareketini (ayrıntı parmakla
+  küçülür, vazgeçince geri büyür, bitince kapanır) ve etkinlik yeniden kurulunca (döndürme) kabuğun açık ekranını ve
+  ekranın durumunu denetler. CI, çekme isteklerinde derleme çıktısını ve test sonuçlarını `ci/logs-pr-<numara>`
+  dalına koyar; kütüphaneyi bir de JitPack gibi (`jitpack.yml`, Java 17) derler.
+
+### Telefon: üç düğmeli gezinme
+
+- `DesktopKitRoot` alttaki sistem gezinme çubuğunu (üç düğme ya da hareket çizgisi) kabuğa bırakır. Telefonda alt
+  çubuğun camı düğmelerin arkasına kadar uzanır; çubuklar kaydırınca camın altına çekilir, camın üstünde ince bir
+  çizgi belirir. Tablet ve DeX'te düğmelerin arkası ray ve kenar çubuğunun renginde. Klavye açıkken bant yok.
+- Düğmeler ve durum çubuğu simgeleri temaya uyar (açık temada koyu), sistem kitin çubuklarının üstüne perde
+  çizmez. Uygulama bunları kendisi yönetecekse `DesktopKitRoot(systemBarsAppearance = false)`.
+- Alt sayfalar, genişleyen oynatıcı ve bildirimler düğmelerin üstünde kalır.
+
+### Yeni bileşenler (kitin çizgisinde, Material'sız)
+
+- **Form (K1):** `DeskTextField` (etiket, ipucu, önek simgesi, birim, temizleme, parola göster/gizle, hata ve
+  açıklama satırı, tek yazı tipi, çok satır), `DeskSearchField` (Esc temizler), `NumberField` (oklarla artırır,
+  aralık dışında yerelleştirilmiş uyarı, isteğe bağlı − / + düğmeleri), `OptionalNumberField` (boş = null),
+  `DeskCheckbox` (açık, kapalı ve ara durum; işaret kendini çizer), `DeskSwitch`, `SwitchRow`, `CheckboxRow`.
+  Klavyenin eylem tuşu sistemdeki işini yapar (Bitti klavyeyi kapatır, İleri sonraki alana geçer);
+  `onImeAction` verilirse onun yerine o çalışır, tek satırda donanım Enter'ı da. `NumberField` uyarı çıkınca
+  yerinden oynamaz, uyarı alanın başına doğru uzar; değer geç gelse de (Flow) yazılan korunur. Alanın içindeki
+  düğmeler farede 24 dp; dokunmada 32 dp görünür, parmak onları 48 dp'lik alanda yakalar.
+- **Geri bildirim (K2):** `DeskProgressBar` (belirli ve belirsiz), dört tonlu `StatusBanner` (`BannerTone`,
+  başlıklı iki satırlı hâli), `CountBadge` (99+), bildirimler: `rememberToastState()` (`ToastState`),
+  `show(mesaj, actionLabel, süre, ton, simge, kısayol)` sıraya girer ve sonucunu döner (`ToastResult`);
+  `DesktopShell(toasts = …)` onları telefonda alt çubuğun ve oynatıcının, geniş pencerede oynatıcının üstünde
+  gösterir. Parmakla yana kaydırınca kapanır, TalkBack açıkken sistemin önerdiği kadar kalır.
+- **Yapı (K3):** `DeskCard` (başlıklı, tıklanabilir), `KeyValueRow` (seçilebilir değer), `DeskListRow` (kapak,
+  ilerleme, seçim modu, sağ tık ve Menu tuşuyla menü), `SelectionBar`, `MenuButton`, `IconMenuButton`, `TabStrip`
+  ve `DeskTab` (rozet, meşgul noktası, kapatma; orta tık kapatır; seçim çizgisi ortadan büyür; Tab kapatma
+  düğmesine geçince düğme yerinde kalır, TalkBack'te "Sekmeyi kapat" eylemi).
+- Her yeni bileşenin üzerine gelme, odak ve basılı durumu ekran görüntüsüyle denetlenir.
+- **Kaynaklar (K7):** `appResources()` ve `pluralString(id, adet, …)` uygulama içi dil değişince yenilenir;
+  başka argüman verilmezse adet metindeki `%d`'yi doldurur.
+- `DeskButton(trailingIcon, role)`; devre dışı düğme dolgusu ve çerçevesiyle bütünüyle %50 saydam. Yeni simgeler:
+  Minus, Warning, Error, CheckCircle, Eye, EyeOff, Undo, Command, DragHandle, NewWindow.
+
+### Komut paleti, ızgara, sürükle bırak
+
+- **Komut paleti (K4):** `CommandPalette(state, items = { sorgu -> … })` Ctrl+K ile açılır: ekranlar, uygulamanın
+  nesneleri ve kısayol tablosu (`shortcuts.paletteItems(resources) { … }`) tek listede. Bulanık arama Türkçe harfleri
+  katlar ("sarki" "Şarkı"yı bulur), eşleşen harfleri vurgular, sonuçları gruplar ve en iyi sonucu üste koyar.
+  Klavye odağı arama alanında kalır: ↑/↓ seçer, Enter çalıştırır, Ctrl+Enter yeni pencerede açar, Tab grup
+  süzgeçlerini gezer, Esc kapatır. Kabuğun içinde palet kapanınca odak açılmadan önceki yerine döner (alt
+  sayfalar da öyle). Telefonda tam sayfa, geniş pencerede cam panel. `DesktopShell(overlays = { CommandPalette(…) })`.
+- **Kapak ızgarası (K5):** `DeskGrid(items, key, onItemClick) { CoverCell(başlık, …) { kapak } }`: tablonun seçim
+  kuralları iki boyutta (Ctrl/Shift ile tıklama, Shift ile oklar, Ctrl+A, Esc), sağ tık, uzun basma ve Menu tuşuyla
+  menü, farede oynat ve "⋯" düğmeleri (TalkBack'te hücrenin eylemleri), dokunmada seçim işaretleri, yüklenirken
+  soluk kapaklar.
+- **Sürükle bırak (K6):** `Modifier.dragSource { DeskDragPayload(tür, anahtarlar, etiket) }` ve
+  `Modifier.dropZone(türler, onDrop = { … })`. Farede ve touchpad'de düğme basılıyken birkaç piksel kayınca başlar
+  (Compose'un fare için kendi algılayıcısı); dokunmada uzun basma menüde kalır (`touch = true` ile sürükler).
+  Bırakma alanı sürükleme sürerken hafifçe, üzerine gelince seçim rengi ve vurgu çerçevesiyle belirir. Hazır yerler: `DenseTable(rowDrag)`, `DeskGrid(itemDrag)`, `DeskListRow(drag)`,
+  `DeskTab(drag)`, kenar çubuğu ve ray için `DesktopShell(navDrop = NavDrop(mapOf(rota to türler)) { rota, yük -> … })`.
+  Sürükleme uygulamanın öbür penceresine de geçer; başka uygulamalar yalnızca etiketi düz metin olarak alır, tür ve
+  anahtarlar (dosya adları, kimlikler) uygulamanın dışına çıkmaz.
+
+### DeX, tablet ve pencereler
+
+- **Başlık çubuğunda menü çubuğu (M1):** kenar çubuklu düzende menü çubuğu pencerenin başlık çubuğuna yerleşir
+  (Android 15+, sistem başlık öğelerinin yerini bildirdiğinde): root başlık çubuğunu saydam yapar, menüler ve arama
+  alanı sistemin uygulama çipiyle pencere düğmeleri arasında durur. Menüler ve arama dokunuşlarını sistemden alır;
+  çubuğun boş yeri pencereyi taşır, çift tık büyütür. Sistem öğelerin yerini bildirmezse ya da başlık çubuğunu
+  içerikten ayrı tutarsa hiçbir şey değişmez.
+- **Birden çok pencere (M2):** `DeskWindows.openNewWindow(activity, route)` uygulamayı DeX'te ve masaüstü
+  pencerelemede ayrı bir pencerede, tablette yan yana açar; yeni pencere `ShellSpec(startRoute =
+  DeskWindows.startRoute(intent))` ile o ekranda başlar. `rememberNewWindow()`, `CommonShortcuts.NewWindow` (Ctrl+N).
+  Tema, vurgu ve yoğunluk pencereler arasında eşitlenir; kenar çubuğu ve panel her pencerede ayrıdır.
+  Manifestte `PROPERTY_SUPPORTS_MULTI_INSTANCE_SYSTEM_UI` sistemin kendi "Yeni pencere" menüsünü açar.
+- **Paylaşılan öğe (M3):** `DetailTransition` içinde listede ve ayrıntıda aynı anahtarla
+  `Modifier.detailSharedElement(…)` (kapak) ve `Modifier.detailSharedBounds(…)` (başlık): ayrıntı açılırken
+  kapak satırdan yerine uçar, başlık akmadan büyür; telefonda parmağı izleyen yayla, genişte vurgulu eğriyle.
+  Animasyonlar kapalıyken yerinde kalır. `CoverCell(titleModifier)` ızgaradaki başlığı da uçurur.
+  Hiçbir şey işaretlemeyen ekran `DetailTransition(sharedElements = false)` ile ön yerleşim geçişini atlar.
+- **Giriş aygıtları (M4):** klavye kapağının touchpad'i açılıp kapandığında ya da fare uyandığında yoğunluk
+  hemen değişir; yalnızca açık aygıtlar sayılır, aygıtın başka değişiklikleri (yeni düzen, tuş eşlemesi)
+  yoğunluğu değiştirmez. (WindowManager'ın hassas işaretçi bilgisi henüz kararlı sürümde değil; kit kendi aygıt
+  takibini kullanmaya devam ediyor.)
+- `ShellSpec(startRoute)` artık olmayan bir rota verilirse çökmek yerine ilk öğeyle açılır.
+
+### Görünüm ve dokunma
+
+- **Duvar kâğıdı rengi (M5):** `Accent.dynamic(context)` ve `rememberDeskPreferences(dynamicAccent = true)`
+  duvar kâğıdından gelen rengi hazır renklerin sonuna ekler; duvar kâğıdı değişince renk de değişir.
+- **Titreşim (M6):** `rememberDeskHaptics()`: `toggle`, `tick`, `threshold`, `confirm`, `reject`, `longPress`;
+  yalnızca dokunmada çalışır. Anahtarlar, çipler, segment seçimi, sekmeler, alt sayfanın kapanma eşiği,
+  oynatıcı ve bırakma alanları bunu kullanır.
+- **Yükleniyor (M6):** `SkeletonBlock`, `SkeletonListRow`, `SkeletonList`, `DenseTable(loading = true)`,
+  `DeskGrid(loading = true)`: nefes alır gibi soluklaşan yer tutucular; animasyonlar kapalıyken durgun.
+
+### Erişilebilirlik (T4)
+
+- Tab ve TalkBack kabukta okuma sırasıyla ilerler: üst çubuk ya da menü çubuğu, gezinme, içerik, oynatıcı
+  (telefonda alt çubuk en sonda). Çizim sırası aynı: çubuklar içeriğin üstünde.
+- Çipler ve telefonun alt çubuğu büyük yazıda boyca büyür, satırları kesilmez; %200'de dar yerlerdeki tek
+  satırlık etiketler (alt çubuğun, kenar çubuğunun) üç noktayla biter. `DeskSlider(label, valueText)` TalkBack'e
+  kaydırıcının adını ve değerini söyler. Menü çubuğunun arama alanı ve tuş kapakları açık temada çerçeveli.
+- Testler: %200 yazı boyutunda hiçbir metin kutusundan taşmaz ya da sessizce kesilmez (telefon, DeX ve bileşen
+  galerisi); sığmayan tek satırlık metinler üç noktayla biter, kitin bütün tek satırlık metinleri böyle (test,
+  üç noktayla kısalanları çıktısında sayar). Her denetimin bir adı var; onay kutuları ve anahtarlar durumunu
+  söyler; Tab DeX penceresinde menü çubuğundan kenar çubuğuna ve içeriğe gider, Shift+Tab geri döner;
+  sekmelerde, komut paletinde ve alt sayfalarda odak kaybolmaz.
+
+### Örnek uygulama (G1)
+
+- **Bileşenler** ekranı her bileşeni her durumuyla gösterir (devre dışı, hata, seçili yan yana; üzerine gelme,
+  Tab ve basma canlı); üstte tema, vurgu ve yoğunluk anahtarları. **Albümler** ızgarası, albüm sayfasına uçan
+  kapak, **Parçalar** (telefonda camın altından kayar), sürüklenenleri alan **Çalma listeleri** ve **Çöp**,
+  albümleri de bulan komut paleti, Ctrl+N ile yeni pencere.
+
+### Bu sürümde olmayan
+
+- **API dökümü (T5):** Kotlin 2.4.20'nin ABI doğrulaması, AGP 9 Kotlin'i kendisi derlerken Android kütüphanesinin
+  sınıflarını görmüyor (döküm boş çıkıyor); binary-compatibility-validator da bu düzende görev açmıyor
+  ([#312](https://github.com/Kotlin/binary-compatibility-validator/issues/312)). İkisinden biri desteklediğinde eklenecek.
+
 ## 1.0.0 (2026-10-29)
 
 Telefonda buzlu cam çubuklar ve parmağı izleyen yaylar, genişleyen oynatıcı ve "⋯" sayfası; tablet ve DeX'te

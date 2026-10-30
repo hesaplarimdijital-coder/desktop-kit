@@ -1,5 +1,8 @@
 package desktopkit.components
 
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.foundation.lazy.items
+import androidx.compose.runtime.State
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -130,6 +133,10 @@ data class TableSort(val column: Int, val ascending: Boolean)
  * [onRowClick] runs for plain clicks only (not for Ctrl, Shift or [toggleOnClick] clicks).
  * [rowMenu] receives the row it was opened on; the selection it acts on is the app's
  * [selectedKeys], already updated when the menu opens.
+ *
+ * [rowDrag] lets rows be dragged with a mouse to a [dropZone] (the sidebar, a list, another window
+ * of the app): it builds what travels for the row under the pointer, usually the whole selection
+ * when that row is selected. [loading] shows breathing placeholder rows while [rows] is empty.
  */
 @Composable
 fun <T> DenseTable(
@@ -150,6 +157,8 @@ fun <T> DenseTable(
     toggleOnClick: Boolean = false,
     columnsState: TableColumnsState? = null,
     glassHeader: Boolean = true,
+    loading: Boolean = false,
+    rowDrag: ((T, Int) -> DeskDragPayload?)? = null,
 ) {
     val dimens = DeskTheme.dimens
     val colors = DeskTheme.colors
@@ -175,6 +184,10 @@ fun <T> DenseTable(
     val tracker = remember { SelectionTracker() }
     val focusManager = LocalFocusManager.current
     val keysInOrder = { rows.map(key) }
+    // while the rows load: breathing placeholder rows under the header
+    val skeleton = loading && rows.isEmpty()
+    val pulse = if (skeleton) rememberSkeletonPulse() else null
+    val loadingLabel = stringResource(R.string.dk_loading)
     fun update(result: TableSelection.Result) {
         tracker.anchor = result.anchor
         if (result.selection != selection) onSelectionChange?.invoke(result.selection)
@@ -229,7 +242,17 @@ fun <T> DenseTable(
                     },
             ),
     ) {
-        LazyColumn(state = state, modifier = Modifier.fillMaxSize().glassSource(rowsGlass, glassMode), contentPadding = padding) {
+        LazyColumn(
+            state = state,
+            modifier = Modifier
+                .fillMaxSize()
+                .glassSource(rowsGlass, glassMode)
+                .then(if (!skeleton) Modifier else Modifier.semantics { contentDescription = loadingLabel }),
+            contentPadding = padding,
+        ) {
+            if (pulse != null) {
+                items(8) { i -> SkeletonTableRow(shownColumns, i, pulse) }
+            }
             itemsIndexed(rows, key = { _, item -> key(item) }) { index, item ->
                 val itemKey = key(item)
                 val onClick = {
@@ -250,9 +273,9 @@ fun <T> DenseTable(
                         item = item,
                         selected = itemKey in selection || (selectedKey != null && itemKey == selectedKey),
                         onClick = onClick,
-                        modifier = if (!multi) Modifier else Modifier.onFocusChanged { focus ->
+                        modifier = (if (!multi) Modifier else Modifier.onFocusChanged { focus ->
                             if (focus.isFocused) tracker.focused = itemKey else if (tracker.focused == itemKey) tracker.focused = null
-                        },
+                        }).dragSource(enabled = rowDrag != null) { rowDrag?.invoke(item, index) },
                     )
                 }
                 if (rowMenu != null) {
@@ -312,7 +335,7 @@ private class HeaderPadding(
 }
 
 /** Keys held at the last press, the anchor of Shift ranges and the focused row; not state, nothing redraws from it. */
-private class SelectionTracker {
+internal class SelectionTracker {
     var toggle = false
     var range = false
     var anchor: Any? = null
@@ -380,17 +403,17 @@ private fun <T> HeaderCell(column: TableColumn<T>, index: Int, sort: TableSort?,
             .background(if (clickable) stateBackground(state) else Color.Transparent, shape)
             .then(
                 if (clickable) Modifier.deskClickable(interaction, {
-                    onSortChange?.invoke(TableSort(index, if (active) !(sort?.ascending ?: true) else true))
+                    onSortChange(TableSort(index, if (active) !sort.ascending else true))
                 }, role = Role.Button) else Modifier,
             )
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (column.alignEnd) Spacer(Modifier.weight(1f))
-        Text(column.title, style = DeskTheme.type.labelSmall, color = if (active) colors.text else colors.textTertiary, maxLines = 1)
+        Text(column.title, style = DeskTheme.type.labelSmall, color = if (active) colors.text else colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (active) {
             Spacer(Modifier.width(4.dp))
-            Icon(if (sort?.ascending != false) DeskIcons.ChevronUp else DeskIcons.ChevronDown, contentDescription = null,
+            Icon(if (sort.ascending) DeskIcons.ChevronUp else DeskIcons.ChevronDown, contentDescription = null,
                 tint = colors.textSecondary, modifier = Modifier.size(12.dp))
         }
     }
@@ -430,6 +453,27 @@ private fun <T> TableRow(columns: List<IndexedValue<TableColumn<T>>>, item: T, s
                     overflow = TextOverflow.Ellipsis,
                     textAlign = if (column.alignEnd) TextAlign.End else TextAlign.Start,
                 )
+            }
+        }
+    }
+}
+
+/** A table row while the rows load: one breathing bar per cell, of varying length. */
+@Composable
+private fun <T> SkeletonTableRow(columns: List<IndexedValue<TableColumn<T>>>, index: Int, pulse: State<Float>) {
+    val dimens = DeskTheme.dimens
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = dimens.pagePadding - 12.dp)
+            .heightIn(min = dimens.rowHeight.coerceAtLeast(dimens.minTarget))
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        columns.forEachIndexed { position, (_, column) ->
+            Box(Modifier.cell(this, column.width).padding(horizontal = 8.dp), contentAlignment = if (column.alignEnd) Alignment.CenterEnd else Alignment.CenterStart) {
+                val fraction = 0.4f + ((index * 7 + position * 3) % 5) * 0.1f
+                SkeletonBlock(Modifier.fillMaxWidth(fraction).height(10.dp), pulse)
             }
         }
     }

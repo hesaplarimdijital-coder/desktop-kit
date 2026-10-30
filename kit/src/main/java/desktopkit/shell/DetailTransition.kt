@@ -3,6 +3,12 @@ package desktopkit.shell
 import androidx.activity.BackEventCompat
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.BoundsTransform
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -16,6 +22,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -24,7 +32,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
@@ -54,6 +64,12 @@ import kotlinx.coroutines.launch
  * [CompactTopBar] inside it (both normally call the same close function), unless [handleBack] is false.
  * [detailKey] tells details apart (the default compares the values); [animate] false switches
  * without motion, e.g. for screenshot tests.
+ *
+ * Shared elements: mark the same thing in the list and in the detail with [detailSharedElement]
+ * (a cover: it flies from the row to its place in the detail and back) or [detailSharedBounds]
+ * (a title: it moves and scales instead of reflowing), with the same key on both sides. They need a
+ * lookahead layout pass over the list and the detail; [sharedElements] false leaves it out for
+ * screens that mark nothing.
  */
 @Composable
 fun <T : Any> DetailTransition(
@@ -64,6 +80,8 @@ fun <T : Any> DetailTransition(
     animate: Boolean = true,
     detailKey: (T) -> Any = { it },
     list: @Composable () -> Unit,
+    // after list, so that 1.0's positional calls still compile
+    sharedElements: Boolean = true,
     detailContent: @Composable (T) -> Unit,
 ) {
     val colors = DeskTheme.colors
@@ -75,42 +93,52 @@ fun <T : Any> DetailTransition(
     val behind = colors.pressed
     val page = colors.background
 
-    AnimatedContent(
-        targetState = detail,
-        modifier = modifier
-            .fillMaxSize()
-            // a shade behind the shrinking detail, so its edges show during the Back gesture
-            .drawBehind {
-                val p = backProgress.value
-                drawRect(if (p > 0f) lerp(page, behind, p) else page)
-            },
-        transitionSpec = { detailTransform(initialState, targetState, animate, tier) },
-        contentKey = { it?.let(detailKey) },
-        label = "detailTransition",
-    ) { target ->
-        if (target == null) {
-            // opaque, so the shade left behind a closed detail never shows through the list
-            Box(Modifier.fillMaxSize().background(page)) { list() }
-        } else {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        val p = backProgress.value
-                        if (p > 0f) {
-                            val scale = 1f - 0.1f * p
-                            scaleX = scale
-                            scaleY = scale
-                            val lean = 24.dp.toPx() * p
-                            translationX = if (swipeEdge == BackEventCompat.EDGE_RIGHT) -lean else lean
-                            shape = RoundedCornerShape((28 * p).dp)
-                            clip = true
-                        }
-                    }
-                    .background(page),
-            ) { detailContent(target) }
+    val container = modifier
+        .fillMaxSize()
+        // a shade behind the shrinking detail, so its edges show during the Back gesture
+        .drawBehind {
+            val p = backProgress.value
+            drawRect(if (p > 0f) lerp(page, behind, p) else page)
+        }
+    val content: @Composable (SharedTransitionScope?) -> Unit = { shared ->
+        AnimatedContent(
+            targetState = detail,
+            modifier = Modifier.fillMaxSize(),
+            transitionSpec = { detailTransform(initialState, targetState, animate, tier) },
+            contentKey = { it?.let(detailKey) },
+            label = "detailTransition",
+        ) { target ->
+            // one object per side: a new one on every recomposition would recompose everything under it
+            val scopes = remember(shared, this, animate, tier) {
+                if (shared != null && animate && tier != MotionTier.Reduced) DetailSharedScopes(shared, this, tier) else null
+            }
+            CompositionLocalProvider(LocalDetailSharedScopes provides scopes) {
+                if (target == null) {
+                    // opaque, so the shade left behind a closed detail never shows through the list
+                    Box(Modifier.fillMaxSize().background(page)) { list() }
+                } else {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                val p = backProgress.value
+                                if (p > 0f) {
+                                    val scale = 1f - 0.1f * p
+                                    scaleX = scale
+                                    scaleY = scale
+                                    val lean = 24.dp.toPx() * p
+                                    translationX = if (swipeEdge == BackEventCompat.EDGE_RIGHT) -lean else lean
+                                    shape = RoundedCornerShape((28 * p).dp)
+                                    clip = true
+                                }
+                            }
+                            .background(page),
+                    ) { detailContent(target) }
+                }
+            }
         }
     }
+    if (sharedElements) SharedTransitionLayout(container) { content(this) } else Box(container) { content(null) }
 
     // a newly opened detail always starts at full size
     LaunchedEffect(detail?.let(detailKey)) {
@@ -170,5 +198,57 @@ private fun <T> detailTransform(initial: T?, target: T?, animate: Boolean, tier:
                         fadeOut(tween(DeskMotion.SHORT_MS + 50, easing = DeskMotion.StandardAccelerate)),
                 )
         else -> fadeIn(tween(DeskMotion.MEDIUM_MS)) togetherWith fadeOut(tween(DeskMotion.SHORT_MS))
+    }
+}
+
+/** The scopes a shared element needs: the [DetailTransition]'s layout and the side (list or detail) it is on. */
+internal class DetailSharedScopes(
+    val transition: SharedTransitionScope,
+    val visibility: AnimatedVisibilityScope,
+    val tier: MotionTier,
+)
+
+internal val LocalDetailSharedScopes = staticCompositionLocalOf<DetailSharedScopes?> { null }
+
+/** Bounds of a shared element move on the gesture spring on a phone, on the emphasized curve wider up. */
+private fun boundsTransform(tier: MotionTier) = BoundsTransform { _, _ ->
+    if (tier == MotionTier.Gesture) spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+    else tween(DeskMotion.LONG_MS + 50, easing = DeskMotion.Emphasized)
+}
+
+/**
+ * Inside a [DetailTransition], this element and the element with the same [key] on the other side
+ * (the list's row and the detail) are one: opening the detail moves it from the row to its place in
+ * the detail, closing moves it back. For things that look the same at both sizes: a cover, an
+ * icon. Put it first in the element's modifiers, before its size and shape, so all of it flies.
+ * Outside a [DetailTransition], or with reduced motion, nothing changes.
+ */
+@Composable
+fun Modifier.detailSharedElement(key: Any): Modifier {
+    val scopes = LocalDetailSharedScopes.current ?: return this
+    return with(scopes.transition) {
+        this@detailSharedElement.sharedElement(
+            sharedContentState = rememberSharedContentState(key),
+            animatedVisibilityScope = scopes.visibility,
+            boundsTransform = boundsTransform(scopes.tier),
+        )
+    }
+}
+
+/**
+ * Like [detailSharedElement] for things that differ in size between the two sides, such as a title
+ * set larger in the detail: the bounds move and the content scales with them instead of reflowing,
+ * cross-fading from one side's look to the other's.
+ */
+@Composable
+fun Modifier.detailSharedBounds(key: Any): Modifier {
+    val scopes = LocalDetailSharedScopes.current ?: return this
+    return with(scopes.transition) {
+        this@detailSharedBounds.sharedBounds(
+            sharedContentState = rememberSharedContentState(key),
+            animatedVisibilityScope = scopes.visibility,
+            boundsTransform = boundsTransform(scopes.tier),
+            resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds(ContentScale.Fit, Alignment.CenterStart),
+        )
     }
 }

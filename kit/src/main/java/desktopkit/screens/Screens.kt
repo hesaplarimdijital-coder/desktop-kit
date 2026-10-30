@@ -74,14 +74,14 @@ fun PageHeader(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (showTitle) {
-            Text(title, style = DeskTheme.type.display, color = DeskTheme.colors.text, maxLines = 1,
+            Text(title, style = DeskTheme.type.display, color = DeskTheme.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.semantics { heading() })
             if (subtitle != null) {
                 Spacer(Modifier.width(dimens.gapS))
-                Text(subtitle, style = DeskTheme.type.body, color = DeskTheme.colors.textTertiary, maxLines = 1)
+                Text(subtitle, style = DeskTheme.type.body, color = DeskTheme.colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         } else if (subtitle != null) {
-            Text(subtitle, style = DeskTheme.type.labelSmall, color = DeskTheme.colors.textTertiary, maxLines = 1)
+            Text(subtitle, style = DeskTheme.type.labelSmall, color = DeskTheme.colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Spacer(Modifier.weight(1f))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(dimens.gapXs), content = actions)
