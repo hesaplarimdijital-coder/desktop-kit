@@ -211,12 +211,12 @@ class AccessibilityTest {
             }
 
     /**
-     * Whether the text runs on past its box or its last line. Not hasVisualOverflow: for plain
-     * strings the semantics lay the text out again, and the new lines can be a fraction of a pixel
-     * taller or wider than the box of the first layout.
+     * Whether the text runs on past its last line or past its box. Not hasVisualOverflow: for plain
+     * strings the semantics lay the text out again, as wide as the space allows rather than as wide
+     * as the box, so the widths of the lines are what to compare.
      */
     private fun TextLayoutResult.runsOn(): Boolean =
-        multiParagraph.didExceedMaxLines || size.width + 1 < multiParagraph.width
+        multiParagraph.didExceedMaxLines || (0 until multiParagraph.lineCount).any { multiParagraph.getLineWidth(it) > size.width + 1 }
 
     /**
      * Text that is cut off: its box is lower than its lines (a fixed height), or it runs on past
@@ -228,7 +228,7 @@ class AccessibilityTest {
         when {
             result.size.height + 1 < lines -> "“$text” ${result.size.height} px < $lines px"
             result.runsOn() && result.layoutInput.overflow == TextOverflow.Clip ->
-                "“$text” clipped without an ellipsis (${result.size}, ${result.multiParagraph.width} × $lines px)"
+                "“$text” clipped without an ellipsis (box ${result.size}, lines ${(0 until result.multiParagraph.lineCount).map { result.multiParagraph.getLineWidth(it) }})"
             else -> null
         }
     }
