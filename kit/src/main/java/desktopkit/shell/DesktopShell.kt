@@ -148,6 +148,9 @@ class ShellNavigator(private val navController: NavHostController) {
  * @param compactSizes on phones, a 64 dp bottom bar and 52 dp touch rows instead of 72 and 56 dp;
  *   targets stay at least 48 dp. False keeps the touch sizes as they are.
  * @param menus menu bar menus, shown in the sidebar layout; [desktopkit.input.ShortcutRegistry.menus] builds them.
+ *   In a desktop window (DeX, Android 15+ desktop windowing) the menu bar fills the window's caption bar
+ *   inside a [desktopkit.DesktopKitRoot]: the menus and the search field sit between the system's app chip
+ *   and window buttons, and the rest of the bar still moves the window.
  * @param onSearch shows a search field (sidebar layout) or a search button (smaller windows) when set.
  * @param moreActions the app's own entries in the phone's "⋯" sheet ([MoreStyle.Sheet]), after the
  *   screens that do not fit the bottom bar.
@@ -309,6 +312,13 @@ private fun ShellContent(
         onDispose { rootInsets?.let { it.shells-- } }
     }
     val systemBottom: () -> Int = remember(rootInsets, density) { { rootInsets?.navigationBottom?.getBottom(density) ?: 0 } }
+    // DeX and desktop windows: the menu bar fills the window's caption bar, between the system's elements
+    val claimsCaption = navKind == NavKind.Sidebar
+    DisposableEffect(rootInsets, claimsCaption) {
+        if (claimsCaption) rootInsets?.let { it.captionClaims++ }
+        onDispose { if (claimsCaption) rootInsets?.let { it.captionClaims-- } }
+    }
+    val captionArea = if (claimsCaption && rootInsets?.captionInUse(density) == true) rootInsets.caption else null
     val floating = floatingPlayer && navKind != NavKind.BottomBar
     val floatingMargin = 12.dp
     var moreOpen by remember { mutableStateOf(false) }
@@ -355,12 +365,14 @@ private fun ShellContent(
             modifier = modifier.fillMaxSize().background(colors.background),
             topBar = {
                 if (navKind == NavKind.Sidebar) {
-                    MenuBarChrome(
-                        title = spec.appTitle,
-                        brand = brand,
-                        menus = { MenuBarMenus(menus) },
-                        search = searchSlot,
-                    )
+                    CompositionLocalProvider(LocalCaptionArea provides captionArea) {
+                        MenuBarChrome(
+                            title = spec.appTitle,
+                            brand = brand,
+                            menus = { MenuBarMenus(menus) },
+                            search = searchSlot,
+                        )
+                    }
                 } else {
                     val title = if (currentRoute == ShellSpec.MORE_ROUTE) more.label else spec.item(currentRoute)?.label ?: spec.appTitle
                     // CompactTopBar registers nothing on wider windows; checked here as well

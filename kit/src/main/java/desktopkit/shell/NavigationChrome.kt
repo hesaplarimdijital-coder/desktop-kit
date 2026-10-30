@@ -9,6 +9,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.absolutePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -52,7 +54,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import desktopkit.R
@@ -523,7 +528,14 @@ private const val NAV_COLOR_MS = 150
 @Composable
 private fun animateNavColor(target: Color) = animateColorAsState(target, tween(NAV_COLOR_MS), label = "navColor")
 
-/** Large and extra-large: brand, application menus and an optional search/command field. */
+/**
+ * Large and extra-large: brand, application menus and an optional search/command field.
+ *
+ * Inside a [DesktopShell] in a desktop window the bar lies in the window's caption bar: as high as
+ * the caption bar, clear of the system's app chip (which then names the app instead of [title] and
+ * [brand]) and window buttons. The menus and the search field take their touches from the system;
+ * the empty rest of the bar moves the window and a double click maximizes it, as on any title bar.
+ */
 @Composable
 fun MenuBarChrome(
     title: String,
@@ -534,19 +546,35 @@ fun MenuBarChrome(
 ) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
+    val caption = LocalCaptionArea.current
+    val density = LocalDensity.current
+    val ltr = LocalLayoutDirection.current == LayoutDirection.Ltr
+    val start = 14.dp
+    val end = 10.dp
+    val height = if (caption == null) dimens.menuBarHeight else maxOf(dimens.menuBarHeight, with(density) { caption.height.toDp() })
+    val left = with(density) { (caption?.left ?: 0).toDp() } + if (ltr) start else end
+    val right = with(density) { (caption?.right ?: 0).toDp() } + if (ltr) end else start
+    // the app chip at the caption bar's start already shows the app's icon and name
+    val chip = caption != null && (if (ltr) caption.left else caption.right) > 0
+    // in the caption bar, touches on these go to the app instead of moving the window
+    val interactive = if (caption == null) Modifier else Modifier.systemGestureExclusion()
     Column(modifier.fillMaxWidth().background(colors.chrome)) {
         Row(
-            modifier = Modifier.fillMaxWidth().heightIn(min = dimens.menuBarHeight).padding(start = 14.dp, end = 10.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(min = height).absolutePadding(left = left, right = right),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (brand != null) {
-                brand(Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
+            if (!chip) {
+                if (brand != null) {
+                    brand(Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                }
+                Text(title, style = DeskTheme.type.bodyStrong, color = colors.text, maxLines = 1)
+                Spacer(Modifier.width(14.dp))
             }
-            Text(title, style = DeskTheme.type.bodyStrong, color = colors.text, maxLines = 1)
-            Spacer(Modifier.width(14.dp))
-            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, content = menus)
-            search?.invoke()
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                Row(interactive, verticalAlignment = Alignment.CenterVertically, content = menus)
+            }
+            if (search != null) Box(interactive) { search() }
         }
         HorizontalRule()
     }

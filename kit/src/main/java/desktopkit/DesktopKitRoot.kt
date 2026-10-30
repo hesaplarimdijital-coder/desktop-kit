@@ -3,17 +3,23 @@ package desktopkit
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.os.Build
 import android.view.View
+import android.view.WindowInsetsController
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.captionBar
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -21,10 +27,12 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -32,6 +40,8 @@ import androidx.core.view.WindowCompat
 import desktopkit.input.rememberInputModeState
 import desktopkit.input.trackInputMode
 import desktopkit.settings.DeskPreferences
+import desktopkit.shell.CaptionArea
+import desktopkit.shell.CaptionElements
 import desktopkit.shell.LocalWidthClass
 import desktopkit.shell.WidthClass
 import desktopkit.theme.Accent
@@ -58,6 +68,10 @@ import desktopkit.theme.DesktopKitTheme
  * [desktopkit.shell.DesktopShell] inside: the shell draws its chrome behind it (the phone's glass bottom
  * bar, the chrome colour on tablets) and keeps its own controls above it. Without a shell the root
  * pads it like the other insets.
+ *
+ * In a desktop window (DeX, Android's desktop windowing) the shell's menu bar fills the window's
+ * caption bar: the root makes the caption bar transparent (Android 15 and later) and leaves it to the
+ * shell, which keeps its menus and search clear of the system's window buttons.
  *
  * With [systemBarsAppearance] the status and navigation bar icons follow the kit's theme (dark icons
  * on the light theme) and the system draws no scrim behind three-button navigation, since the kit's
@@ -101,8 +115,24 @@ fun DesktopKitRoot(
         val safeDrawing = WindowInsets.safeDrawing
         // the keyboard covers the navigation bar: what is left of the bar above it
         val navigationBottom = WindowInsets.navigationBars.only(WindowInsetsSides.Bottom).exclude(WindowInsets.ime)
-        val rootInsets = remember(navigationBottom) { RootInsets(navigationBottom) }
-        val padding = remember(safeDrawing, rootInsets) { RootPadding(safeDrawing, rootInsets) }
+        val captionTop = WindowInsets.captionBar.only(WindowInsetsSides.Top)
+        // safeDrawing without the caption bar, for a shell whose menu bar fills it
+        val belowCaption = WindowInsets.statusBars.union(WindowInsets.navigationBars).union(WindowInsets.displayCutout)
+            .union(WindowInsets.ime)
+        val rootInsets = remember(navigationBottom, captionTop) { RootInsets(navigationBottom, captionTop) }
+        val padding = remember(safeDrawing, belowCaption, rootInsets) { RootPadding(safeDrawing, belowCaption, rootInsets) }
+        // the window's caption bar and the system's elements on it, read again whenever the window is
+        // laid out (resized, the caption bar shown or hidden) or the caption bar reaches the content
+        val view = LocalView.current
+        val captionPx = captionTop.getTop(LocalDensity.current)
+        DisposableEffect(view, rootInsets, captionPx) {
+            val update = { rootInsets.caption = CaptionElements.area(view) }
+            val listener = View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> update() }
+            view.addOnLayoutChangeListener(listener)
+            update()
+            onDispose { view.removeOnLayoutChangeListener(listener) }
+        }
+        CaptionAppearance(transparent = rootInsets.captionClaims > 0 && rootInsets.caption != null, dark = DeskTheme.colors.isDark)
         BoxWithConstraints(
             modifier
                 .fillMaxSize()
@@ -126,25 +156,69 @@ fun DesktopKitRoot(
 internal class RootInsets(
     /** The bottom navigation bar (three buttons or the gesture handle), less the keyboard covering it. */
     val navigationBottom: WindowInsets,
+    /** The caption bar of a desktop window, as far as it reaches the app's content. */
+    private val captionTop: WindowInsets = WindowInsets(0, 0, 0, 0),
 ) {
     /** How many shells draw behind [navigationBottom]; while one does, the root does not pad it. */
     var shells by mutableIntStateOf(0)
+
+    /** How many shells draw their menu bar in the caption bar; while one does, it is transparent. */
+    var captionClaims by mutableIntStateOf(0)
+
+    /** The window's caption bar, when it has one and the system says where its elements are. */
+    var caption by mutableStateOf<CaptionArea?>(null)
+
+    /**
+     * Whether a shell's menu bar lies in the caption bar: claimed, transparent and reaching the
+     * content (the system keeps an opaque caption bar's insets from the content).
+     */
+    fun captionInUse(density: Density): Boolean = captionClaims > 0 && caption != null && captionTop.getTop(density) > 0
 }
 
 internal val LocalRootInsets = staticCompositionLocalOf<RootInsets?> { null }
 
-/** `safeDrawing`, without the bottom navigation bar while a shell draws behind it. Read while measuring. */
-private class RootPadding(private val safe: WindowInsets, private val root: RootInsets) : WindowInsets {
+/**
+ * `safeDrawing`, without the bottom navigation bar while a shell draws behind it and without the
+ * caption bar while a shell's menu bar fills it. Read while measuring.
+ */
+private class RootPadding(
+    private val safe: WindowInsets,
+    private val belowCaption: WindowInsets,
+    private val root: RootInsets,
+) : WindowInsets {
     override fun getLeft(density: Density, layoutDirection: LayoutDirection) = safe.getLeft(density, layoutDirection)
-    override fun getTop(density: Density) = safe.getTop(density)
+    override fun getTop(density: Density) =
+        if (root.captionInUse(density)) belowCaption.getTop(density) else safe.getTop(density)
     override fun getRight(density: Density, layoutDirection: LayoutDirection) = safe.getRight(density, layoutDirection)
     override fun getBottom(density: Density): Int {
         val bottom = safe.getBottom(density)
         return if (root.shells > 0) (bottom - root.navigationBottom.getBottom(density)).coerceAtLeast(0) else bottom
     }
 
-    override fun equals(other: Any?) = other is RootPadding && other.safe == safe && other.root === root
-    override fun hashCode() = 31 * safe.hashCode() + root.hashCode()
+    override fun equals(other: Any?) =
+        other is RootPadding && other.safe == safe && other.belowCaption == belowCaption && other.root === root
+    override fun hashCode() = 31 * (31 * safe.hashCode() + belowCaption.hashCode()) + root.hashCode()
+}
+
+/**
+ * A transparent caption bar while a shell's menu bar fills it (Android 15 and later), with window
+ * buttons that suit the theme. The system then leaves touches on the menus and the search field,
+ * which exclude themselves from its gestures, to the app; the rest of the bar still moves the window.
+ */
+@Composable
+private fun CaptionAppearance(transparent: Boolean, dark: Boolean) {
+    val view = LocalView.current
+    if (view.isInEditMode || Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return
+    DisposableEffect(view, transparent, dark) {
+        val controller = view.context.findActivity()?.window?.insetsController
+        val mask = WindowInsetsController.APPEARANCE_TRANSPARENT_CAPTION_BAR_BACKGROUND or
+            WindowInsetsController.APPEARANCE_LIGHT_CAPTION_BARS
+        if (transparent) {
+            val light = if (dark) 0 else WindowInsetsController.APPEARANCE_LIGHT_CAPTION_BARS
+            controller?.setSystemBarsAppearance(WindowInsetsController.APPEARANCE_TRANSPARENT_CAPTION_BAR_BACKGROUND or light, mask)
+        }
+        onDispose { if (transparent) controller?.setSystemBarsAppearance(0, mask) }
+    }
 }
 
 /** Status and navigation bar icons that suit the kit's theme; no system scrim over the kit's chrome. */
