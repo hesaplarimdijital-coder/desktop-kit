@@ -133,6 +133,10 @@ data class TableSort(val column: Int, val ascending: Boolean)
  * [onRowClick] runs for plain clicks only (not for Ctrl, Shift or [toggleOnClick] clicks).
  * [rowMenu] receives the row it was opened on; the selection it acts on is the app's
  * [selectedKeys], already updated when the menu opens.
+ *
+ * [rowDrag] lets rows be dragged with a mouse to a [dropZone] (the sidebar, a list, another window
+ * of the app): it builds what travels for the row under the pointer, usually the whole selection
+ * when that row is selected. [loading] shows breathing placeholder rows while [rows] is empty.
  */
 @Composable
 fun <T> DenseTable(
@@ -154,6 +158,7 @@ fun <T> DenseTable(
     columnsState: TableColumnsState? = null,
     glassHeader: Boolean = true,
     loading: Boolean = false,
+    rowDrag: ((T, Int) -> DeskDragPayload?)? = null,
 ) {
     val dimens = DeskTheme.dimens
     val colors = DeskTheme.colors
@@ -268,9 +273,9 @@ fun <T> DenseTable(
                         item = item,
                         selected = itemKey in selection || (selectedKey != null && itemKey == selectedKey),
                         onClick = onClick,
-                        modifier = if (!multi) Modifier else Modifier.onFocusChanged { focus ->
+                        modifier = (if (!multi) Modifier else Modifier.onFocusChanged { focus ->
                             if (focus.isFocused) tracker.focused = itemKey else if (tracker.focused == itemKey) tracker.focused = null
-                        },
+                        }).dragSource(enabled = rowDrag != null) { rowDrag?.invoke(item, index) },
                     )
                 }
                 if (rowMenu != null) {
@@ -330,7 +335,7 @@ private class HeaderPadding(
 }
 
 /** Keys held at the last press, the anchor of Shift ranges and the focused row; not state, nothing redraws from it. */
-private class SelectionTracker {
+internal class SelectionTracker {
     var toggle = false
     var range = false
     var anchor: Any? = null

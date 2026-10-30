@@ -57,7 +57,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import desktopkit.R
 import desktopkit.components.DeskIconButton
+import desktopkit.components.DeskDragPayload
 import desktopkit.components.DeskIcons
+import desktopkit.components.dropZone
 import desktopkit.components.HorizontalRule
 import desktopkit.components.SectionCaption
 import desktopkit.components.VerticalRule
@@ -75,6 +77,25 @@ import desktopkit.theme.glass
 
 /** Item counts and badges shown next to sidebar entries ("4 812", "4 new"), by route. */
 typealias NavBadges = Map<String, String>
+
+/**
+ * Lets the sidebar's and the rail's entries take drops: tracks dragged onto "Playlists", files
+ * onto "Downloads". [kinds] are the drag kinds they take ([desktopkit.components.DeskDragPayload.kind]),
+ * [accepts] which entries (by route) take them, [onDrop] gets the route and what was dropped and says
+ * whether it was taken. An entry under a fitting drag is highlighted.
+ */
+@Immutable
+class NavDrop(
+    val kinds: Set<String>,
+    val accepts: (route: String) -> Boolean = { true },
+    val onDrop: (route: String, payload: DeskDragPayload) -> Boolean,
+)
+
+/** The drop target of a navigation entry, when [navDrop] takes drops on [route]. */
+@Composable
+private fun Modifier.navDropZone(navDrop: NavDrop?, route: String, shape: androidx.compose.ui.graphics.Shape): Modifier =
+    if (navDrop == null || !navDrop.accepts(route)) this
+    else dropZone(navDrop.kinds, onDrop = { payload -> navDrop.onDrop(route, payload) }, shape = shape)
 
 /** The kit's "More" entry; it lists [ShellSpec.overflow] for the current chrome. */
 @Composable
@@ -202,6 +223,7 @@ fun NavRail(
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
     brand: (@Composable (Modifier) -> Unit)? = null,
+    navDrop: NavDrop? = null,
 ) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
@@ -224,16 +246,16 @@ fun NavRail(
                 modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).selectableGroup(),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                main.forEach { item -> RailItem(item, isSelected(item, currentRoute, all)) { onSelect(item.route) } }
+                main.forEach { item -> RailItem(item, isSelected(item, currentRoute, all), navDrop) { onSelect(item.route) } }
             }
-            footer.forEach { item -> RailItem(item, isSelected(item, currentRoute, all)) { onSelect(item.route) } }
+            footer.forEach { item -> RailItem(item, isSelected(item, currentRoute, all), navDrop) { onSelect(item.route) } }
         }
         VerticalRule(Modifier.fillMaxHeight())
     }
 }
 
 @Composable
-private fun RailItem(item: NavItem, selected: Boolean, onClick: () -> Unit) {
+private fun RailItem(item: NavItem, selected: Boolean, navDrop: NavDrop?, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val state = interaction.collectState()
     val colors = DeskTheme.colors
@@ -245,6 +267,7 @@ private fun RailItem(item: NavItem, selected: Boolean, onClick: () -> Unit) {
         modifier = Modifier
             .width(dimens.railWidth)
             .heightIn(min = dimens.minTarget.coerceAtLeast(52.dp))
+            .navDropZone(navDrop, item.route, pill)
             .semantics { this.selected = selected }
             .deskClickable(interaction, onClick, role = Role.Tab)
             .padding(vertical = 4.dp),
@@ -278,6 +301,7 @@ fun Sidebar(
     onToggleCollapsed: () -> Unit,
     badges: NavBadges,
     modifier: Modifier = Modifier,
+    navDrop: NavDrop? = null,
 ) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
@@ -316,7 +340,7 @@ fun Sidebar(
                         Spacer(Modifier.height(dimens.gapS))
                     }
                     section.items.forEach { item ->
-                        SidebarItem(item, item.route == currentRoute, collapsed, badges[item.route], open) { onSelect(item.route) }
+                        SidebarItem(item, item.route == currentRoute, collapsed, badges[item.route], open, navDrop) { onSelect(item.route) }
                     }
                 }
             }
@@ -357,7 +381,7 @@ private fun labelAlpha(open: Float): Float = ((open - 0.5f) * 2f).coerceIn(0f, 1
  */
 @Composable
 private fun SidebarItem(item: NavItem, selected: Boolean, collapsed: Boolean, badge: String?, open: Float = if (collapsed) 0f else 1f,
-                        onClick: () -> Unit) {
+                        navDrop: NavDrop? = null, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val state = interaction.collectState()
     val colors = DeskTheme.colors
@@ -374,6 +398,7 @@ private fun SidebarItem(item: NavItem, selected: Boolean, collapsed: Boolean, ba
             .fillMaxWidth()
             .heightIn(min = dimens.navItemHeight.coerceAtLeast(dimens.minTarget))
             .padding(vertical = 1.dp)
+            .navDropZone(navDrop, item.route, shape)
             .focusRing(state, shape)
             .background(indicator, shape)
             .semantics {

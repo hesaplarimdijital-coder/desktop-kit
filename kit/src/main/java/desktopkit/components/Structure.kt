@@ -151,7 +151,7 @@ fun KeyValueRow(
  *
  * Tapping runs [onClick]. A long press runs [onLongClick] (usually: start selecting) or, without
  * it, opens [menu]; a right click and the Menu key open [menu] too. In [selectionMode] a check box
- * leads the row and shows [selected].
+ * leads the row and shows [selected]. [drag] lets the row be dragged with a mouse to a [dropZone].
  */
 @Composable
 fun DeskListRow(
@@ -178,6 +178,7 @@ fun DeskListRow(
     onClick: () -> Unit = {},
     onLongClick: (() -> Unit)? = null,
     menu: (() -> List<MenuEntry>)? = null,
+    drag: (() -> DeskDragPayload?)? = null,
 ) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
@@ -194,7 +195,7 @@ fun DeskListRow(
         subtitle != null || progress != null -> if (touch) 56.dp else 44.dp
         else -> dimens.rowHeight.coerceAtLeast(dimens.minTarget)
     }
-    Box(modifier.fillMaxWidth().onSizeChanged { rowHeight = it.height }) {
+    Box(modifier.fillMaxWidth().onSizeChanged { rowHeight = it.height }.dragSource(enabled = drag != null) { drag?.invoke() }) {
         Row(
             Modifier
                 .fillMaxWidth()

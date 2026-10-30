@@ -158,6 +158,7 @@ class ShellNavigator(private val navController: NavHostController) {
  *   and the player on a phone, above the player on tablet and DeX.
  * @param overlays drawn over the whole shell, bars included, with the shell's glass: the place for the
  *   [desktopkit.components.CommandPalette].
+ * @param navDrop lets the sidebar's and the rail's entries take drops ([desktopkit.components.dragSource]).
  * @param content the screen for a route of [spec]. The "More" route is handled by the shell. On
  *   compact windows a screen can change the top bar with [CompactTopBar]; [LocalWidthClass] and
  *   [currentWidthClass] tell it the width class in use.
@@ -188,6 +189,7 @@ fun DesktopShell(
     glass: Boolean = true,
     toasts: DeskToastState? = null,
     overlays: @Composable () -> Unit = {},
+    navDrop: NavDrop? = null,
     content: @Composable (route: String, navigator: ShellNavigator) -> Unit,
 ) {
     // tablet and DeX read one size larger; phones get the tighter compact sizes
@@ -234,6 +236,7 @@ fun DesktopShell(
                 glassMode = glassMode,
                 toasts = toasts,
                 overlays = overlays,
+                navDrop = navDrop,
                 content = content,
             )
         }
@@ -265,6 +268,7 @@ private fun ShellContent(
     glassMode: GlassMode,
     toasts: DeskToastState?,
     overlays: @Composable () -> Unit,
+    navDrop: NavDrop?,
     content: @Composable (route: String, navigator: ShellNavigator) -> Unit,
 ) {
     val navigator = remember(navController) { ShellNavigator(navController) }
@@ -388,7 +392,7 @@ private fun ShellContent(
                                 .graphicsLayer { translationY = overlayHost.expandProgress() * size.height },
                         )
                     }
-                    NavKind.Rail -> NavRail(spec, currentRoute, navigator::navigate, brand = brand)
+                    NavKind.Rail -> NavRail(spec, currentRoute, navigator::navigate, brand = brand, navDrop = navDrop)
                     NavKind.Sidebar -> Sidebar(
                         spec = spec,
                         currentRoute = currentRoute,
@@ -396,6 +400,7 @@ private fun ShellContent(
                         collapsed = sidebarCollapsed,
                         onToggleCollapsed = { onSidebarCollapsedChange(!sidebarCollapsed) },
                         badges = badges,
+                        navDrop = navDrop,
                     )
                 }
             },
