@@ -37,8 +37,8 @@ arayüzünden çıkarıldı. Klavye, fare, sağ tık ve dokunmatik aynı uygulam
   uygulamanın öbür penceresine sürüklenir.
 - **DeX ve pencereler:** menü çubuğu pencerenin başlık çubuğuna yerleşir (Android 15+); uygulama birden çok
   pencerede açılır, tema ve vurgu pencereler arasında eşitlenir.
-- **Erişilebilirlik:** %200 yazı boyutunda kesilen yazı yok, her denetimin TalkBack adı var, Tab okuma sırasıyla
-  ilerler; testle denetlenir.
+- **Erişilebilirlik:** %200 yazı boyutunda taşan ya da sessizce kesilen yazı yok (sığmayan tek satırlık
+  etiketler üç noktayla biter), her denetimin TalkBack adı var, Tab okuma sırasıyla ilerler; testle denetlenir.
 - **Klavye kısayolları:** tek tablodan menü çubuğu, ipuçları, ayarlardaki liste ve sistemin
   Meta+/ listesi üretilir.
 - **Hazır ekranlar:** sayfa başlığı, boş durum veya "yakında" ekranı, görünüm, giriş ve kısayol
@@ -198,7 +198,7 @@ Değerlere doğrudan erişim için `DeskTheme.colors.text`, `DeskTheme.type.body
 | `DeskTextField`, `DeskSearchField`, `NumberField`, `OptionalNumberField` | Metin, arama ve sayı alanları (aşağıya bak) |
 | `DeskCheckbox`, `DeskSwitch`, `CheckboxRow`, `SwitchRow` | Onay kutusu (ara durum dahil) ve anahtar; satır hâlleri TalkBack'e adını söyler |
 | `DeskProgressBar`, `StatusBanner`, `CountBadge` | İlerleme (belirli, belirsiz), dört tonlu durum şeridi, sayı rozeti |
-| `rememberToastState`, `ToastHost` | Bildirimler; kabuk `DesktopShell(toasts = …)` ile yerleştirir (aşağıya bak) |
+| `rememberToastState`, `ToastState`, `ToastHost` | Bildirimler; kabuk `DesktopShell(toasts = …)` ile yerleştirir (aşağıya bak) |
 | `DeskCard`, `KeyValueRow`, `DeskListRow`, `SelectionBar` | Kart, etiket–değer satırı, telefon listesi satırı, seçim çubuğu |
 | `MenuButton`, `IconMenuButton` | Altında menü açan düğmeler |
 | `TabStrip`, `DeskTab` | Sekmeler: rozet, meşgul noktası, kapatma, orta tık, sürükleme |
@@ -497,6 +497,9 @@ SwitchRow("Sesi DAC'a doğrudan gönder", açık, { açık = it }, subtitle = "S
 CheckboxRow("Tüm biçimler", ToggleableState.Indeterminate, onClick = { … })
 ```
 
+Klavyenin eylem tuşu sistemdeki işini yapar (Bitti klavyeyi kapatır, İleri sonraki alana geçer); `onImeAction`
+verilirse onun yerine o çalışır, tek satırda donanım Enter'ı da. `NumberField`'ın aralık uyarısı alanı genişletmez.
+
 Alanın etiketi, ipucu ve açıklaması TalkBack'e alanla birlikte okunur. Tek başına bir `DeskCheckbox` ya da
 `DeskSwitch` kullanılacaksa ona `Modifier.semantics { contentDescription = … }` ile ad ver; satır hâlleri bunu kendisi
 yapar.
@@ -518,8 +521,10 @@ Bildirimler sırayla gösterilir; telefonda alt çubuğun ve oynatıcının, tab
 ### Komut paleti
 
 ```kotlin
+val navController = rememberNavController()
+val navigator = remember(navController) { ShellNavigator(navController) }   // paletten ekran açmak için
 val palet = rememberCommandPaletteState()
-DesktopShell(…, onSearch = { palet.open() }, overlays = {
+DesktopShell(…, navController = navController, onSearch = { palet.open() }, overlays = {
     CommandPalette(palet, items = { sorgu ->
         ekranlar.map { PaletteItem(it.route, it.label, "Ekranlar", { navigator.navigate(it.route) }, icon = it.icon) } +
             albümler.map { PaletteItem(it.id, it.ad, "Albümler", { aç(it) }, subtitle = it.sanatçı) } +
@@ -528,8 +533,9 @@ DesktopShell(…, onSearch = { palet.open() }, overlays = {
 })
 ```
 
-Arama Türkçe harfleri katlar ("sarki" "Şarkı"yı bulur), eşleşen harfleri vurgular ve sonuçları gruplar. ↑/↓,
-Enter, Ctrl+Enter (`onOpenInNewWindow` varsa yeni pencerede), Tab ile grup süzgeçleri, Esc.
+Arama Türkçe harfleri katlar ("sarki" "Şarkı"yı bulur), eşleşen harfleri vurgular ve sonuçları gruplar. Klavye
+odağı alanda kalır: ↑/↓, Enter, Ctrl+Enter (`onOpenInNewWindow` varsa yeni pencerede), Tab ile grup süzgeçleri,
+Esc. Palet kapanınca odak açılmadan önceki yerine döner.
 
 ### Kapak ızgarası
 
@@ -541,7 +547,9 @@ DeskGrid(albümler, key = { it.id }, onItemClick = { albüm, _ -> aç(albüm) },
 }
 ```
 
-Seçim kuralları tablonunkiyle aynı (Ctrl/Shift ile tıklama, Shift ile oklar, Ctrl+A, Esc).
+Seçim kuralları tablonunkiyle aynı (Ctrl/Shift ile tıklama, Shift ile oklar, Ctrl+A, Esc). Oynat düğmesi
+farenin altında çıkar; TalkBack onu hücrenin eylemlerinde bulur, klavye için `itemMenu`'ye de "Oynat" koy (Menu
+tuşu menüyü açar).
 
 ### Sürükle bırak
 
@@ -551,8 +559,9 @@ Box(Modifier.dropZone(setOf("file"), onDrop = { yük -> taşı(yük.keys); true 
 DesktopShell(…, navDrop = NavDrop(mapOf("bin" to setOf("file"))) { rota, yük -> çöpeAt(yük.keys); true })
 ```
 
-Farede düğme basılı sürükleyince başlar; dokunmada uzun basma menüyü açmaya devam eder. Sürükleme uygulamanın
-öbür penceresine de geçer (`DeskDragPayload.from(event)`), başka uygulamalara etiketi düz metin olarak gider.
+Farede düğme basılıyken birkaç piksel kayınca başlar; dokunmada uzun basma menüyü açmaya devam eder. Sürükleme
+uygulamanın öbür penceresine de geçer (`DeskDragPayload.from(event)`); başka uygulamalar yalnızca etiketi düz metin
+olarak alır, tür ve anahtarlar uygulamanın dışına çıkmaz.
 
 ### Birden çok pencere ve başlık çubuğu
 

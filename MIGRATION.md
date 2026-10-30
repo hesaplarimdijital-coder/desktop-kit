@@ -67,9 +67,9 @@ tanımı sil, `import desktopkit.components.…` ekle.
 | `DeskProgressBar(fraction, modifier, color, height)` | `DeskProgressBar(...)` | Aynı; `null` belirsiz çubuk. Ek: `trackColor`, `contentDescription`. |
 | `DeskDialog(title, text, confirmLabel, dismissLabel, onConfirm, onDismiss)` | `DeskDialog(onDismiss, title, actions = { … }) { Text(text) }` | Aşağıdaki örneğe bak. |
 | `DeskFormDialog(title, …) { içerik }` | `DeskDialog(onDismiss, title, actions = { … }) { içerik }` | `confirmEnabled` → onay düğmesinin `enabled`'ı. |
-| `DeskTextField(value, onValueChange, hint, leading, trailing, …)` | `DeskTextField(...)` | Üst küme: `label`, `suffix`, `clearable`, `password`, `error`, `supportingText`, `mono`, `onImeAction`. |
+| `DeskTextField(value, onValueChange, hint, leading, trailing, …)` | `DeskTextField(..., trailingContent = …)` | `trailing` yuvası `trailingContent` oldu. Üst küme: `label`, `suffix`, `clearable`, `password`, `error`, `supportingText`, `mono`, `onImeAction` (verilmezse klavyenin tuşu sistemdeki işini yapar). |
 | `FilterTextField(value, onValueChange, hint)` | `DeskSearchField(value, onValueChange, hint = hint)` | Büyüteç, temizleme düğmesi; Esc temizler. |
-| `NumberField(value, onValue, min, max)` | `NumberField(value, onValueChange, min = …, max = …)` | Aralık dışı değer için altında yerelleştirilmiş uyarı; `steppers = true` ile − / + düğmeleri. |
+| `NumberField(value, onValue, min, max)` | `NumberField(value, onValueChange, min = …, max = …)` | Aralık dışı değer için altında yerelleştirilmiş uyarı (alan yerinde kalır); `steppers = true` ile − / + düğmeleri. Değer bir Flow'dan geç gelse de yazılan korunur. |
 | `OptionalNumberField(value, onValue, hint, reset)` | `OptionalNumberField(value, onValueChange, hint = …)` | `reset` gerekmez: dışarıdan gelen değer yazılanın yerine geçer. |
 | `MenuButton(text, entries, icon, enabled)` | `MenuButton(...)` | Aynı; sağında aşağı ok. |
 | `IconMenuButton(icon, label, entries)` | `IconMenuButton(...)` | Aynı. |
@@ -78,13 +78,13 @@ tanımı sil, `import desktopkit.components.…` ekle.
 | `BannerTone`, `StatusBanner(tone, text, actionLabel, onAction, closeLabel, onClose)` | Aynı adlar | Ek: `title` (iki satırlı şerit), `icon`. Uygulamanın kendi `BannerTone`'unu sil. |
 | `CountBadge(count, color, onColor)` | `CountBadge(...)` | Ek: `max` (99+). |
 | `ToggleChip(label, selected, onClick, icon)` | `DeskChip(text, selected, onClick, icon = …)` | Ek: `count`. Birden fazlası için `FilterChips`. |
-| `TabChip(label, selected, onClick, icon, badge, closeLabel, onClose, busy)` | `DeskTab(...)` | Aynı parametreler; `closeLabel` kitin metnine düşer. Orta tık kapatır. |
+| `TabChip(label, selected, onClick, icon, badge, closeLabel, onClose, busy)` | `DeskTab(...)` | Aynı parametreler, ama adlarıyla ver: kitte `modifier` dördüncü sırada, `busy` de yer değiştirdi. `closeLabel` kitin metnine düşer. Orta tık kapatır. |
 | `ScrollRow { }` | `TabStrip { }` (sekmeler), `ChipRow(wrap = false) { }` (çipler) | |
 | `Modifier.pagePadding()` | `Modifier.padding(horizontal = DeskTheme.dimens.pagePadding)` | İstersen uygulamada kalabilir. |
 | `CompactListRow(...)` | `DeskListRow(...)` | Aynı parametreler (`openMenuOnTap` dahil). Ek: `leadingContent` (kapak), `trailingContent`, `divider`, `enabled`, `drag`; sağ tık ve Menu tuşu menüyü açar. |
 | `CompactSelectionBar(countText, closeLabel, onClose, actions)` | `SelectionBar(text, onClose, closeLabel = …, actions = …)` | |
 | `CompactCaption`, `isCompactWidth()` | — | Kitte yok, uygulamada kalır. |
-| Soulseek+'ın `ToastHost(appViewModel)` | `rememberToastState()` + `DesktopShell(toasts = …)` | Aşağıdaki örneğe bak. |
+| Soulseek+'ın `ToastHost(appViewModel)` | `rememberToastState()` (`ToastState`) + `DesktopShell(toasts = …)` | Aşağıdaki örneğe bak. |
 
 İletişim kutusu:
 
@@ -136,7 +136,7 @@ Uyumu bozan değişiklikler azdır; çoğu yeni parametre varsayılanla gelir.
 - **Sekme sırası:** Tab artık üst çubuk → gezinme → içerik → oynatıcı sırasıyla ilerler (telefonda alt
   çubuk en sonda). Kendi `focusProperties` sırası olan ekranlar etkilenmez.
 - **`ShellSpec(startRoute)`** bilinmeyen bir rota verilirse çökmek yerine ilk öğeyle açılır.
-- **Görünüm:** devre dışı düğmeler %50 saydam; menü çubuğunun arama alanı ve tuş kapakları açık temada
+- **Görünüm:** devre dışı düğmeler dolgu ve çerçeveleriyle %50 saydam; menü çubuğunun arama alanı ve tuş kapakları açık temada
   çerçeveli; telefonun alt çubuğu ve çipler büyük yazıda büyür. Ekran görüntüsü testleri olan
   uygulamalar referanslarını yenilemeli.
 
