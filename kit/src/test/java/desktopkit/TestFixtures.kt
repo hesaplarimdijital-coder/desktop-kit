@@ -277,7 +277,7 @@ fun SampleTransportBar(track: Int = 0) {
         DeskIconButton(DeskIcons.Pause, "Duraklat", {})
         DeskIconButton(DeskIcons.Next, "Sonraki", {})
         Spacer(Modifier.width(12.dp))
-        DeskSlider(value = 0.35f, onValueChange = {}, modifier = Modifier.weight(1f))
+        DeskSlider(value = 0.35f, onValueChange = {}, modifier = Modifier.weight(1f), label = "Konum")
     }
 }
 
@@ -347,7 +347,7 @@ fun SampleStatusBar(kind: NavKind) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("Kopyalanıyor: Yedek.zip", style = DeskTheme.type.labelSmall, color = colors.textSecondary, modifier = Modifier.weight(1f))
-            DeskSlider(value = 0.42f, onValueChange = {}, modifier = Modifier.width(160.dp))
+            DeskSlider(value = 0.42f, onValueChange = {}, modifier = Modifier.width(160.dp), label = "Kopyalama")
             DeskIconButton(DeskIcons.Close, "İptal", {})
         }
     }

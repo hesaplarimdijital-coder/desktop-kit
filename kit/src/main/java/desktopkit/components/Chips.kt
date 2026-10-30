@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -82,7 +83,8 @@ fun DeskChip(
     Row(
         modifier = modifier
             .then(if (touch) Modifier.minimumInteractiveComponentSize() else Modifier)
-            .height(if (touch) 36.dp else 28.dp)
+            // grows with larger text instead of cutting it
+            .heightIn(min = if (touch) 36.dp else 28.dp)
             .pressScale(state.pressed)
             .focusRing(state, shape)
             .background(background, shape)

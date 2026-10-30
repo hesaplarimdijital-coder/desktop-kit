@@ -315,7 +315,7 @@ private fun GalleryScreen(onAbout: () -> Unit) {
             SegmentedChoice(listOf(1 to "Grid", 2 to "List", 3 to "Columns"), selected = choice, onSelect = { choice = it })
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Volume", style = DeskTheme.type.body, color = DeskTheme.colors.textSecondary, modifier = Modifier.width(80.dp))
-                DeskSlider(volume, { volume = it }, Modifier.width(280.dp))
+                DeskSlider(volume, { volume = it }, Modifier.width(280.dp), label = "Volume")
             }
         }
         Box(Modifier.weight(1f).padding(top = 16.dp)) {
@@ -649,7 +649,7 @@ private fun FullPlayer(index: Int, onCollapse: () -> Unit, onPrevious: () -> Uni
         Text(track.title, style = DeskTheme.type.headline, color = DeskTheme.colors.text)
         Text(track.artist, style = DeskTheme.type.body, color = DeskTheme.colors.textSecondary)
         Spacer(Modifier.height(16.dp))
-        DeskSlider(position, { position = it }, Modifier.fillMaxWidth())
+        DeskSlider(position, { position = it }, Modifier.fillMaxWidth(), label = "Position")
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
             DeskIconButton(DeskIcons.Previous, "Previous", onPrevious)
             DeskIconButton(DeskIcons.Pause, "Pause", {}, size = 64.dp, iconSize = 28.dp)
@@ -672,6 +672,6 @@ private fun TransportBar(index: Int, onPrevious: () -> Unit, onNext: () -> Unit)
         DeskIconButton(DeskIcons.Previous, "Previous", onPrevious)
         DeskIconButton(DeskIcons.Pause, "Pause", {})
         DeskIconButton(DeskIcons.Next, "Next", onNext)
-        DeskSlider(position, { position = it }, Modifier.weight(1f).padding(start = 12.dp))
+        DeskSlider(position, { position = it }, Modifier.weight(1f).padding(start = 12.dp), label = "Position")
     }
 }

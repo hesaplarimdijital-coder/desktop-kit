@@ -6,6 +6,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layoutId
+import androidx.compose.ui.semantics.isTraversalGroup
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 
@@ -15,6 +18,18 @@ private const val SLOT_CONTENT = "content"
 private const val SLOT_PLAYER = "player"
 private const val SLOT_OVERLAY = "overlay"
 private const val SLOT_BAND = "band"
+
+// drawn in this order: the content, the chrome over it, the system band over the sliding bars, the
+// overlay over everything. Within a layer, slots are drawn (and reached with Tab) in the order placed.
+private const val CHROME = 1f
+private const val BAND = 2f
+private const val OVERLAY = 3f
+
+/** A slot TalkBack reads as a whole, at [index] among the shell's slots. */
+private fun Modifier.readingOrder(index: Float) = semantics {
+    isTraversalGroup = true
+    traversalIndex = index
+}
 
 /**
  * Places the shell's slots for a [NavKind]. The content slot is always the same child of the same
@@ -38,6 +53,10 @@ private const val SLOT_BAND = "band"
  * of the window: three-button navigation or the gesture handle. The layout keeps everything above it
  * and fills it with [systemBand] across the whole width: on a phone the bars' glass continues behind
  * the buttons and stays there while the bars slide away beneath it; on tablets the chrome colour.
+ *
+ * The keyboard's Tab key and TalkBack go through the slots in reading order: the top bar (menu bar),
+ * the navigation, the content, the player; on a phone the bottom navigation comes last. The chrome
+ * is still drawn over the content.
  */
 @Composable
 fun ShellLayout(
@@ -56,25 +75,27 @@ fun ShellLayout(
     systemBand: @Composable () -> Unit = {},
 ) {
     val slides = navKind == NavKind.BottomBar
+    // reading order for TalkBack; the Tab key follows the order the slots are placed in (below)
+    val navOrder = if (slides) 3f else 0.5f
     Layout(
         modifier = modifier,
         content = {
-            // drawn in this order (also the order they are placed in): content first, the chrome over
-            // it, the system band over the sliding bars, the overlay over everything
-            Box(Modifier.layoutId(SLOT_CONTENT)) { content() }
-            Box(Modifier.layoutId(SLOT_TOP)) { topBar() }
+            Box(Modifier.layoutId(SLOT_CONTENT).readingOrder(1f)) { content() }
+            Box(Modifier.layoutId(SLOT_TOP).readingOrder(0f)) { topBar() }
             Box(
                 Modifier
                     .layoutId(SLOT_NAV)
+                    .readingOrder(navOrder)
                     .graphicsLayer { translationY = if (slides) navigationOffset().toFloat() else 0f },
             ) { navigation() }
             Box(
                 Modifier
                     .layoutId(SLOT_PLAYER)
+                    .readingOrder(2f)
                     .graphicsLayer { translationY = if (slides) navigationOffset().toFloat() else 0f },
             ) { player() }
             Box(Modifier.layoutId(SLOT_BAND)) { systemBand() }
-            Box(Modifier.layoutId(SLOT_OVERLAY)) { overlay() }
+            Box(Modifier.layoutId(SLOT_OVERLAY).readingOrder(4f)) { overlay() }
         },
     ) { measurables, constraints ->
         val width = constraints.maxWidth
@@ -98,12 +119,12 @@ fun ShellLayout(
                 // the content fills the window and never changes size while the bars move: they are drawn over it
                 val content = contentM.measure(Constraints.fixed(width, fullHeight))
                 layout(width, fullHeight) {
+                    top.placeRelative(0, 0, CHROME)
                     content.placeRelative(0, 0)
-                    top.placeRelative(0, 0)
-                    player.placeRelative(0, height - nav.height - player.height)
-                    nav.placeRelative(0, height - nav.height)
-                    band.placeRelative(0, height)
-                    overlay.placeRelative(0, 0)
+                    player.placeRelative(0, height - nav.height - player.height, CHROME)
+                    nav.placeRelative(0, height - nav.height, CHROME)
+                    band.placeRelative(0, height, BAND)
+                    overlay.placeRelative(0, 0, OVERLAY)
                 }
             }
 
@@ -117,24 +138,24 @@ fun ShellLayout(
                     val contentHeight = (height - top.height).coerceAtLeast(0)
                     val content = contentM.measure(Constraints.fixed(rest, contentHeight))
                     layout(width, fullHeight) {
+                        top.placeRelative(nav.width, 0, CHROME)
+                        nav.placeRelative(0, 0, CHROME)
                         content.placeRelative(nav.width, top.height)
-                        nav.placeRelative(0, 0)
-                        top.placeRelative(nav.width, 0)
-                        player.placeRelative(nav.width + (rest - playerWidth) / 2, height - margin - player.height)
-                        band.placeRelative(0, height)
-                        overlay.placeRelative(0, 0)
+                        player.placeRelative(nav.width + (rest - playerWidth) / 2, height - margin - player.height, CHROME)
+                        band.placeRelative(0, height, BAND)
+                        overlay.placeRelative(0, 0, OVERLAY)
                     }
                 } else {
                     val player = playerM.measure(Constraints(minWidth = rest, maxWidth = rest, maxHeight = height))
                     val contentHeight = (height - top.height - player.height).coerceAtLeast(0)
                     val content = contentM.measure(Constraints.fixed(rest, contentHeight))
                     layout(width, fullHeight) {
+                        top.placeRelative(nav.width, 0, CHROME)
+                        nav.placeRelative(0, 0, CHROME)
                         content.placeRelative(nav.width, top.height)
-                        nav.placeRelative(0, 0)
-                        top.placeRelative(nav.width, 0)
-                        player.placeRelative(nav.width, height - player.height)
-                        band.placeRelative(0, height)
-                        overlay.placeRelative(0, 0)
+                        player.placeRelative(nav.width, height - player.height, CHROME)
+                        band.placeRelative(0, height, BAND)
+                        overlay.placeRelative(0, 0, OVERLAY)
                     }
                 }
             }
@@ -149,12 +170,12 @@ fun ShellLayout(
                     val playerWidth = (contentWidth - 2 * margin).coerceAtMost(floatingMaxWidth.roundToPx()).coerceAtLeast(0)
                     val player = playerM.measure(Constraints(minWidth = playerWidth, maxWidth = playerWidth, maxHeight = height))
                     layout(width, fullHeight) {
+                        top.placeRelative(0, 0, CHROME)
+                        nav.placeRelative(0, top.height, CHROME)
                         content.placeRelative(nav.width, top.height)
-                        top.placeRelative(0, 0)
-                        nav.placeRelative(0, top.height)
-                        player.placeRelative(nav.width + (contentWidth - playerWidth) / 2, height - margin - player.height)
-                        band.placeRelative(0, height)
-                        overlay.placeRelative(0, 0)
+                        player.placeRelative(nav.width + (contentWidth - playerWidth) / 2, height - margin - player.height, CHROME)
+                        band.placeRelative(0, height, BAND)
+                        overlay.placeRelative(0, 0, OVERLAY)
                     }
                 } else {
                     val player = playerM.measure(Constraints(minWidth = width, maxWidth = width, maxHeight = height))
@@ -163,12 +184,12 @@ fun ShellLayout(
                     val contentWidth = (width - nav.width).coerceAtLeast(0)
                     val content = contentM.measure(Constraints.fixed(contentWidth, middle))
                     layout(width, fullHeight) {
+                        top.placeRelative(0, 0, CHROME)
+                        nav.placeRelative(0, top.height, CHROME)
                         content.placeRelative(nav.width, top.height)
-                        top.placeRelative(0, 0)
-                        nav.placeRelative(0, top.height)
-                        player.placeRelative(0, height - player.height)
-                        band.placeRelative(0, height)
-                        overlay.placeRelative(0, 0)
+                        player.placeRelative(0, height - player.height, CHROME)
+                        band.placeRelative(0, height, BAND)
+                        overlay.placeRelative(0, 0, OVERLAY)
                     }
                 }
             }

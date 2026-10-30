@@ -37,9 +37,11 @@ import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setProgress
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
@@ -50,7 +52,8 @@ import desktopkit.theme.DeskTheme
  * - drag or click anywhere on the track;
  * - mouse wheel and two-finger touchpad scroll move it by [wheelStep] per notch;
  * - arrow keys move it by [keyStep] when focused (Home/End jump to the ends);
- * - exposes progress semantics so TalkBack can read and set it.
+ * - exposes progress semantics so TalkBack can read and set it; [label] is what TalkBack calls it
+ *   ("Volume"), and [valueText] how it reads the value ("−6 dB"; a percentage by default).
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -62,6 +65,8 @@ fun DeskSlider(
     wheelStep: Float = 0.02f,
     keyStep: Float = 0.01f,
     onValueChangeFinished: (() -> Unit)? = null,
+    label: String? = null,
+    valueText: ((Float) -> String)? = null,
 ) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
@@ -86,6 +91,8 @@ fun DeskSlider(
             .focusable(enabled, interaction)
             .semantics {
                 progressBarRangeInfo = ProgressBarRangeInfo(shown, 0f..1f)
+                if (label != null) contentDescription = label
+                if (valueText != null) stateDescription = valueText(shown)
                 if (enabled) setProgress { target -> latestOnChange(target.coerceIn(0f, 1f)); true }
             }
             .onKeyEvent { event ->

@@ -9,10 +9,12 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -132,10 +134,11 @@ fun BottomNavBar(
     val items = spec.shown(NavKind.BottomBar) + if (!needsMore) emptyList() else listOf(if (sheet) moreSheetItem() else moreItem())
     Column(modifier.fillMaxWidth().glass(DeskGlass.chrome(colors, GlassThickness.Regular))) {
         HorizontalRule()
+        // the bar's height, or more with large text (the labels keep their lines whole)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(DeskTheme.dimens.bottomBarHeight)
+                .height(IntrinsicSize.Min)
                 .semantics { paneTitle = label }
                 .selectableGroup(),
             verticalAlignment = Alignment.CenterVertically,
@@ -159,6 +162,7 @@ private fun RowScope.BottomBarItem(item: NavItem, selected: Boolean, onClick: ()
     Column(
         modifier = Modifier
             .weight(1f)
+            .heightIn(min = dimens.bottomBarHeight)
             .fillMaxHeight()
             .semantics { this.selected = selected }
             .deskClickable(interaction, onClick, role = Role.Tab),
@@ -593,6 +597,8 @@ fun SearchField(onClick: () -> Unit, shortcut: String?, modifier: Modifier = Mod
             .heightIn(min = dimens.controlHeight.coerceAtLeast(dimens.minTarget))
             .focusRing(state, shape)
             .background(if (state.hovered) colors.hover else colors.surface, shape)
+            // the field's edge, as on the kit's text fields (the light theme's bars are as white as it)
+            .then(if (state.focused) Modifier else Modifier.border(1.dp, colors.borderStrong, shape))
             .deskClickable(interaction, onClick, onClickLabel = stringResource(R.string.dk_search))
             .padding(start = 10.dp, end = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -609,9 +615,12 @@ fun SearchField(onClick: () -> Unit, shortcut: String?, modifier: Modifier = Mod
 @Composable
 fun KeyCap(text: String, modifier: Modifier = Modifier) {
     val colors = DeskTheme.colors
+    val shape = RoundedCornerShape(4.dp)
     Box(
         modifier
-            .background(colors.surfaceRaised, RoundedCornerShape(4.dp))
+            .background(colors.surfaceRaised, shape)
+            // the light theme's raised surface is as white as the bars: the outline shows the key
+            .border(1.dp, colors.border, shape)
             .padding(horizontal = 6.dp, vertical = 1.dp),
     ) {
         Text(text, style = DeskTheme.type.mono, color = colors.textSecondary, maxLines = 1)
