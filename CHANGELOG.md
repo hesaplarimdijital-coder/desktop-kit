@@ -21,7 +21,7 @@ değişiklikleri aşağıda ve rehberde.
 - Testler Robolectric 4.17 ile API 36'da (Java 21) çalışır; yeni testler öngörülü geri hareketini (ayrıntı parmakla
   küçülür, vazgeçince geri büyür, bitince kapanır) ve etkinlik yeniden kurulunca (döndürme) kabuğun açık ekranını ve
   ekranın durumunu denetler. CI, çekme isteklerinde derleme çıktısını ve test sonuçlarını `ci/logs-pr-<numara>`
-  dalına koyar.
+  dalına koyar; kütüphaneyi bir de JitPack gibi (`jitpack.yml`, Java 17) derler.
 
 ### Telefon: üç düğmeli gezinme
 
