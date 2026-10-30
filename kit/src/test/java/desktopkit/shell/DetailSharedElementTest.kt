@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
@@ -62,14 +63,17 @@ class DetailSharedElementTest {
         compose.waitForIdle()
         compose.mainClock.autoAdvance = false
         compose.runOnIdle { detail = "album" }
-        // one frame composes the detail, the next starts the flight
-        compose.mainClock.advanceTimeByFrame()
-        compose.mainClock.advanceTimeByFrame()
-        compose.mainClock.advanceTimeBy(100)
-        // half way: the cover is somewhere between the row's 40 dp and the detail's 232 dp
-        val flying = compose.onNodeWithTag("large", useUnmergedTree = true).getBoundsInRoot()
-        val width = flying.right - flying.left
-        assertTrue("cover width mid-flight: $width", width > 40.dp && width < 232.dp)
+        // frame by frame: the cover grows from the row's 40 dp to the detail's 232 dp
+        val widths = mutableListOf<Float>()
+        repeat(30) {
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+            if (compose.onAllNodesWithTag("large", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()) {
+                val bounds = compose.onNodeWithTag("large", useUnmergedTree = true).getBoundsInRoot()
+                widths += (bounds.right - bounds.left).value
+            }
+        }
+        assertTrue("the cover passes through sizes in between: $widths", widths.any { it > 44f && it < 228f })
         compose.mainClock.autoAdvance = true
         compose.waitForIdle()
         val landed = compose.onNodeWithTag("large", useUnmergedTree = true).getBoundsInRoot()
