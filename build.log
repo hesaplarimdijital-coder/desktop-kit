@@ -1,0 +1,172 @@
+Downloading https://services.gradle.org/distributions/gradle-9.8.2-bin.zip
+..............10%..............20%...............30%..............40%...............50%..............60%...............70%..............80%...............90%..............100%
+Starting a Gradle Daemon (subsequent builds will be faster)
+> Task :kit:preBuild UP-TO-DATE
+> Task :kit:preDebugBuild UP-TO-DATE
+> Task :kit:generateDebugResources
+> Task :kit:packageDebugResources
+> Task :kit:processDebugNavigationResources
+> Task :kit:preDebugUnitTestBuild UP-TO-DATE
+> Task :kit:javaPreCompileDebug
+> Task :kit:writeDebugAarMetadata
+> Task :kit:mapDebugSourceSetPaths
+> Task :kit:parseDebugLocalResources
+> Task :kit:checkDebugUnitTestAarMetadata
+> Task :kit:generateDebugRFile
+> Task :kit:compileDebugLibraryResources
+> Task :kit:mapDebugUnitTestSourceSetPaths
+> Task :kit:generateDebugUnitTestResources
+> Task :kit:extractDeepLinksDebug
+> Task :kit:javaPreCompileDebugUnitTest FROM-CACHE
+> Task :kit:generateDebugUnitTestAssets UP-TO-DATE
+> Task :kit:generateDebugAssets UP-TO-DATE
+> Task :kit:mergeDebugAssets
+> Task :kit:processDebugManifest
+> Task :kit:mergeDebugUnitTestAssets
+> Task :kit:mergeDebugUnitTestResources
+> Task :kit:mergeDebugUnitTestManifest
+> Task :kit:processDebugUnitTestManifest
+> Task :kit:preReleaseBuild UP-TO-DATE
+> Task :kit:mergeReleaseJniLibFolders
+> Task :kit:checkReleaseAarMetadata
+> Task :kit:mergeReleaseNativeLibs NO-SOURCE
+> Task :kit:stripReleaseDebugSymbols NO-SOURCE
+> Task :kit:copyReleaseJniLibsProjectAndLocalJars
+> Task :kit:extractDeepLinksForAarRelease
+> Task :kit:generateReleaseResources FROM-CACHE
+> Task :kit:packageReleaseResources
+> Task :kit:processReleaseNavigationResources FROM-CACHE
+> Task :kit:parseReleaseLocalResources FROM-CACHE
+> Task :kit:generateReleaseRFile FROM-CACHE
+> Task :kit:processDebugUnitTestResources
+> Task :kit:extractReleaseAnnotations
+> Task :kit:packageDebugUnitTestForUnitTest
+> Task :kit:generateReleaseAssets UP-TO-DATE
+> Task :kit:generateDebugUnitTestConfig
+> Task :kit:mergeReleaseAssets
+> Task :kit:javaPreCompileRelease FROM-CACHE
+> Task :kit:prepareLintJarForPublish
+> Task :kit:prepareReleaseArtProfile
+> Task :kit:processReleaseManifest FROM-CACHE
+> Task :kit:writeReleaseAarMetadata
+> Task :kit:sourceReleaseJar
+> Task :kit:generatePomFileForReleasePublication
+> Task :sample:preBuild UP-TO-DATE
+> Task :sample:preDebugBuild UP-TO-DATE
+> Task :sample:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :sample:generateDebugResources
+> Task :sample:packageDebugResources
+> Task :sample:processDebugNavigationResources
+> Task :sample:javaPreCompileDebug FROM-CACHE
+> Task :sample:generateDebugAssets UP-TO-DATE
+> Task :sample:parseDebugLocalResources
+> Task :sample:mergeDebugAssets
+> Task :sample:compressDebugAssets
+> Task :sample:generateDebugRFile
+> Task :sample:generateDebugGlobalSynthetics
+> Task :kit:compileDebugKotlin
+> Task :sample:desugarDebugFileDependencies
+> Task :sample:checkDebugDuplicateClasses
+> Task :sample:checkDebugAarMetadata
+> Task :kit:compileReleaseKotlin
+> Task :sample:mergeExtDexDebug
+
+> Task :kit:compileDebugKotlin
+w: file:///home/runner/work/desktop-kit/desktop-kit/kit/src/main/java/desktopkit/DesktopKitRoot.kt:232:20 'var isStatusBarContrastEnforced: Boolean' is deprecated. Deprecated in Java.
+
+> Task :kit:compileReleaseKotlin
+w: file:///home/runner/work/desktop-kit/desktop-kit/kit/src/main/java/desktopkit/DesktopKitRoot.kt:232:20 'var isStatusBarContrastEnforced: Boolean' is deprecated. Deprecated in Java.
+
+> Task :kit:compileDebugJavaWithJavac NO-SOURCE
+> Task :kit:processDebugJavaRes
+> Task :kit:compileReleaseJavaWithJavac NO-SOURCE
+> Task :kit:bundleLibCompileToJarDebug
+> Task :kit:mergeReleaseGeneratedProguardFiles
+> Task :kit:bundleLibRuntimeToJarDebug
+> Task :kit:mergeReleaseConsumerProguardFiles
+> Task :kit:processReleaseJavaRes
+> Task :kit:mergeReleaseJavaResource
+> Task :kit:syncReleaseLibJars
+> Task :kit:bundleReleaseAar
+> Task :kit:generateMetadataFileForReleasePublication
+> Task :kit:publishReleasePublicationToMavenLocal
+> Task :kit:publishToMavenLocal
+> Task :kit:bundleLibRuntimeToDirDebug
+> Task :sample:mapDebugSourceSetPaths
+> Task :sample:compileDebugNavigationResources
+> Task :sample:mergeDebugResources
+> Task :sample:createDebugCompatibleScreenManifests
+> Task :sample:extractDeepLinksDebug
+> Task :sample:processDebugMainManifest
+> Task :sample:processDebugManifest
+> Task :sample:processDebugManifestForPackage
+> Task :sample:processDebugResources
+> Task :kit:mergeDebugJniLibFolders
+> Task :kit:mergeDebugNativeLibs NO-SOURCE
+> Task :kit:copyDebugJniLibsProjectOnly
+> Task :sample:mergeDebugJniLibFolders
+> Task :sample:mergeDebugNativeLibs
+
+> Task :sample:stripDebugDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so. Run with --info option to learn more.
+
+> Task :sample:compileDebugKotlin
+> Task :sample:validateSigningDebug
+> Task :sample:compileDebugJavaWithJavac NO-SOURCE
+> Task :sample:processDebugJavaRes
+
+> Task :kit:compileDebugUnitTestKotlin
+w: file:///home/runner/work/desktop-kit/desktop-kit/kit/src/test/java/desktopkit/accessibility/AccessibilityTest.kt:99:19 'fun <reified A : ComponentActivity> createAndroidComposeRule(effectContext: CoroutineContext = ...): AndroidComposeTestRule<ActivityScenarioRule<A>, A>' is deprecated. Use `androidx.compose.ui.test.junit4.v2.createAndroidComposeRule` instead. The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher, which aligns with standard coroutine behavior by queuing tasks rather than executing them immediately. Tests relying on immediate execution may require explicit synchronization. Please refer to the migration guide for more details.
+w: file:///home/runner/work/desktop-kit/desktop-kit/kit/src/test/java/desktopkit/components/CommandPaletteTest.kt:36:19 'fun <reified A : ComponentActivity> createAndroidComposeRule(effectContext: CoroutineContext = ...): AndroidComposeTestRule<ActivityScenarioRule<A>, A>' is deprecated. Use `androidx.compose.ui.test.junit4.v2.createAndroidComposeRule` instead. The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher, which aligns with standard coroutine behavior by queuing tasks rather than executing them immediately. Tests relying on immediate execution may require explicit synchronization. Please refer to the migration guide for more details.
+w: file:///home/runner/work/desktop-kit/desktop-kit/kit/src/test/java/desktopkit/components/DenseTableSelectionTest.kt:57:19 'fun <reified A : ComponentActivity> createAndroidComposeRule(effectContext: CoroutineContext = ...): AndroidComposeTestRule<ActivityScenarioRule<A>, A>' is deprecated. Use `androidx.compose.ui.test.junit4.v2.createAndroidComposeRule` instead. The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher, which aligns with standard coroutine behavior by queuing tasks rather than executing them immediately. Tests relying on immediate execution may require explicit synchronization. Please refer to the migration guide for more details.
+w: file:///home/runner/work/desktop-kit/desktop-kit/kit/src/test/java/desktopkit/components/FormsTest.kt:64:19 'fun <reified A : ComponentActivity> createAndroidComposeRule(effectContext: CoroutineContext = ...): AndroidComposeTestRule<ActivityScenarioRule<A>, A>' is deprecated. Use `androidx.compose.ui.test.junit4.v2.createAndroidComposeRule` instead. The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher, which aligns with standard coroutine behavior by queuing tasks rather than executing them immediately. Tests relying on immediate execution may require explicit synchronization. Please refer to the migration guide for more details.
+w: file:///home/runner/work/desktop-kit/desktop-kit/kit/src/test/java/desktopkit/components/FormsTest.kt:272:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///home/runner/work/desktop-kit/desktop-kit/kit/src/test/java/desktopkit/components/FormsTest.kt:276:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///home/runner/work/desktop-kit/desktop-kit/kit/src/test/java/desktopkit/components/FormsTest.kt:279:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///home/runner/work/desktop-kit/desktop-kit/kit/src/test/java/desktopkit/components/GridTest.kt:49:19 'fun <reified A : ComponentActivity> createAndroidComposeRule(effectContext: CoroutineContext = ...): AndroidComposeTestRule<ActivityScenarioRule<A>, A>' is deprecated. Use `androidx.compose.ui.test.junit4.v2.createAndroidComposeRule` instead. The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher, which aligns with standard coroutine behavior by queuing tasks rather than executing them immediately. Tests relying on immediate execution may require explicit synchronization. Please refer to the migration guide for more details.
+w: file:///home/runner/work/desktop-kit/desktop-kit/kit/src/test/java/desktopkit/components/KeyboardFocusTest.kt:53:19 'fun <reified A : ComponentActivity> createAndroidComposeRule(effectContext: CoroutineContext = ...): AndroidComposeTestRule<ActivityScenarioRule<A>, A>' is deprecated. Use `androidx.compose.ui.test.junit4.v2.createAndroidComposeRule` instead. The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher, which aligns with standard coroutine behavior by queuing tasks rather than executing them immediately. Tests relying on immediate execution may require explicit synchronization. Please refer to the migration guide for more details.
+w: file:///home/runner/work/desktop-kit/desktop-kit/kit/src/test/java/desktopkit/components/PlayerAndSheetTest.kt:49:19 'fun <reified A : ComponentActivity> createAndroidComposeRule(effectContext: CoroutineContext = ...): AndroidComposeTestRule<ActivityScenarioRule<A>, A>' is deprecated. Use `androidx.compose.ui.test.junit4.v2.createAndroidComposeRule` instead. The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher, which aligns with standard coroutine behavior by queuing tasks rather than executing them immediately. Tests relying on immediate execution may require explicit synchronization. Please refer to the migration guide for more details.
+w: file:///home/runner/work/desktop-kit/desktop-kit/kit/src/test/java/desktopkit/components/StateBackgroundTest.kt:48:19 'fun <reified A : ComponentActivity> createAndroidComposeRule(effectContext: CoroutineContext = ...): AndroidComposeTestRule<ActivityScenarioRule<A>, A>' is deprecated. Use `androidx.compose.ui.test.junit4.v2.createAndroidComposeRule` instead. The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher, which aligns with standard coroutine behavior by queuing tasks rather than executing them immediately. Tests relying on immediate execution may require explicit synchronization. Please refer to the migration guide for more details.
+w: file:///home/runner/work/desktop-kit/desktop-kit/kit/src/test/java/desktopkit/input/ContextMenuDismissTest.kt:53:19 'fun <reified A : ComponentActivity> createAndroidComposeRule(effectContext: CoroutineContext = ...): AndroidComposeTestRule<ActivityScenarioRule<A>, A>' is deprecated. Use `androidx.compose.ui.test.junit4.v2.createAndroidComposeRule` instead. The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher, which aligns with standard coroutine behavior by queuing tasks rather than executing them immediately. Tests relying on immediate execution may require explicit synchronization. Please refer to the migration guide for more details.
+w: file:///home/runner/work/desktop-kit/desktop-kit/kit/src/test/java/desktopkit/screenshots/ComponentStatesTest.kt:98:19 'fun <reified A : ComponentActivity> createAndroidComposeRule(effectContext: CoroutineContext = ...): AndroidComposeTestRule<ActivityScenarioRule<A>, A>' is deprecated. Use `androidx.compose.ui.test.junit4.v2.createAndroidComposeRule` instead. The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher, which aligns with standard coroutine behavior by queuing tasks rather than executing them immediately. Tests relying on immediate execution may require explicit synchronization. Please refer to the migration guide for more details.
+w: file:///home/runner/work/desktop-kit/desktop-kit/kit/src/test/java/desktopkit/screenshots/FormsScreenshotTest.kt:76:19 'fun <reified A : ComponentActivity> createAndroidComposeRule(effectContext: CoroutineContext = ...): AndroidComposeTestRule<ActivityScenarioRule<A>, A>' is deprecated. Use `androidx.compose.ui.test.junit4.v2.createAndroidComposeRule` instead. The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher, which aligns with standard coroutine behavior by queuing tasks rather than executing them immediately. Tests relying on immediate execution may require explicit synchronization. Please refer to the migration guide for more details.
+w: file:///home/runner/work/desktop-kit/desktop-kit/kit/src/test/java/desktopkit/screenshots/KitScreenshotTest.kt:83:19 'fun <reified A : ComponentActivity> createAndroidComposeRule(effectContext: CoroutineContext = ...): AndroidComposeTestRule<ActivityScenarioRule<A>, A>' is deprecated. Use `androidx.compose.ui.test.junit4.v2.createAndroidComposeRule` instead. The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher, which aligns with standard coroutine behavior by queuing tasks rather than executing them immediately. Tests relying on immediate execution may require explicit synchronization. Please refer to the migration guide for more details.
+w: file:///home/runner/work/desktop-kit/desktop-kit/kit/src/test/java/desktopkit/screenshots/PaletteScreenshotTest.kt:39:19 'fun <reified A : ComponentActivity> createAndroidComposeRule(effectContext: CoroutineContext = ...): AndroidComposeTestRule<ActivityScenarioRule<A>, A>' is deprecated. Use `androidx.compose.ui.test.junit4.v2.createAndroidComposeRule` instead. The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher, which aligns with standard coroutine behavior by queuing tasks rather than executing them immediately. Tests relying on immediate execution may require explicit synchronization. Please refer to the migration guide for more details.
+w: file:///home/runner/work/desktop-kit/desktop-kit/kit/src/test/java/desktopkit/screenshots/SettingsScreenshotTest.kt:45:19 'fun <reified A : ComponentActivity> createAndroidComposeRule(effectContext: CoroutineContext = ...): AndroidComposeTestRule<ActivityScenarioRule<A>, A>' is deprecated. Use `androidx.compose.ui.test.junit4.v2.createAndroidComposeRule` instead. The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher, which aligns with standard coroutine behavior by queuing tasks rather than executing them immediately. Tests relying on immediate execution may require explicit synchronization. Please refer to the migration guide for more details.
+w: file:///home/runner/work/desktop-kit/desktop-kit/kit/src/test/java/desktopkit/screenshots/ShellScreenshotTest.kt:44:19 'fun <reified A : ComponentActivity> createAndroidComposeRule(effectContext: CoroutineContext = ...): AndroidComposeTestRule<ActivityScenarioRule<A>, A>' is deprecated. Use `androidx.compose.ui.test.junit4.v2.createAndroidComposeRule` instead. The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher, which aligns with standard coroutine behavior by queuing tasks rather than executing them immediately. Tests relying on immediate execution may require explicit synchronization. Please refer to the migration guide for more details.
+w: file:///home/runner/work/desktop-kit/desktop-kit/kit/src/test/java/desktopkit/shell/BackAndRestoreTest.kt:45:19 'fun <reified A : ComponentActivity> createAndroidComposeRule(effectContext: CoroutineContext = ...): AndroidComposeTestRule<ActivityScenarioRule<A>, A>' is deprecated. Use `androidx.compose.ui.test.junit4.v2.createAndroidComposeRule` instead. The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher, which aligns with standard coroutine behavior by queuing tasks rather than executing them immediately. Tests relying on immediate execution may require explicit synchronization. Please refer to the migration guide for more details.
+w: file:///home/runner/work/desktop-kit/desktop-kit/kit/src/test/java/desktopkit/shell/CaptionBarTest.kt:56:19 'fun <reified A : ComponentActivity> createAndroidComposeRule(effectContext: CoroutineContext = ...): AndroidComposeTestRule<ActivityScenarioRule<A>, A>' is deprecated. Use `androidx.compose.ui.test.junit4.v2.createAndroidComposeRule` instead. The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher, which aligns with standard coroutine behavior by queuing tasks rather than executing them immediately. Tests relying on immediate execution may require explicit synchronization. Please refer to the migration guide for more details.
+w: file:///home/runner/work/desktop-kit/desktop-kit/kit/src/test/java/desktopkit/shell/CompactTopBarTest.kt:44:19 'fun <reified A : ComponentActivity> createAndroidComposeRule(effectContext: CoroutineContext = ...): AndroidComposeTestRule<ActivityScenarioRule<A>, A>' is deprecated. Use `androidx.compose.ui.test.junit4.v2.createAndroidComposeRule` instead. The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher, which aligns with standard coroutine behavior by queuing tasks rather than executing them immediately. Tests relying on immediate execution may require explicit synchronization. Please refer to the migration guide for more details.
+w: file:///home/runner/work/desktop-kit/desktop-kit/kit/src/test/java/desktopkit/shell/DetailSharedElementTest.kt:37:19 'fun <reified A : ComponentActivity> createAndroidComposeRule(effectContext: CoroutineContext = ...): AndroidComposeTestRule<ActivityScenarioRule<A>, A>' is deprecated. Use `androidx.compose.ui.test.junit4.v2.createAndroidComposeRule` instead. The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher, which aligns with standard coroutine behavior by queuing tasks rather than executing them immediately. Tests relying on immediate execution may require explicit synchronization. Please refer to the migration guide for more details.
+w: file:///home/runner/work/desktop-kit/desktop-kit/kit/src/test/java/desktopkit/shell/ShellImeTest.kt:46:19 'fun <reified A : ComponentActivity> createAndroidComposeRule(effectContext: CoroutineContext = ...): AndroidComposeTestRule<ActivityScenarioRule<A>, A>' is deprecated. Use `androidx.compose.ui.test.junit4.v2.createAndroidComposeRule` instead. The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher, which aligns with standard coroutine behavior by queuing tasks rather than executing them immediately. Tests relying on immediate execution may require explicit synchronization. Please refer to the migration guide for more details.
+w: file:///home/runner/work/desktop-kit/desktop-kit/kit/src/test/java/desktopkit/shell/ShellPaddingTest.kt:48:19 'fun <reified A : ComponentActivity> createAndroidComposeRule(effectContext: CoroutineContext = ...): AndroidComposeTestRule<ActivityScenarioRule<A>, A>' is deprecated. Use `androidx.compose.ui.test.junit4.v2.createAndroidComposeRule` instead. The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher, which aligns with standard coroutine behavior by queuing tasks rather than executing them immediately. Tests relying on immediate execution may require explicit synchronization. Please refer to the migration guide for more details.
+w: file:///home/runner/work/desktop-kit/desktop-kit/kit/src/test/java/desktopkit/shell/ShellStateTest.kt:33:19 'fun createComposeRule(effectContext: CoroutineContext = ...): ComposeContentTestRule' is deprecated. Use `androidx.compose.ui.test.junit4.v2.createComposeRule` instead. The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher, which aligns with standard coroutine behavior by queuing tasks rather than executing them immediately. Tests relying on immediate execution may require explicit synchronization. Please refer to the migration guide for more details.
+w: file:///home/runner/work/desktop-kit/desktop-kit/kit/src/test/java/desktopkit/shell/SystemBarsTest.kt:53:19 'fun <reified A : ComponentActivity> createAndroidComposeRule(effectContext: CoroutineContext = ...): AndroidComposeTestRule<ActivityScenarioRule<A>, A>' is deprecated. Use `androidx.compose.ui.test.junit4.v2.createAndroidComposeRule` instead. The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher, which aligns with standard coroutine behavior by queuing tasks rather than executing them immediately. Tests relying on immediate execution may require explicit synchronization. Please refer to the migration guide for more details.
+w: file:///home/runner/work/desktop-kit/desktop-kit/kit/src/test/java/desktopkit/shell/WindowsTest.kt:24:19 'fun <reified A : ComponentActivity> createAndroidComposeRule(effectContext: CoroutineContext = ...): AndroidComposeTestRule<ActivityScenarioRule<A>, A>' is deprecated. Use `androidx.compose.ui.test.junit4.v2.createAndroidComposeRule` instead. The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher, which aligns with standard coroutine behavior by queuing tasks rather than executing them immediately. Tests relying on immediate execution may require explicit synchronization. Please refer to the migration guide for more details.
+w: file:///home/runner/work/desktop-kit/desktop-kit/kit/src/test/java/desktopkit/theme/HapticsAndAccentTest.kt:31:19 'fun <reified A : ComponentActivity> createAndroidComposeRule(effectContext: CoroutineContext = ...): AndroidComposeTestRule<ActivityScenarioRule<A>, A>' is deprecated. Use `androidx.compose.ui.test.junit4.v2.createAndroidComposeRule` instead. The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher, which aligns with standard coroutine behavior by queuing tasks rather than executing them immediately. Tests relying on immediate execution may require explicit synchronization. Please refer to the migration guide for more details.
+
+> Task :sample:mergeLibDexDebug
+> Task :sample:mergeDebugJavaResource
+> Task :sample:dexBuilderDebug
+> Task :kit:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :kit:processDebugUnitTestJavaRes
+> Task :kit:testDebugUnitTest
+> Task :sample:writeDebugAppMetadata
+> Task :sample:writeDebugSigningConfigVersions
+> Task :sample:mergeProjectDexDebug
+> Task :sample:packageDebug
+> Task :sample:createDebugApkListingFileRedirect
+> Task :sample:assembleDebug
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run-1793328626810.json
+
+[Incubating] Problems report is available at: file:///home/runner/work/desktop-kit/desktop-kit/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 4m 14s
+96 actionable tasks: 88 executed, 8 from cache
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.8.2/userguide/configuration_cache_enabling.html

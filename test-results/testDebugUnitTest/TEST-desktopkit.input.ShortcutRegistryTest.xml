@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.input.ShortcutRegistryTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-30T02:54:15.917Z" hostname="runnervmnwato" time="0.094">
+  <properties/>
+  <testcase name="commonShortcutsDoNotConflict" classname="desktopkit.input.ShortcutRegistryTest" time="0.012"/>
+  <testcase name="eventsMatchShortcuts" classname="desktopkit.input.ShortcutRegistryTest" time="0.012"/>
+  <testcase name="menusFollowTheTable" classname="desktopkit.input.ShortcutRegistryTest" time="0.013"/>
+  <testcase name="systemShortcutListCoversEveryShortcut" classname="desktopkit.input.ShortcutRegistryTest" time="0.012"/>
+  <testcase name="labels" classname="desktopkit.input.ShortcutRegistryTest" time="0.011"/>
+  <testcase name="conflictsRespectScopes" classname="desktopkit.input.ShortcutRegistryTest" time="0.03"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

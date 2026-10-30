@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.components.PlayerAndSheetTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-30T02:54:13.538Z" hostname="runnervmnwato" time="1.09">
+  <properties/>
+  <testcase name="moreTabOpensTheSheetWithScreensAndActions" classname="desktopkit.components.PlayerAndSheetTest" time="0.28"/>
+  <testcase name="tapExpandsAndBackCollapses" classname="desktopkit.components.PlayerAndSheetTest" time="0.198"/>
+  <testcase name="sidewaysSwipeSkipsPastTheThreshold" classname="desktopkit.components.PlayerAndSheetTest" time="0.22"/>
+  <testcase name="dismissStyleFollowsTheHardwareKeyboard" classname="desktopkit.components.PlayerAndSheetTest" time="0.041"/>
+  <testcase name="dragSettlesOnTheNearerSide" classname="desktopkit.components.PlayerAndSheetTest" time="0.289"/>
+  <testcase name="dialogShowsEscWithAKeyboardAndACrossWithout" classname="desktopkit.components.PlayerAndSheetTest" time="0.058"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

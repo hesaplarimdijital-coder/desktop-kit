@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.input.PointerDevicesTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-30T02:54:15.912Z" hostname="runnervmnwato" time="0.001">
+  <properties/>
+  <testcase name="theTouchpadSwitchedOffAndOnAgain" classname="desktopkit.input.PointerDevicesTest" time="0.001"/>
+  <testcase name="aMouseComesAndGoes" classname="desktopkit.input.PointerDevicesTest" time="0.0"/>
+  <testcase name="aKeyboardCoversOtherChangesLeaveTheDensityAlone" classname="desktopkit.input.PointerDevicesTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

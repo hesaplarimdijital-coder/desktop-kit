@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.shell.ShellStateTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-30T02:54:27.499Z" hostname="runnervmnwato" time="0.196">
+  <properties/>
+  <testcase name="stateSurvivesWidthChanges" classname="desktopkit.shell.ShellStateTest" time="0.102"/>
+  <testcase name="moreListsTheOverflow" classname="desktopkit.shell.ShellStateTest" time="0.091"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
