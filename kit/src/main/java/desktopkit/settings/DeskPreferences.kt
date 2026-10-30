@@ -3,6 +3,7 @@ package desktopkit.settings
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -41,6 +42,19 @@ class DeskPreferences(
         private set
     var inspectorCollapsed by mutableStateOf(prefs.getBoolean(KEY_INSPECTOR_COLLAPSED, false))
         private set
+
+    /**
+     * Reads the theme, accent and density again: another window of the app changed them. The
+     * sidebar and the inspector stay as they are in each window.
+     */
+    internal fun reloadAppearance() {
+        themeMode = prefs.enumValue(KEY_THEME, themeMode)
+        accent = accents.firstOrNull { it.name == prefs.getString(KEY_ACCENT, null) } ?: accent
+        density = prefs.enumValue(KEY_DENSITY, density)
+    }
+
+    /** The shared preferences behind these, for listening to other windows. */
+    internal val store: SharedPreferences get() = prefs
 
     fun updateThemeMode(value: ThemeMode) {
         themeMode = value
@@ -114,9 +128,18 @@ fun rememberDeskPreferences(
     val configuration = LocalConfiguration.current
     val offered = if (dynamicAccent) remember(accents, configuration) { accents + Accent.dynamic(context) } else accents
     val app = context.applicationContext
-    return remember(offered, defaultTheme) {
+    val prefs = remember(offered, defaultTheme) {
         DeskPreferences(app.getSharedPreferences(DeskPreferences.FILE, Context.MODE_PRIVATE), offered, defaultTheme)
     }
+    // another window of the app (DeX, split screen) changed the theme, the accent or the density
+    DisposableEffect(prefs) {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == DeskPreferences.KEY_THEME || key == DeskPreferences.KEY_ACCENT || key == DeskPreferences.KEY_DENSITY) prefs.reloadAppearance()
+        }
+        prefs.store.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { prefs.store.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+    return prefs
 }
 
 private inline fun <reified E : Enum<E>> SharedPreferences.enumValue(key: String, default: E): E {

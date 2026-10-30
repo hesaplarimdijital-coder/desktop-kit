@@ -91,6 +91,7 @@ import desktopkit.settings.DeskPreferences
 import desktopkit.settings.rememberDeskPreferences
 import desktopkit.shell.CompactTopBar
 import desktopkit.shell.DetailTransition
+import desktopkit.shell.DeskWindows
 import desktopkit.shell.DesktopShell
 import desktopkit.shell.MoreStyle
 import desktopkit.shell.NavKind
@@ -117,7 +118,7 @@ val shortcuts = ShortcutRegistry(
         Shortcut("open", FileGroup, R.string.action_open, KeyChord(Key.O, ctrl = true)),
         Shortcut("new_folder", FileGroup, R.string.action_new_folder, KeyChord(Key.N, ctrl = true, shift = true)),
         Shortcut("refresh", FileGroup, R.string.action_refresh, KeyChord(Key.F5)),
-    ) + CommonShortcuts.all,
+    ) + CommonShortcuts.all + CommonShortcuts.NewWindow,
 )
 
 /** A brand colour offered next to the four presets. */
@@ -140,10 +141,12 @@ class MainActivity : ComponentActivity() {
             // Ctrl+K: the command palette over the shortcut table and the app's screens
             val palette = rememberCommandPaletteState()
             val toasts = rememberToastState()
-            val appSpec = spec()
+            // a window opened with Ctrl+N or from the palette starts at its screen
+            val appSpec = spec(startRoute = DeskWindows.startRoute(intent))
             perform = { id ->
                 when (id) {
                     CommonShortcuts.SEARCH -> palette.open()
+                    CommonShortcuts.NEW_WINDOW -> DeskWindows.openNewWindow(this@MainActivity)
                     CommonShortcuts.SETTINGS -> navigator.navigate("settings")
                     CommonShortcuts.SHORTCUT_LIST -> navigator.navigate("settings")
                     CommonShortcuts.TOGGLE_SIDEBAR -> prefs.updateSidebarCollapsed(!prefs.sidebarCollapsed)
@@ -165,7 +168,7 @@ class MainActivity : ComponentActivity() {
             // the shell already sets text one sp larger on tablet and DeX windows (largeWindowTextStep = 1f)
             DesktopKitRoot(prefs, accent = accent) { widthClass ->
                 DesktopShell(
-                    spec = spec(),
+                    spec = appSpec,
                     widthClass = widthClass,
                     navController = navController,
                     sidebarCollapsed = prefs.sidebarCollapsed,
@@ -179,7 +182,13 @@ class MainActivity : ComponentActivity() {
                             state = palette,
                             items = {
                                 appSpec.items.map { item ->
-                                    PaletteItem(item.route, item.label, "Ekranlar", { navigator.navigate(item.route) }, icon = item.icon)
+                                    PaletteItem(
+                                        item.route, item.label, "Ekranlar", { navigator.navigate(item.route) }, icon = item.icon,
+                                        // Ctrl+Enter: the screen in a window of its own (tablet and DeX)
+                                        onOpenInNewWindow = if (widthClass == WidthClass.Compact) null else {
+                                            { DeskWindows.openNewWindow(this@MainActivity, route = item.route) }
+                                        },
+                                    )
                                 } + shortcuts.paletteItems(context.resources) { id -> perform(id) }
                             },
                         )
@@ -219,8 +228,8 @@ class MainActivity : ComponentActivity() {
                         }
                         else -> MessageScreen(
                             title = "Coming soon",
-                            icon = spec().item(route)?.icon ?: DeskIcons.Info,
-                            pageTitle = spec().item(route)?.label,
+                            icon = appSpec.item(route)?.icon ?: DeskIcons.Info,
+                            pageTitle = appSpec.item(route)?.label,
                             description = "Each app fills its screens in here.",
                         )
                     }
@@ -255,7 +264,7 @@ class MainActivity : ComponentActivity() {
 // ------------------------------------------------------------------ 3. navigation
 
 @Composable
-private fun spec() = remember {
+private fun spec(startRoute: String? = null) = remember {
     ShellSpec(
         appTitle = "Desktop Kit",
         sections = listOf(
@@ -278,6 +287,7 @@ private fun spec() = remember {
         footer = NavItem("settings", "Settings", DeskIcons.Settings),
         // phone: three tabs and "⋯" (the glass sheet)
         bottomBar = listOf("home", "files", "music"),
+        startRoute = startRoute,
         moreStyle = MoreStyle.Sheet,
     )
 }

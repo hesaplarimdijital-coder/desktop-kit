@@ -406,7 +406,8 @@ fun TabStrip(
  * One tab: an optional [icon], the [label], a [badge] count and a [busy] dot; the selected tab gets
  * an accent line along its bottom edge that grows out from the middle. With [onClose] a close
  * button follows the label (on DeX only while the tab is selected or under the pointer) and a
- * middle click closes it too.
+ * middle click closes it too. With [drag] the tab can be dragged with a mouse to a [dropZone], for
+ * instance onto another window of the app to move it there.
  */
 @Composable
 fun DeskTab(
@@ -419,6 +420,7 @@ fun DeskTab(
     busy: Boolean = false,
     closeLabel: String = stringResource(R.string.dk_tab_close),
     onClose: (() -> Unit)? = null,
+    drag: (() -> DeskDragPayload?)? = null,
 ) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
@@ -454,6 +456,7 @@ fun DeskTab(
                 }
             }
             .middleClick(onClose != null, closeByMiddleClick)
+            .dragSource(enabled = drag != null) { drag?.invoke() }
             .deskClickable(interaction, {
                 if (!selected) haptics.tick()
                 onClick()

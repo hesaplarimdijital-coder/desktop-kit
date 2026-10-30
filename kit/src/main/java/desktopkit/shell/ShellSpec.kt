@@ -24,6 +24,8 @@ data class NavSection(val title: String?, val items: List<NavItem>)
  * @param bottomBar routes shown in the compact bottom bar, at most 4 (a fifth "More" tab is added when needed).
  *   Three routes and [MoreStyle.Sheet] give the phone layout of a media app: three tabs and "⋯".
  * @param rail routes shown in the medium/expanded rail; by default the first 7 items.
+ * @param startRoute the screen the shell opens at (a window opened at a route: [DeskWindows.startRoute]);
+ *   by default, and for a route that is not in [sections] or [footer], the first item.
  * @param moreStyle what the phone's "More" tab opens: the "More" screen ([MoreStyle.Screen], as
  *   before) or a glass sheet ([MoreStyle.Sheet]) listing the other screens and the app's own actions
  *   (`DesktopShell(moreActions = …)`). The rail keeps the "More" screen.
@@ -39,7 +41,8 @@ class ShellSpec(
     val moreStyle: MoreStyle = MoreStyle.Screen,
 ) {
     val items: List<NavItem> = sections.flatMap { it.items } + listOfNotNull(footer)
-    val startRoute: String = startRoute ?: items.first().route
+    // a route the app no longer has (an old window's intent, DeskWindows) starts at the first item
+    val startRoute: String = startRoute?.takeIf { route -> items.any { it.route == route } } ?: items.first().route
     val bottomBarRoutes: List<String> = (bottomBar ?: sections.flatMap { it.items }.take(4).map { it.route }).take(4)
     val railRoutes: List<String> = rail ?: sections.flatMap { it.items }.take(7).map { it.route }
 
