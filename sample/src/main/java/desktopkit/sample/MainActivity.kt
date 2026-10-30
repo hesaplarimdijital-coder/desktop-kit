@@ -89,6 +89,9 @@ class MainActivity : ComponentActivity() {
     /** Set by the composition; runs a shortcut's action. */
     private var perform: (String) -> Boolean = { false }
 
+    /** Set by the composition; while the command palette is open it takes the keys itself. */
+    private var paletteOpen: () -> Boolean = { false }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -101,6 +104,7 @@ class MainActivity : ComponentActivity() {
             val scope = rememberCoroutineScope()
             // Ctrl+K: the command palette over the screens, the albums and the shortcut table
             val palette = rememberCommandPaletteState()
+            paletteOpen = { palette.isOpen }
             val toasts = rememberToastState()
             val library = remember { LibraryState() }
             var openAlbum by rememberSaveable { mutableStateOf<String?>(null) }
@@ -278,8 +282,9 @@ class MainActivity : ComponentActivity() {
 
     // ------------------------------------------------------------------ 2. route keys to the table
 
+    // Not while the palette is open: Ctrl+K would clear what was typed, and F5 or Ctrl+B would act behind it.
     override fun dispatchKeyEvent(event: KeyEvent): Boolean =
-        shortcuts.matchNative(event)?.let { perform(it.id) } == true || super.dispatchKeyEvent(event)
+        (!paletteOpen() && shortcuts.matchNative(event)?.let { perform(it.id) } == true) || super.dispatchKeyEvent(event)
 
     /** Meta+/ (or the system's keyboard shortcuts screen) lists the same table. */
     override fun onProvideKeyboardShortcuts(data: MutableList<KeyboardShortcutGroup>, menu: Menu?, deviceId: Int) {

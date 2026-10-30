@@ -297,7 +297,7 @@ class CommandPaletteState {
     /** The group chosen with a filter chip; null shows every group. */
     var filter by mutableStateOf<String?>(null)
 
-    /** Opens the palette, empty or with [initialQuery]. */
+    /** Opens the palette, empty or with [initialQuery] (also when it is open already). */
     fun open(initialQuery: String = "") {
         query = initialQuery
         filter = null
@@ -327,6 +327,11 @@ fun rememberCommandPaletteState(): CommandPaletteState = remember { CommandPalet
  *
  * Inside [desktopkit.shell.DesktopShell] put it in the shell's `overlays`, so it is drawn over the
  * bars and blurs them; elsewhere it opens in a pop-up window.
+ *
+ * Shortcuts the activity routes itself ([desktopkit.input.ShortcutRegistry.matchNative] in
+ * `dispatchKeyEvent`) reach it before the palette does: skip that routing while [CommandPaletteState.isOpen],
+ * or Ctrl+K clears what was typed, other shortcuts act behind the palette, and a shortcut on
+ * Ctrl+Enter or on a plain key takes the palette's own key.
  */
 @Composable
 fun CommandPalette(
