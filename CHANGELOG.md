@@ -8,29 +8,34 @@ fark edebileceği değişiklikler [MIGRATION.md](MIGRATION.md#210dan-220a) için
 
 - **Geri seçimi temizler:** 2.1.0'dan beri uzun basma seçiyor ve seçim varken parmak dokunuşu seçimi değiştiriyor;
   "Seç/Bitti" düğmesi olmayan ekranda telefonda seçimden çıkmanın tek yolu öğeleri tek tek bırakmaktı (Esc için
-  klavye gerekir). `DenseTable` ve `DeskGrid`'de seçim varken sistemin Geri hareketi önce seçimi temizler,
-  Android'in eylem kipindeki gibi; seçim yokken Geri'ye dokunmaz, öngörülü geri ve gezinme aynı kalır.
-  `clearSelectionOnBack = false` Geri'yi uygulamaya bırakır.
+  klavye gerekir). `DenseTable` ve `DeskGrid`'de süren bir seçim varken (dokunmatik yerleşimde ya da seçim modunda
+  her seçim, farede birden çok öğe; ızgarada işaret dairelerinin göründüğü durum) sistemin Geri hareketi önce
+  seçimi temizler, Android'in eylem kipindeki gibi. Farenin tıklayıp seçtiği tek öğede ve seçim yokken Geri'ye
+  dokunmaz; uygulama temizlemeyi almazsa sonraki Geri ona geçer. `clearSelectionOnBack = false` Geri'yi
+  uygulamaya bırakır; geri çağrısı sağlayıcısı olmayan yerde (bir hizmetin penceresi, ekran görüntüsü testi)
+  hiçbir şey eklenmez.
 - **İlerleme çubuğunun adı:** açıklama verilmeyen her `DeskProgressBar` TalkBack'te "Yükleniyor" okunuyordu;
   kopyalamanın ne kadarının bittiğini gösteren çubuk da (liste satırınınki dahil). Bu adı artık yalnızca miktarı
   belirsiz çubuk alır; miktarı belli çubuk yüzdesini söyler, uygulamanın verdiği ad ikisinde de kullanılır.
 - **Kısayol ipuçları tek kural:** kısayolların ne zaman yazılacağı (fare ya da donanım klavyesi, parmak tek
-  başına değil) artık genel API: `showShortcutHints()`. Bildirimler ve komut paleti de ona uyar: klavye kapağı
-  bağlı dokunmatik yerleşimde bildirimde "Ctrl+Z", palette Enter, Ctrl+Enter ve Esc görünür; elde tutulan
-  telefonda paletin öğelerindeki kısayollar gizlenir.
+  başına değil) artık genel API: `showShortcutHints()`. Bildirimler, komut paleti ve menü çubuğunun arama alanı
+  da ona uyar: klavye kapağı bağlı dokunmatik yerleşimde bildirimde "Ctrl+Z", palette Enter, Ctrl+Enter ve Esc
+  görünür; elde tutulan telefonda paletin öğelerindeki, klavyesiz tablette arama alanındaki kısayollar gizlenir.
 - **Komut paleti açıkken kısayollar:** etkinlik tuşları Compose'dan önce gördüğü için README'nin önerdiği
   yönlendirme palet açıkken de çalışıyordu: örnek uygulamada Ctrl+K yazılanı siliyor, F5 ve Ctrl+B paletin
   arkasında çalışıyordu; Ctrl+Enter'a ya da düz tuşa bağlı bir kısayol paletin kendi tuşunu alırdı. Örnek uygulama
-  palet açıkken (`palette.isOpen`) yönlendirmeyi atlar; README, `matchNative` ve `CommandPalette` belgeleri bunu
-  gösterir.
-- **Kartta öğe aralığı:** `DeskCard(verticalArrangement = Arrangement.spacedBy(…))` içeriğin öğelerini aralar,
-  başlığın altındaki boşluk aynı kalır; varsayılan görünüm değişmez. Örnek uygulamanın bölümleri bunu kullanır.
+  palet açıkken (`palette.isOpen`) yönlendirmeyi atlar; bunun için paletin durumu etkinlikte durur
+  (`CommandPaletteState()`). README, `matchNative` ve `CommandPalette` belgeleri bunu gösterir.
+- **Kartta öğe aralığı:** `DeskCard(verticalArrangement = Arrangement.spacedBy(…))` kartın sütununu her Column
+  gibi düzenler: öğeler aralanır, başlığın altına da aynı aralık eklenir, hizalamalar kartın kenarına göre kalır.
+  Varsayılan görünüm değişmez. Örnek uygulamanın bölümleri bunu kullanır.
 - **MIGRATION:** başlık ve 1. adım güncel sürümü söyler; 0.1.3'ten gelenler için telefon ile tablet ve DeX'te
   "görünümde fark edecekleriniz" bölümü; saf Kotlin/JVM modülü ve foojay-resolver-convention notu (Gradle 9 ile
   en az 1.0.0); bileşen tablosunda `DeskCard`'ın boşlukları, `KeyValueRow`'un ayrıntıları, `MenuButton`'ın oku,
   şerit simgeleri ve `CheckboxRow`; Soulseek+'ın bildirim örneğindeki eski "sırayla gösterir" notu düzeltildi.
 - **Testler:** ilerleme çubuğunun TalkBack adı, kısayol ipucu kuralı (fare, parmak, klavye kapağı), kartın öğe
-  aralığı ve başlık boşluğu, Geri'nin ızgarada ve tabloda seçimi temizlemesi ve kapatılabilmesi.
+  aralığı, başlık boşluğu ve kenara hizalama, Geri'nin ızgarada ve tabloda seçimi temizlemesi, farenin tek
+  seçiminde ve uygulamanın almadığı temizlemede Geri'yi bırakması ve kapatılabilmesi.
 
 ## 2.1.0 (2026-10-30)
 

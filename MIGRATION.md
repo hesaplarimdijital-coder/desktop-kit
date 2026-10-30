@@ -131,8 +131,8 @@ kaydırınca kapanır, TalkBack açıkken sistemin önerdiği süre kadar kalır
 
 ## 0.1.3'ten gelince görünümde fark edecekleriniz
 
-Kod değişmeden derlenir ama 0.2.0 ve 1.0.0 bazı varsayılanları değiştirdi. Ayrıntılar CHANGELOG'da; eski
-görünümde kalmak istenen yerin anahtarı yanında.
+Kod değişmeden derlenir ama 0.2.0 ve 1.0.0 bazı varsayılanları değiştirdi. Ayrıntılar CHANGELOG'da; eskisine
+dönmenin bir anahtarı olanlarda anahtar yanında yazılı.
 
 ### Telefon
 
@@ -144,9 +144,10 @@ görünümde kalmak istenen yerin anahtarı yanında.
   biner, üst çubuk içerik altına kayınca cama döner ve altında ince bir çizgi belirir. Listesini camın altına
   uzatmak isteyen ekran `rememberShellContentPadding()` ile çubuk yüksekliklerini alır; bunu çağırmayan ekran
   eskisi gibi çubukların arasında kalır. Hepsini düz yapmak: `DesktopShell(glass = false)`.
-- **Ekran geçişleri:** ekranlar arasında Android'in fade-through geçişi (yeni ekran %96'dan büyüyerek belirir);
-  yer değiştiren ve parmakla sürüklenen her şey yaylarla hareket eder, öngörülü geri hareketi geçişi parmakla
-  oynatır. Geçişsiz: `DesktopShell(transitions = ShellTransitions.None)`.
+- **Ekran geçişleri:** fade-through 0.1.3'te de vardı; yeni ekran artık %98 yerine %96'dan büyüyerek belirir.
+  Yer değiştiren ve parmakla sürüklenen her şey (çubuklar, oynatıcı, sayfalar, ayrıntı) parmağın hızını devralan
+  yaylarla hareket eder, öngörülü geri hareketi geçişi parmakla oynatır. Eskisine dönmenin anahtarı yok;
+  `DesktopShell(transitions = ShellTransitions.None)` geçişi tamamen kapatır.
 - **Çipler** tek satırda yana kayar; düğmeler ve simgeler basılıyken hafifçe küçülür.
 
 ### Tablet ve DeX
@@ -154,8 +155,10 @@ görünümde kalmak istenen yerin anahtarı yanında.
 - **Yazılar 1 sp büyük:** ray ve kenar çubuklu düzende her yazı 1 sp büyür; yerleşim, boyut ve renkler aynı.
   Eskisi: `DesktopShell(largeWindowTextStep = 0f)`. Uygulama `pointerStep = 1f` kullanıyorsa DeX'te toplam 2 sp
   olur; birini kaldır.
-- **Ekran geçişleri:** tablette fade-through (%98'den), DeX'te 150 ms'lik sade geçiş; kenar çubuğu daraltılıp
-  genişletilirken 300 ms'de akıcı değişir, menüler köşelerinden büyüyerek açılır.
+- **Ekran geçişleri:** raylı düzende (orta genişlik) 0.1.3'ün 150 ms'lik solması yerine fade-through: yeni
+  ekran %98'den büyüyerek belirir. Kenar çubuklu düzende (DeX, geniş pencere) 150 ms'lik solma aynı.
+- **Panel ve menüler:** kenar çubuğu daraltılıp genişletilirken genişliği 300 ms'de akıcı değişir; menüler
+  köşelerinden büyüyerek açılır, solarak kapanır.
 - **Cam:** tablonun yapışkan başlığı satırlar altından geçerken buzlu cama döner (`DenseTable(glassHeader = false)`
   düz bırakır); menüler, sağ tık menüleri ve yüzen oynatıcı camdır. Hepsi düz: `DesktopShell(glass = false)`.
 
@@ -188,8 +191,9 @@ Hepsi isteğe bağlı; hiçbiri açılmadan uygulama 2.0'la eskisi gibi çalış
 - **Komut paleti (Ctrl+K):** `rememberCommandPaletteState()` ve `DesktopShell(overlays = { CommandPalette(state, items = { sorgu -> … }) })`;
   `shortcuts.paletteItems(resources) { perform(it) }` kısayol tablosunu palete ekler. Türkçe harfleri
   katlayan bulanık arama, gruplar, Ctrl+Enter ile yeni pencere. Kısayolları etkinliğin `dispatchKeyEvent`'inden
-  yönlendiriyorsan palet açıkken atla: `(!palet.isOpen && shortcuts.matchNative(event)?.let { … } == true) ||
-  super.dispatchKeyEvent(event)`; yoksa Ctrl+K yazılanı siler, öbür kısayollar paletin arkasında çalışır.
+  yönlendiriyorsan paletin durumunu etkinlikte tut (`private val palet = CommandPaletteState()`, palete de bunu
+  ver) ve palet açıkken yönlendirmeyi atla: `(!palet.isOpen && shortcuts.matchNative(event)?.let { … } == true)
+  || super.dispatchKeyEvent(event)`; yoksa Ctrl+K yazılanı siler, öbür kısayollar paletin arkasında çalışır.
 - **Kapak ızgarası:** `DeskGrid(items, key, onItemClick) { CoverCell(başlık, …) { kapak } }` tablonun seçim
   kurallarıyla.
 - **Sürükle bırak:** satır ya da kapak için `DenseTable(rowDrag = …)`, `DeskGrid(itemDrag = …)`,
@@ -243,14 +247,20 @@ Kod değişmeden derlenir; sürümü `2.1.0` yapmak yeter. Testlerde ve kullanı
 
 Kod değişmeden derlenir; sürümü `2.2.0` yapmak yeter.
 
-- **Geri seçimi temizler:** `DenseTable` ve `DeskGrid`'de seçim varken sistemin Geri hareketi önce seçimi
-  temizler (Esc gibi, Android'in eylem kipindeki gibi); seçim yokken Geri'ye dokunmaz. Geri'yi uygulama kendisi
-  yönetecekse `clearSelectionOnBack = false`. Compose en son oluşturulan açık geri işleyicisini önce çağırır:
-  tablonunki genelde ekranın kendi `BackHandler`'ından sonra oluşturulur, yani tablonunki önce çalışır.
+- **Geri seçimi temizler:** `DenseTable` ve `DeskGrid`'de süren bir seçim varken sistemin Geri hareketi önce
+  seçimi temizler (Esc gibi, Android'in eylem kipindeki gibi): dokunmatik yerleşimde ya da seçim modunda her
+  seçim, farede birden çok satır. Farenin tıklayıp seçtiği tek satırda Geri eskisi gibi geri gider. Uygulama
+  temizlemeyi almazsa (aynı seçimi tutarsa) sonraki Geri uygulamanındır; Geri'yi baştan uygulama yönetecekse
+  `clearSelectionOnBack = false`.
+  - Sıra: Compose en son oluşturulan açık geri işleyicisini önce çağırır ve tablonunki tabloyla birlikte
+    oluşturulur. `DetailTransition` ayrıntısının içindeki tabloda önce ayrıntı kapanır, seçim kalır.
+  - Ekranın kendi `BackHandler`'ı tablonunkinden önce de sonra da çalışabilir; onunki önce çalışmalıysa bunu
+    kapatıp seçimi kendi işleyicisinde temizle.
 - **İlerleme çubuğunun adı:** miktarı belli bir `DeskProgressBar`'a açıklama verilmezse TalkBack artık
   "Yükleniyor" demez, yalnızca yüzdeyi okur. Ad istiyorsan `contentDescription` ver.
 - **Kısayol ipuçları tek kural:** bildirimlerdeki ve komut paletindeki tuşlar da `showShortcutHints()`'e uyar:
   klavye kapağı bağlı dokunmatik yerleşimde görünür, elde tutulan telefonda paletin öğelerindeki kısayollar gizlenir.
-- **Komut paleti açıkken yönlendirme:** etkinliğin `dispatchKeyEvent`'indeki kısayol yönlendirmesine
-  `!palet.isOpen` koşulunu ekle (3. adımdaki örnek).
+- **Komut paleti açıkken yönlendirme:** paletin durumunu etkinlikte tut (`private val palet =
+  CommandPaletteState()`) ve `dispatchKeyEvent`'teki kısayol yönlendirmesine `!palet.isOpen` koşulunu ekle
+  (3. adımdaki örnek).
 - **Yeni:** `showShortcutHints()`, `DeskCard(verticalArrangement)`, `DenseTable`/`DeskGrid(clearSelectionOnBack)`.

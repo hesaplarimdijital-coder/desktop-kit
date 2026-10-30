@@ -149,14 +149,17 @@ val shortcuts = ShortcutRegistry(
 - Tuşları etkinlikten yönlendirmek odak nerede olursa olsun çalışır:
 
   ```kotlin
+  private val palet = CommandPaletteState()   // etkinlikte; CommandPalette(palet, …) de bunu alır
+
   override fun dispatchKeyEvent(event: KeyEvent) =
       (!palet.isOpen && shortcuts.matchNative(event)?.let { run(it.id) } == true) || super.dispatchKeyEvent(event)
   ```
 
   Etkinlik tuşları Compose'dan önce görür; komut paleti açıkken yönlendirmeyi atla, yoksa Ctrl+K yazılanı
   siler, öbür kısayollar paletin arkasında çalışır, Ctrl+Enter'a ya da düz tuşa bağlı bir kısayol paletin
-  kendi tuşunu alır. Ctrl/Alt/Meta'sız tek tuşlar (Boşluk, M) metin kutusuna yazmayı bozmasın diye burada
-  atlanır. Onları sahibi olan ekranda `shortcuts.match(event, scopes)` ile yakala.
+  kendi tuşunu alır. Bunun için paletin durumu `rememberCommandPaletteState()` yerine etkinlikte durur.
+  Ctrl/Alt/Meta'sız tek tuşlar (Boşluk, M) metin kutusuna yazmayı bozmasın diye burada atlanır. Onları sahibi
+  olan ekranda `shortcuts.match(event, scopes)` ile yakala.
 - Meta+/ sistem listesi: `onProvideKeyboardShortcuts` içinde `shortcuts.keyboardShortcutGroups(resources)`.
 - Ayarlardaki liste: `ShortcutListSection(shortcuts)`. Yalnızca fare ya da donanım klavyesi varken göstermek
   için `if (showShortcutHints())`. Menüler, "⋯" sayfası, komut paleti ve bildirimler kısayolları zaten yalnızca
@@ -429,9 +432,12 @@ DenseTable(
 - Sağ tık ya da uzun basma seçili bir satırdaysa seçim korunur, başka satırdaysa yalnızca o satır seçilir: menü
   üzerinde çalıştığı satırları seçili bulur.
   `rowMenu` uygulamanın `secili` durumunu okuyarak "3 kitabı sil" gibi menü kurar.
-- Seçim varken sistemin Geri hareketi önce seçimi temizler (Esc gibi); seçim yokken Geri'ye dokunmaz.
-  Geri'yi uygulama yönetecekse `clearSelectionOnBack = false`. Compose en son oluşturulan açık geri işleyicisini
-  önce çağırır: tablonunki genelde ekranınkinden sonra gelir, sonradan açılan iletişim kutusununki ondan önce.
+- Süren bir seçim varken (dokunmatik yerleşimde ya da seçim modunda her seçim, farede birden çok satır) sistemin
+  Geri hareketi önce seçimi temizler, Esc gibi; farenin tıklayıp seçtiği tek satırda ve seçim yokken Geri'ye
+  dokunmaz. Uygulama temizlemeyi almazsa sonraki Geri uygulamanındır; Geri'yi baştan uygulama yönetecekse
+  `clearSelectionOnBack = false`. Compose en son oluşturulan açık geri işleyicisini önce çağırır: bir
+  `DetailTransition` ayrıntısının içindeki tabloda önce ayrıntı kapanır; ekranın kendi `BackHandler`'ı tablonunkinden
+  önce de sonra da çalışabilir, onunki önce gelmeliyse bunu kapatıp seçimi orada temizle.
 - `onSelectionChange` verilmezse tablo eskisi gibi tek seçimlidir (`selectedKey`).
 
 ### Ekran klavyesi
@@ -564,8 +570,9 @@ DesktopShell(…, navController = navController, onSearch = { palet.open() }, ov
 
 Arama Türkçe harfleri katlar ("sarki" "Şarkı"yı bulur), eşleşen harfleri vurgular ve sonuçları gruplar. Klavye
 odağı alanda kalır: ↑/↓, Enter, Ctrl+Enter (`onOpenInNewWindow` varsa yeni pencerede), Tab ile grup süzgeçleri,
-Esc. Palet kapanınca odak açılmadan önceki yerine döner. Kısayolları etkinlikten yönlendiriyorsan palet açıkken
-(`palet.isOpen`) atla (yukarıdaki Klavye kısayolları bölümü).
+Esc. Palet kapanınca odak açılmadan önceki yerine döner. Kısayolları etkinlikten yönlendiriyorsan paletin
+durumunu etkinlikte tut (`private val palet = CommandPaletteState()`) ve palet açıkken yönlendirmeyi atla
+(yukarıdaki Klavye kısayolları bölümü).
 
 ### Kapak ızgarası
 
