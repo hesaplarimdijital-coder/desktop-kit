@@ -25,6 +25,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import desktopkit.TestShell
 import desktopkit.components.DeskButton
 import desktopkit.components.DeskTextField
@@ -34,6 +35,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.ExternalResource
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 
@@ -47,7 +49,15 @@ import org.robolectric.annotation.Config
 @Config(qualifiers = "tr-w411dp-h891dp-hdpi")
 class KeyboardDismissTest {
 
-    @get:Rule
+    // On a device the first finger on the glass puts the window in touch mode, where taking the focus
+    // from a field leaves nothing focused. Robolectric's window starts in keyboard mode, where the
+    // system hands the focus straight back to the first field, so it starts the way a finger leaves it.
+    @get:Rule(order = 0)
+    val touchMode = object : ExternalResource() {
+        override fun before() = InstrumentationRegistry.getInstrumentation().setInTouchMode(true)
+    }
+
+    @get:Rule(order = 1)
     val compose = createAndroidComposeRule<ComponentActivity>()
 
     private var text by mutableStateOf("Kış")
@@ -72,6 +82,7 @@ class KeyboardDismissTest {
             }
         }
         compose.waitForIdle()
+        compose.runOnIdle { assertTrue("the window is in touch mode", compose.activity.window.decorView.isInTouchMode) }
         compose.onNodeWithTag("field").performClick()
         compose.waitForIdle()
         compose.onNodeWithTag("field").assertIsFocused()
