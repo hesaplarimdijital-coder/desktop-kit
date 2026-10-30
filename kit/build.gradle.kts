@@ -59,6 +59,7 @@ android {
 // to it fails the build until the dump is updated with ./gradlew :kit:updateKotlinAbi, so every API
 // change shows up in the pull request.
 kotlin {
+    @OptIn(org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation::class)
     abiValidation()
 }
 
