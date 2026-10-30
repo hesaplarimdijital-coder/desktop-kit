@@ -52,8 +52,8 @@ internal class TextFields {
  * With a finger, the on-screen keyboard steps aside once the user moves on, as in the system's own
  * apps: scrolling the content, or a tap that lands outside every text field, takes the focus from
  * the kit's field that has it, and with it the keyboard. A scroll the field asks for itself (to
- * stay in sight above a rising keyboard) has no finger behind it and leaves the keyboard open; so
- * do a mouse and a stylus.
+ * stay in sight above a rising keyboard) has no finger behind it and leaves the keyboard open, and
+ * so does a mouse.
  */
 @Composable
 internal fun Modifier.dismissKeyboardOnTouch(fields: TextFields): Modifier {
@@ -75,7 +75,8 @@ internal fun Modifier.dismissKeyboardOnTouch(fields: TextFields): Modifier {
         .pointerInput(fields) {
             awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                if (down.type != PointerType.Touch) return@awaitEachGesture
+                // a mouse keeps the desktop's way (the field keeps the focus); fingers and pens move on
+                if (down.type == PointerType.Mouse) return@awaitEachGesture
                 gesture.fingerDown = true
                 try {
                     var moved = false

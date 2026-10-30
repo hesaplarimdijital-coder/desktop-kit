@@ -11,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsFocused
@@ -21,7 +22,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.test.swipe
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import desktopkit.TestShell
@@ -36,7 +37,8 @@ import org.robolectric.annotation.Config
 
 /**
  * With a finger the keyboard steps aside when the user moves on: a scroll or a tap outside the text
- * field takes the focus from it. A tap on the field itself keeps it; a mouse click elsewhere too.
+ * fields takes the focus from the field. A tap on another field moves it there; a mouse click
+ * elsewhere leaves it where it is.
  */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
@@ -47,6 +49,7 @@ class KeyboardDismissTest {
     val compose = createAndroidComposeRule<ComponentActivity>()
 
     private var text by mutableStateOf("Kış")
+    private var other by mutableStateOf("")
 
     private fun screen() {
         compose.runOnUiThread { compose.activity.actionBar?.hide() }
@@ -55,6 +58,7 @@ class KeyboardDismissTest {
                 TestShell(WidthClass.Compact, content = { _, _ ->
                     Column(Modifier.fillMaxSize()) {
                         DeskTextField(text, { text = it }, Modifier.fillMaxWidth().padding(16.dp).testTag("field"), hint = "Ara")
+                        DeskTextField(other, { other = it }, Modifier.fillMaxWidth().padding(16.dp).testTag("other"), hint = "Not")
                         DeskButton("Kaydet", {}, Modifier.padding(16.dp).testTag("button"))
                         LazyColumn(Modifier.fillMaxSize().testTag("list")) {
                             items(80) { Text("Satır $it", Modifier.padding(16.dp)) }
@@ -80,17 +84,20 @@ class KeyboardDismissTest {
     @Test
     fun aScrollClosesTheKeyboard() {
         screen()
-        compose.onNodeWithTag("list").performTouchInput { swipeUp(durationMillis = 500) }
+        // in the middle of the list: its end lies under the bottom bar
+        compose.onNodeWithTag("list").performTouchInput {
+            swipe(center + Offset(0f, height / 4f), center - Offset(0f, height / 4f), durationMillis = 500)
+        }
         compose.waitForIdle()
         compose.onNodeWithTag("field").assertIsNotFocused()
     }
 
     @Test
-    fun aTapOnTheFieldKeepsIt() {
+    fun aTapOnAnotherFieldMovesTheFocusThere() {
         screen()
-        compose.onNodeWithTag("field").performClick()
+        compose.onNodeWithTag("other").performClick()
         compose.waitForIdle()
-        compose.onNodeWithTag("field").assertIsFocused()
+        compose.onNodeWithTag("other").assertIsFocused()
     }
 
     @Test

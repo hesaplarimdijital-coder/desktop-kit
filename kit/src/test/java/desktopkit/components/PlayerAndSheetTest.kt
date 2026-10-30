@@ -13,6 +13,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -100,17 +101,20 @@ class PlayerAndSheetTest {
         compose.mainClock.autoAdvance = false
         compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
         var miniFrames = 0
+        var sheetFrames = 0
         repeat(120) {
             compose.mainClock.advanceTimeByFrame()
             compose.waitForIdle()
             if (player.progress <= 0.001f) {
                 miniFrames++
-                // the sheet's background covered the bottom bar for the spring's last half second
-                compose.onNodeWithTag("full-player").assertDoesNotExist()
+                // the sheet's background covered the bottom bar for the spring's last half second;
+                // now it leaves the overlay a frame after the mini player is back (and is not drawn then)
+                if (compose.onAllNodesWithTag("full-player").fetchSemanticsNodes().isNotEmpty()) sheetFrames++
             }
         }
         compose.mainClock.autoAdvance = true
         assertTrue("the mini player never came back", miniFrames > 0)
+        assertTrue("the sheet stayed $sheetFrames frames after the mini player was back", sheetFrames <= 1)
     }
 
     @Test

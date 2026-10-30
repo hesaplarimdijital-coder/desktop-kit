@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.getBoundsInRoot
@@ -18,7 +19,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.test.swipe
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.Insets
@@ -112,7 +113,10 @@ class ShellImeTest {
         val root = compose.onRoot().getBoundsInRoot()
         val shown = compose.onNodeWithText("Kopyalanıyor: Yedek.zip").getBoundsInRoot()
         // scrolling down slides the bars and the strip above them away
-        compose.onNodeWithTag("list").performTouchInput { swipeUp(durationMillis = 600) }
+        // in the middle of the list: its ends lie under the top bar and the bottom bar
+        compose.onNodeWithTag("list").performTouchInput {
+            swipe(center + Offset(0f, height / 4f), center - Offset(0f, height / 4f), durationMillis = 600)
+        }
         compose.waitForIdle()
         val slid = compose.onNodeWithText("Kopyalanıyor: Yedek.zip").getBoundsInRoot()
         assertTrue("the strip slid down: ${shown.top} → ${slid.top}", slid.top > shown.top + 20.dp)

@@ -260,7 +260,8 @@ private fun PlayerSheet(
     val scope = rememberCoroutineScope()
     val backProgress = remember { Animatable(0f) }
     val label = stringResource(R.string.dk_player)
-    Box(Modifier.fillMaxSize()) {
+    // drawn no more from the frame the mini player is back (it leaves the overlay a frame later)
+    Box(Modifier.fillMaxSize().graphicsLayer { alpha = if (state.progress > SHEET_OUT || state.targetValue == PlayerValue.Expanded) 1f else 0f }) {
         Box(
             Modifier
                 .fillMaxSize()
