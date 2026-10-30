@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import desktopkit.input.showShortcutHints
 import desktopkit.theme.DeskGlass
 import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
@@ -94,8 +95,9 @@ class MenuSpec(val title: String, val entries: () -> List<MenuEntry>)
 
 /**
  * Menu surface shared by the menu bar and context menus. It opens at [offset] from the
- * anchor's top-left corner and moves inside the window when it would overflow (flipping above
- * the anchor point near the bottom edge, like desktop menus).
+ * anchor's top-left corner and moves inside the window when it would overflow: near the bottom
+ * edge a menu at a point flips above that point, like desktop menus, and a drop-down (offset at or
+ * below the anchor's bottom) above the anchor.
  *
  * Like Android's own pop-up menus it grows in from its corner while fading in (150 ms) and fades
  * out where it is when closed (100 ms); with animations turned off in the system it simply appears.
@@ -290,7 +292,7 @@ internal fun MenuItemRow(item: MenuEntry.Item, onClick: () -> Unit) {
         Spacer(Modifier.width(10.dp))
         Text(item.label, style = DeskTheme.type.body, color = content, maxLines = 1, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f))
-        if (item.shortcut != null) {
+        if (item.shortcut != null && showShortcutHints()) {
             Spacer(Modifier.width(24.dp))
             Text(item.shortcut, style = DeskTheme.type.mono, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
@@ -320,7 +322,7 @@ fun RowScope.MenuBarMenus(menus: List<MenuSpec>) {
     }
 }
 
-private class ClampedOffsetPositionProvider(private val offset: IntOffset) : PopupPositionProvider {
+internal class ClampedOffsetPositionProvider(private val offset: IntOffset) : PopupPositionProvider {
     override fun calculatePosition(
         anchorBounds: IntRect,
         windowSize: IntSize,
@@ -331,7 +333,10 @@ private class ClampedOffsetPositionProvider(private val offset: IntOffset) : Pop
         var y = anchorBounds.top + offset.y
         if (x + popupContentSize.width > windowSize.width) x = windowSize.width - popupContentSize.width
         if (y + popupContentSize.height > windowSize.height) {
-            val above = anchorBounds.top + offset.y - popupContentSize.height
+            // a drop-down under its anchor (a menu button) goes above the anchor, not over it; a menu
+            // at a point inside the anchor (a right click) above that point
+            val dropDown = offset.y >= anchorBounds.height
+            val above = (if (dropDown) anchorBounds.top else anchorBounds.top + offset.y) - popupContentSize.height
             y = if (above >= 0) above else windowSize.height - popupContentSize.height
         }
         return IntOffset(x.coerceAtLeast(0), y.coerceAtLeast(0))

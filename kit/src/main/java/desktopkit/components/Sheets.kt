@@ -83,6 +83,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import desktopkit.R
+import desktopkit.input.showShortcutHints
 import desktopkit.shell.LocalShellOverlayHost
 import desktopkit.shell.ShellOverlayHost
 import desktopkit.shell.WidthClass
@@ -174,8 +175,8 @@ internal fun ActionGroupList(groups: List<ActionGroup>, onDismiss: () -> Unit) {
 }
 
 /**
- * One action of [MoreSheet]: its icon, its label and its shortcut. An item with `checked` set is a
- * switch at the end of the line, and the whole line flips it.
+ * One action of [MoreSheet]: its icon, its label and (with a keyboard or a mouse) its shortcut. An
+ * item with `checked` set is a switch at the end of the line, and the whole line flips it.
  */
 @Composable
 private fun SheetActionRow(item: MenuEntry.Item, onClick: () -> Unit) {
@@ -225,7 +226,7 @@ private fun SheetActionRow(item: MenuEntry.Item, onClick: () -> Unit) {
         Spacer(Modifier.width(dimens.gapM))
         Text(item.label, style = DeskTheme.type.body, color = content, maxLines = 1, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f))
-        if (item.shortcut != null) {
+        if (item.shortcut != null && showShortcutHints()) {
             Text(item.shortcut, style = DeskTheme.type.mono, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (checked != null) {

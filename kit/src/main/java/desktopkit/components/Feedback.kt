@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -35,6 +36,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,7 +45,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -67,6 +68,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import desktopkit.R
 import desktopkit.shell.KeyCap
+import desktopkit.shell.WidthClass
+import desktopkit.shell.currentWidthClass
 import desktopkit.theme.DeskGlass
 import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
@@ -76,14 +79,14 @@ import desktopkit.theme.InputMode
 import desktopkit.theme.LocalMotionTier
 import desktopkit.theme.MotionTier
 import desktopkit.theme.glass
+import kotlin.coroutines.resume
+import kotlin.math.abs
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlin.coroutines.resume
-import kotlin.math.abs
 
 // ---------------------------------------------------------------- progress
 
@@ -170,7 +173,7 @@ val BannerTone.icon: ImageVector
 /**
  * A message strip in one of four tones: a tinted background, a border and an icon in the tone's
  * colour, the [text] (under a bold [title] when given), and optionally an action button and a close
- * button. TalkBack announces it when it appears.
+ * button. On a phone the action sits under the text. TalkBack announces it when it appears.
  */
 @Composable
 fun StatusBanner(
@@ -188,6 +191,9 @@ fun StatusBanner(
     val dimens = DeskTheme.dimens
     val color = tone.color()
     val shape = RoundedCornerShape(if (title != null) dimens.radiusCard else dimens.radiusControl)
+    // on a phone the action goes under the text, which would otherwise squeeze into a narrow column
+    val action = actionLabel != null && onAction != null
+    val stacked = action && currentWidthClass() == WidthClass.Compact
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -196,11 +202,11 @@ fun StatusBanner(
             .semantics { liveRegion = LiveRegionMode.Polite }
             .padding(
                 start = dimens.gapM + 2.dp,
-                end = if (actionLabel != null || closeLabel != null) dimens.gapS + 2.dp else dimens.gapM + 2.dp,
-                top = if (title != null) dimens.gapM else dimens.gapS,
-                bottom = if (title != null) dimens.gapM else dimens.gapS,
+                end = if ((action && !stacked) || closeLabel != null) dimens.gapS + 2.dp else dimens.gapM + 2.dp,
+                top = if (title != null || stacked) dimens.gapM else dimens.gapS,
+                bottom = if (title != null || stacked) dimens.gapM else dimens.gapS,
             ),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = if (stacked) Alignment.Top else Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(dimens.gapM),
     ) {
         Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(dimens.iconLarge))
@@ -208,8 +214,12 @@ fun StatusBanner(
             if (title != null) Text(title, style = DeskTheme.type.bodyStrong, color = colors.text)
             Text(text, style = if (title != null) DeskTheme.type.label else DeskTheme.type.body,
                 color = if (title != null) colors.textSecondary else colors.text)
+            if (stacked) {
+                Spacer(Modifier.height(dimens.gapS))
+                DeskButton(actionLabel!!, onAction!!)
+            }
         }
-        if (actionLabel != null && onAction != null) DeskButton(actionLabel, onAction)
+        if (action && !stacked) DeskButton(actionLabel!!, onAction!!)
         if (closeLabel != null && onClose != null) DeskIconButton(DeskIcons.Close, closeLabel, onClose)
     }
 }
@@ -281,19 +291,25 @@ class DeskToast internal constructor(
  * }
  * ```
  *
- * [show] waits until the toast is gone and says how it ended; toasts shown meanwhile wait their turn.
+ * [show] waits until the toast is gone and says how it ended. A newer toast takes the place of the one
+ * on screen at once (that one ends as [ToastResult.Dismissed]): news of the latest action comes
+ * when it happens, not after the older toasts have run their time.
  */
 @Stable
 class ToastState {
     private val mutex = Mutex()
+
+    /** Counts the toasts asked for; the newest one is the one to show. */
+    private var asked = 0L
 
     /** The toast on screen, if any. */
     var current: DeskToast? by mutableStateOf(null)
         private set
 
     /**
-     * Shows [message] and suspends until the toast is dismissed or its action used. [duration]
-     * defaults to [ToastDuration.Long] for a toast with an action, [ToastDuration.Short] otherwise.
+     * Shows [message] and suspends until the toast is dismissed, replaced by a newer one or its
+     * action used. [duration] defaults to [ToastDuration.Long] for a toast with an action,
+     * [ToastDuration.Short] otherwise.
      */
     suspend fun show(
         message: String,
@@ -302,13 +318,19 @@ class ToastState {
         tone: BannerTone? = null,
         icon: ImageVector? = tone?.icon,
         shortcut: String? = null,
-    ): ToastResult = mutex.withLock {
-        try {
-            suspendCancellableCoroutine { continuation ->
-                current = DeskToast(message, actionLabel, duration, tone, icon, shortcut, continuation)
+    ): ToastResult {
+        val mine = ++asked
+        current?.dismiss()
+        return mutex.withLock {
+            // asked for while another waited: only the newest of them shows
+            if (mine != asked) return@withLock ToastResult.Dismissed
+            try {
+                suspendCancellableCoroutine { continuation ->
+                    current = DeskToast(message, actionLabel, duration, tone, icon, shortcut, continuation)
+                }
+            } finally {
+                current = null
             }
-        } finally {
-            current = null
         }
     }
 
