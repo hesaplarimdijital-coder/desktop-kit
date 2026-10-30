@@ -9,10 +9,10 @@ arayüzünden çıkarıldı. Klavye, fare, sağ tık ve dokunmatik aynı uygulam
   Ekran geçişleri canlandırılır (telefonda fade-through, geniş pencerede kısa geçiş); telefonun üst
   çubuğunu ekran kendisi değiştirebilir (`CompactTopBar`).
 - **Buzlu cam:** telefonun alt ve üst çubuğu, oynatıcı şeridi, alt sayfalar ve menüler arkalarındaki içeriği
-  bulanıklaştırır (Android 12+); eski sürümlerde yarı saydam, pil tasarrufunda opak.
+  bulanıklaştırır; pil tasarrufunda ve "Animasyonları kaldır" açıkken opak.
 - **Telefona göre:** telefonda alt çubuk 64 dp, satırlar 52 dp; içerik çubukların altından geçer, kaydırılınca
-  alt çubuk çekilir (yalnızca çizimde, ekran yeniden ölçülmez), yukarı kaydırınca geri gelir. Üç sekme ve "⋯",
-  genişleyen oynatıcı. Chip filtreler tek satırda yana kayar, gereksiz tablo sütunları gizlenir, ayar
+  alt çubuk çekilir (yalnızca çizimde, ekran yeniden ölçülmez), yukarı kaydırınca geri gelir. Cam, üç düğmeli
+  gezinmenin arkasına kadar uzanır. Üç sekme ve "⋯", genişleyen oynatıcı. Chip filtreler tek satırda yana kayar, gereksiz tablo sütunları gizlenir, ayar
   satırları sığmazsa alt alta dizilir. Tablet ve DeX'te yazılar bir punto büyük, düzen aynı.
 - **Android hareketleri:** telefonda parmağı izleyen, kesilebilen yaylar; tablet ve DeX'te kısa, süreli
   geçişler. Fade-through ve paylaşılan eksen geçişleri, öngörülü geri hareketi (`DetailTransition`, genişleyen
@@ -25,10 +25,20 @@ arayüzünden çıkarıldı. Klavye, fare, sağ tık ve dokunmatik aynı uygulam
 - **Tema:** açık, koyu ve OLED siyah. Dört hazır vurgu rengi var; istediğin markanın rengini de
   verebilirsin. Tüm metinler WCAG AA kontrastını (4.5:1) testle sağlar.
 - **Bileşenler:** düğme, simge düğmesi, segment ve renk seçimi, kaydırıcı (tekerlek ve ok
-  tuşları), yoğun tablo (sıralama, çoklu seçim, sütun seçici, satır menüsü), bölünmüş panel, menü çubuğu, sağ tık
-  menüsü (sağ tık, iki parmak dokunma, uzun basma, Menu tuşu), "⋯" sayfası, iletişim kutusu, ipucu (tooltip),
-  ayar satırı.
-  Her birinde üzerine gelme, odak halkası ve basılı durumu var ve testle denetleniyor.
+  tuşları), yoğun tablo (sıralama, çoklu seçim, sütun seçici, satır menüsü), kapak ızgarası, bölünmüş panel, menü
+  çubuğu, sağ tık menüsü (sağ tık, iki parmak dokunma, uzun basma, Menu tuşu), "⋯" sayfası, iletişim kutusu, ipucu
+  (tooltip), ayar satırı; metin, arama ve sayı alanları, onay kutusu, anahtar, ilerleme çubuğu, durum şeridi,
+  rozet, bildirim (geri alma düğmeli), kart, liste satırı, seçim çubuğu, sekmeler, yükleniyor yer tutucuları.
+  Hepsi kitin kendi çizgisinde (Material bileşeni yok). Her birinde üzerine gelme, odak halkası ve basılı durumu
+  var ve testle denetleniyor.
+- **Komut paleti (Ctrl+K):** ekranlar, uygulamanın nesneleri ve kısayollar tek aramada; Türkçe harfleri katlayan
+  bulanık eşleşme.
+- **Sürükle bırak:** tablo satırları, kapaklar, liste satırları ve sekmeler kenar çubuğuna, listelere ya da
+  uygulamanın öbür penceresine sürüklenir.
+- **DeX ve pencereler:** menü çubuğu pencerenin başlık çubuğuna yerleşir (Android 15+); uygulama birden çok
+  pencerede açılır, tema ve vurgu pencereler arasında eşitlenir.
+- **Erişilebilirlik:** %200 yazı boyutunda kesilen yazı yok, her denetimin TalkBack adı var, Tab okuma sırasıyla
+  ilerler; testle denetlenir.
 - **Klavye kısayolları:** tek tablodan menü çubuğu, ipuçları, ayarlardaki liste ve sistemin
   Meta+/ listesi üretilir.
 - **Hazır ekranlar:** sayfa başlığı, boş durum veya "yakında" ekranı, görünüm, giriş ve kısayol
@@ -55,14 +65,15 @@ Uygulama modülünün `build.gradle.kts` dosyası:
 
 ```kotlin
 dependencies {
-    implementation("com.github.hesaplarimdijital-coder:desktop-kit:1.0.0")
-    implementation("androidx.activity:activity-compose:1.10.1")
+    implementation("com.github.hesaplarimdijital-coder:desktop-kit:2.0.0")
+    implementation("androidx.activity:activity-compose:1.13.0")
 }
 ```
 
-Gereksinimler: `minSdk` 21, `compileSdk` 35 ve Compose açık (`buildFeatures { compose = true }` ile Kotlin Compose
-eklentisi). Kit Compose BOM 2024.12.01 (Compose 1.7) ile derlenir ve buzlu cam için
-[Haze](https://github.com/chrisbanes/haze) 1.5.4'ü (Apache-2.0) getirir.
+Gereksinimler: `minSdk` 34 (Android 14), `compileSdk` 37, Android Gradle eklentisi 9.1.1 ve üstü, Kotlin 2.3 ve
+üstü, Compose açık (`buildFeatures { compose = true }` ile Kotlin Compose eklentisi). Kit Compose BOM 2026.09.00
+(Compose 1.12) ile derlenir ve buzlu cam için [Haze](https://github.com/chrisbanes/haze) 2.0.1'i (Apache-2.0)
+getirir. Eski bir sürümden geçiş: [MIGRATION.md](MIGRATION.md).
 
 ## Yeni uygulama: en kısa hâli
 
@@ -104,18 +115,22 @@ class MainActivity : ComponentActivity() {
 }
 ```
 
-`AndroidManifest.xml` içinde DeX'te pencere boyutlandırılınca etkinlik yeniden başlamasın diye:
+`AndroidManifest.xml` içinde DeX'te pencere boyutlandırılınca etkinlik yeniden başlamasın diye (ve sistemin kendi
+"Yeni pencere" menüsü için):
 
 ```xml
 <activity
     android:name=".MainActivity"
     android:resizeableActivity="true"
     android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboard|keyboardHidden|navigation|uiMode|fontScale"
-    android:windowSoftInputMode="adjustResize" />
+    android:windowSoftInputMode="adjustResize">
+    <property android:name="android.window.PROPERTY_SUPPORTS_MULTI_INSTANCE_SYSTEM_UI" android:value="true" />
+</activity>
 ```
 
-Tam örnek (kısayollar, menü çubuğu, tablo, sağ tık, ayarlar) `sample/` klasöründe. Yeni bir
-uygulamaya başlarken onu kopyalayıp ekranları değiştirmek en hızlı yol.
+Tam örnek `sample/` klasöründe: her bileşeni her durumuyla gösteren katalog, kapak ızgarası ve albüm sayfası,
+sürükle bırak, komut paleti, kısayollar, menü çubuğu, tablo, ayarlar. Yeni bir uygulamaya başlarken onu
+kopyalayıp ekranları değiştirmek en hızlı yol.
 
 ## Klavye kısayolları
 
@@ -180,6 +195,19 @@ Değerlere doğrudan erişim için `DeskTheme.colors.text`, `DeskTheme.type.body
 | `MoreSheet`, `MoreButton`, `GlassBottomSheet`, `ActionGroup` | "⋯" eylemleri: telefonda cam alt sayfa, genişte menü |
 | `WorkstationLayout`, `InspectorPane`, `InspectorToggleButton` | Tablet ve DeX'te sekmeli, boyutlandırılabilir ayrıntı paneli |
 | `DeskDialog`, `DialogFrame`, `DialogDismissButton` | İletişim kutusu; klavye varsa "Esc", yoksa × |
+| `DeskTextField`, `DeskSearchField`, `NumberField`, `OptionalNumberField` | Metin, arama ve sayı alanları (aşağıya bak) |
+| `DeskCheckbox`, `DeskSwitch`, `CheckboxRow`, `SwitchRow` | Onay kutusu (ara durum dahil) ve anahtar; satır hâlleri TalkBack'e adını söyler |
+| `DeskProgressBar`, `StatusBanner`, `CountBadge` | İlerleme (belirli, belirsiz), dört tonlu durum şeridi, sayı rozeti |
+| `rememberToastState`, `ToastHost` | Bildirimler; kabuk `DesktopShell(toasts = …)` ile yerleştirir (aşağıya bak) |
+| `DeskCard`, `KeyValueRow`, `DeskListRow`, `SelectionBar` | Kart, etiket–değer satırı, telefon listesi satırı, seçim çubuğu |
+| `MenuButton`, `IconMenuButton` | Altında menü açan düğmeler |
+| `TabStrip`, `DeskTab` | Sekmeler: rozet, meşgul noktası, kapatma, orta tık, sürükleme |
+| `DeskGrid`, `CoverCell` | Kapak ızgarası (aşağıya bak) |
+| `CommandPalette`, `PaletteItem` | Ctrl+K komut paleti (aşağıya bak) |
+| `Modifier.dragSource`, `Modifier.dropZone`, `NavDrop` | Sürükle bırak (aşağıya bak) |
+| `SkeletonList`, `SkeletonListRow`, `SkeletonBlock` | Yükleniyor yer tutucuları; tablo ve ızgarada `loading = true` |
+| `rememberDeskHaptics` | Dokunmada titreşim: aç/kapa, tık, eşik, onay, ret |
+| `DeskWindows`, `rememberNewWindow` | Uygulamayı yeni pencerede açmak (aşağıya bak) |
 
 ### Buzlu cam
 
@@ -187,8 +215,8 @@ Kabuk içerik alanını cam kaynağı yapar; çubuklar, sayfalar ve menüler onu
 
 | Cihaz durumu | Görünüm |
 | --- | --- |
-| Android 12+ (API 31), donanım çizimi | Bulanık cam (Haze) |
-| Android 11 ve öncesi | Yarı saydam düz yüzey, bulanıklık yok |
+| Donanım çizimi | Bulanık cam (Haze) |
+| Yazılım tuvali (ekran görüntüsü testleri) | Yarı saydam düz yüzey, bulanıklık yok |
 | Pil tasarrufu ya da "Animasyonları kaldır" | Opak yüzey, içerik kaydedilmez |
 
 - Cam yüzeyler: telefonda alt çubuk ve oynatıcı şeridi, içerik altına kaydıkça üst çubuk, alt sayfalar, menüler
@@ -323,7 +351,9 @@ Başlığın yanındaki kapatma işareti klavye bağlıyken "Esc", dokunmatikte 
 ### Vurgu rengi
 
 Vurgu (ve camın tonu) değişince renkler 150 ms'de geçer. Çalan parçanın kapağından vurgu almak için
-`DesktopKitRoot(prefs, accent = Accent.custom("Kapak", kapakRengi))`; saklanan vurgu değişmez.
+`DesktopKitRoot(prefs, accent = Accent.custom("Kapak", kapakRengi))`; saklanan vurgu değişmez. Duvar kâğıdının
+rengini ayarlarda sunmak için `rememberDeskPreferences(dynamicAccent = true)` (`Accent.dynamic(context)`); duvar
+kâğıdı değişince renk de değişir.
 
 ### Chip filtreler
 
@@ -456,20 +486,103 @@ CompactTopBar(
 - Telefonda alt başlığı ve eylemi olmayan bir `PageHeader` hiç yer kaplamaz (önceden boş bir şerit
   bırakıyordu). Ekranın kendi başlığını telefonda göstermek için `CompactTopBar(title = …)` kullan.
 
+### Formlar
+
+```kotlin
+DeskTextField(klasör, { klasör = it }, Modifier.fillMaxWidth(), label = "Müzik klasörü", clearable = true, mono = true,
+    error = !geçerli, supportingText = if (geçerli) null else "Bu cihazda böyle bir klasör yok")
+DeskSearchField(sorgu, { sorgu = it })                          // Esc temizler
+NumberField(tampon, { tampon = it }, label = "Ön tampon", min = 0, max = 5000, suffix = "ms", steppers = true)
+SwitchRow("Sesi DAC'a doğrudan gönder", açık, { açık = it }, subtitle = "Ses düzeyi DAC'tan ayarlanır")
+CheckboxRow("Tüm biçimler", ToggleableState.Indeterminate, onClick = { … })
+```
+
+Alanın etiketi, ipucu ve açıklaması TalkBack'e alanla birlikte okunur. Tek başına bir `DeskCheckbox` ya da
+`DeskSwitch` kullanılacaksa ona `Modifier.semantics { contentDescription = … }` ile ad ver; satır hâlleri bunu kendisi
+yapar.
+
+### Bildirimler
+
+```kotlin
+val toasts = rememberToastState()
+DesktopShell(…, toasts = toasts) { … }
+
+scope.launch {
+    val sonuç = toasts.show("“Pencere” sıranın sonuna eklendi", actionLabel = "Geri al", shortcut = "Ctrl+Z")
+    if (sonuç == ToastResult.ActionPerformed) geriAl()
+}
+```
+
+Bildirimler sırayla gösterilir; telefonda alt çubuğun ve oynatıcının, tablet ve DeX'te oynatıcının üstünde çıkar.
+
+### Komut paleti
+
+```kotlin
+val palet = rememberCommandPaletteState()
+DesktopShell(…, onSearch = { palet.open() }, overlays = {
+    CommandPalette(palet, items = { sorgu ->
+        ekranlar.map { PaletteItem(it.route, it.label, "Ekranlar", { navigator.navigate(it.route) }, icon = it.icon) } +
+            albümler.map { PaletteItem(it.id, it.ad, "Albümler", { aç(it) }, subtitle = it.sanatçı) } +
+            shortcuts.paletteItems(resources) { çalıştır(it) }
+    })
+})
+```
+
+Arama Türkçe harfleri katlar ("sarki" "Şarkı"yı bulur), eşleşen harfleri vurgular ve sonuçları gruplar. ↑/↓,
+Enter, Ctrl+Enter (`onOpenInNewWindow` varsa yeni pencerede), Tab ile grup süzgeçleri, Esc.
+
+### Kapak ızgarası
+
+```kotlin
+DeskGrid(albümler, key = { it.id }, onItemClick = { albüm, _ -> aç(albüm) },
+    selectedKeys = seçili, onSelectionChange = { seçili = it }, itemMenu = { albüm, _ -> menü(albüm) },
+    loading = yükleniyor) { albüm ->
+    CoverCell(albüm.ad, subtitle = albüm.sanatçı, onPlay = { çal(albüm) }, playLabel = "Çal") { Kapak(albüm) }
+}
+```
+
+Seçim kuralları tablonunkiyle aynı (Ctrl/Shift ile tıklama, Shift ile oklar, Ctrl+A, Esc).
+
+### Sürükle bırak
+
+```kotlin
+DenseTable(…, rowDrag = { dosya, _ -> DeskDragPayload("file", listOf(dosya.ad), dosya.ad) })
+Box(Modifier.dropZone(setOf("file"), onDrop = { yük -> taşı(yük.keys); true })) { … }
+DesktopShell(…, navDrop = NavDrop(mapOf("bin" to setOf("file"))) { rota, yük -> çöpeAt(yük.keys); true })
+```
+
+Farede düğme basılı sürükleyince başlar; dokunmada uzun basma menüyü açmaya devam eder. Sürükleme uygulamanın
+öbür penceresine de geçer (`DeskDragPayload.from(event)`), başka uygulamalara etiketi düz metin olarak gider.
+
+### Birden çok pencere ve başlık çubuğu
+
+```kotlin
+val appSpec = ShellSpec(…, startRoute = DeskWindows.startRoute(intent))   // yeni pencere kendi ekranında açılır
+DeskWindows.openNewWindow(activity, route = "albums")                        // Ctrl+N: CommonShortcuts.NewWindow
+```
+
+DeX'te ve masaüstü pencerelemede pencere ayrı açılır, tablette yan yana. Tema, vurgu ve yoğunluk pencereler
+arasında eşitlenir. Kenar çubuklu düzende menü çubuğu pencerenin başlık çubuğuna yerleşir (Android 15+, sistem
+başlık düğmelerinin yerini bildirdiğinde); menüler ve arama dokunuşları uygulamaya gider, çubuğun boş yeri pencereyi
+taşır. Liste–ayrıntı geçişinde kapak ve başlık uçar: listede ve ayrıntıda aynı anahtarla
+`Modifier.detailSharedElement("kapak-$id")` ve `Modifier.detailSharedBounds("başlık-$id")`.
+
 ## Geliştirme
 
-- `./gradlew :kit:testDebugUnitTest`: kontrast, boyut, kabuk durumu ve kısayol testleri ile
-  ekran görüntüleri. Görüntüler `kit/build/outputs/screenshots` altına yazılır.
+- `./gradlew :kit:testDebugUnitTest`: kontrast, boyut, kabuk durumu, kısayol ve erişilebilirlik testleri ile
+  ekran görüntüleri (Robolectric, API 36; Java 21 gerekir). Görüntüler `kit/build/outputs/screenshots` altına yazılır.
 - CI her gönderimde derler, testleri çalıştırır ve görüntüleri `kit/src/test/screenshots`
   ile karşılaştırır. `main` dalında görüntüler `ci/screenshots` dalına konur; örnek APK de
-  Actions çıktısı olarak indirilebilir. Görünüm bilerek değiştiyse yeni görüntüleri
+  Actions çıktısı olarak indirilebilir. Çekme isteklerinde görüntüler `ci/screenshots-pr-<numara>`, derleme çıktısı
+  ve test sonuçları `ci/logs-pr-<numara>` dalına konur. Görünüm bilerek değiştiyse yeni görüntüleri
   `kit/src/test/screenshots` altına kopyalayıp gönder.
 
 ## Sürüm yayınlamak
 
-1. `CHANGELOG.md` dosyasına ne değiştiğini yaz.
-2. Etiketle ve gönder: `git tag 1.0.0 && git push origin 1.0.0`
-3. JitPack ilk istekte derler. Uygulamada sürümü `1.0.0` yapman yeterli.
+1. `CHANGELOG.md` dosyasına ne değiştiğini yaz, `gradle.properties` içindeki `VERSION_NAME`'i güncelle.
+2. GitHub'da **Releases → Draft a new release** ile etiketi (`2.0.0`) `main` üzerinde oluştur; ya da
+   `git tag 2.0.0 && git push origin 2.0.0`.
+3. JitPack ilk istekte derler (`jitpack.yml`, Java 17). Uygulamada sürümü `2.0.0` yapman yeterli.
 
 Sürüm numaraları [SemVer](https://semver.org/lang/tr/) kuralına uyar: uyumu bozan değişiklik
 ana sürümü, yeni özellik ikinci sayıyı, düzeltme üçüncüyü artırır.
