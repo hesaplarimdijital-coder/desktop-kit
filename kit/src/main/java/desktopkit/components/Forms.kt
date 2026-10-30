@@ -31,6 +31,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.layout.Layout
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -91,7 +98,9 @@ internal fun isTouchDensity(): Boolean = DeskTheme.dimens.minTarget >= 48.dp
  * - [clearable] adds a clear button while there is text; [password] hides the text and adds a
  *   button that shows it;
  * - [mono] sets the text in the monospace face (paths, numbers);
- * - [onImeAction] runs on the keyboard's action key ([imeAction]) and on Enter in a single line.
+ * - [onImeAction] runs on the keyboard's action key ([imeAction]) and on Enter in a single line,
+ *   in place of the key's own action. Without it the key does what the system does: Done closes
+ *   the keyboard, Next moves to the next field.
  */
 @Composable
 fun DeskTextField(
@@ -101,7 +110,7 @@ fun DeskTextField(
     hint: String = "",
     label: String? = null,
     leading: ImageVector? = null,
-    trailing: (@Composable () -> Unit)? = null,
+    trailingContent: (@Composable () -> Unit)? = null,
     suffix: String? = null,
     clearable: Boolean = false,
     singleLine: Boolean = true,
@@ -118,11 +127,15 @@ fun DeskTextField(
     onImeAction: (() -> Unit)? = null,
     interactionSource: MutableInteractionSource? = null,
 ) = TextFieldImpl(
-    value, onValueChange, modifier, hint, label, leading, trailing, suffix, clearable, singleLine, minLines, maxLines, password,
+    value, onValueChange, modifier, hint, label, leading, trailingContent, suffix, clearable, singleLine, minLines, maxLines, password,
     error, supportingText, supportingText, enabled, readOnly, mono, keyboardType, imeAction, onImeAction, interactionSource,
 )
 
-/** [DeskTextField] with [errorDescription], what TalkBack says about an error shown elsewhere. */
+/**
+ * [DeskTextField] with [errorDescription], what TalkBack says about an error, and [endMessage], one
+ * line under the field aligned with its end that may reach past the field's start edge instead of
+ * widening it (TalkBack hears it as [errorDescription]).
+ */
 @Composable
 internal fun TextFieldImpl(
     value: String,
@@ -148,6 +161,7 @@ internal fun TextFieldImpl(
     imeAction: ImeAction,
     onImeAction: (() -> Unit)?,
     interactionSource: MutableInteractionSource?,
+    endMessage: String? = null,
 ) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
@@ -177,12 +191,23 @@ internal fun TextFieldImpl(
         onValueChange = onValueChange,
         modifier = modifier
             .hoverable(interaction, enabled)
+            .then(
+                // a hardware Enter in one line runs the action itself: the field would run its
+                // imeAction, which is often Default and so nothing
+                if (!singleLine || onImeAction == null) Modifier else Modifier.onPreviewKeyEvent { event ->
+                    val enter = (event.key == Key.Enter || event.key == Key.NumPadEnter) &&
+                        !event.isCtrlPressed && !event.isAltPressed && !event.isMetaPressed
+                    if (enter && event.type == KeyEventType.KeyDown) onImeAction()
+                    enter
+                },
+            )
             .semantics { if (error) this.error(errorDescription ?: "") },
         enabled = enabled,
         readOnly = readOnly,
         textStyle = textStyle,
         keyboardOptions = KeyboardOptions(keyboardType = if (password) KeyboardType.Password else keyboardType, imeAction = imeAction),
-        keyboardActions = KeyboardActions(onAny = { onImeAction?.invoke() }),
+        // only a given action replaces the key's own: Done closes the keyboard, Next moves on
+        keyboardActions = if (onImeAction == null) KeyboardActions.Default else KeyboardActions(onAny = { onImeAction() }),
         singleLine = singleLine,
         maxLines = maxLines,
         minLines = minLines,
@@ -237,16 +262,40 @@ internal fun TextFieldImpl(
                     Spacer(Modifier.height(4.dp))
                     Text(supportingText, style = DeskTheme.type.labelSmall, color = if (error) colors.danger else colors.textTertiary)
                 }
+                if (endMessage != null) {
+                    Spacer(Modifier.height(4.dp))
+                    EndAligned {
+                        Text(endMessage, style = DeskTheme.type.labelSmall, color = colors.danger, maxLines = 1, softWrap = false,
+                            modifier = Modifier.clearAndSetSemantics {})
+                    }
+                }
             }
         },
     )
 }
 
-/** A small icon button inside a field (clear, show password, steppers): 32 dp on touch, 20 dp with a mouse. */
+/**
+ * [content] at the end of the available width, as wide as it needs: wider than the space, it
+ * reaches past the start edge instead of widening its parent.
+ */
+@Composable
+private fun EndAligned(content: @Composable () -> Unit) {
+    Layout(content) { measurables, constraints ->
+        val placeable = measurables.first().measure(constraints.copy(minWidth = 0, maxWidth = Constraints.Infinity))
+        val width = if (constraints.hasBoundedWidth) constraints.maxWidth else placeable.width
+        layout(width, placeable.height) { placeable.placeRelative(width - placeable.width, 0) }
+    }
+}
+
+/**
+ * A small icon button inside a field (clear, show password, steppers): 32 dp on touch, where a
+ * finger reaches it 8 dp around it as well (Compose widens a touch target to 48 dp), and 24 dp,
+ * the kit's smallest pointer target, with a mouse.
+ */
 @Composable
 private fun FieldButton(icon: ImageVector, label: String, enabled: Boolean = true, onClick: () -> Unit) {
     val touch = isTouchDensity()
-    DeskIconButton(icon, label, onClick, enabled = enabled, size = if (touch) 32.dp else 20.dp, iconSize = if (touch) 16.dp else 12.dp)
+    DeskIconButton(icon, label, onClick, enabled = enabled, size = if (touch) 32.dp else 24.dp, iconSize = if (touch) 16.dp else 12.dp)
 }
 
 /**
@@ -277,9 +326,40 @@ fun DeskSearchField(
         clearable = true,
         enabled = enabled,
         imeAction = ImeAction.Search,
-        onImeAction = { onSearch?.invoke(value) },
+        onImeAction = onSearch?.let { search -> { search(value) } },
         interactionSource = interactionSource,
     )
+}
+
+/**
+ * What a number field shows: the text as typed. A value set from outside (a reset, a step made
+ * elsewhere) replaces the text; the field's own reports coming back do not, even when they come
+ * late, after further keystrokes (state passed through a Flow arrives a frame or more later).
+ */
+private class NumberText<T>(initial: T, private val format: (T) -> String, private val parse: (String) -> T?) {
+    var text by mutableStateOf(format(initial))
+    private var seen: T = initial
+    private val reported = ArrayDeque<T>()
+
+    /** Reports [value] to the caller and remembers it, to know it again when it comes back. */
+    fun report(value: T, onValueChange: (T) -> Unit) {
+        reported.addLast(value)
+        if (reported.size > 64) reported.removeFirst()
+        onValueChange(value)
+    }
+
+    /** After every composition, with the caller's value. */
+    fun sync(value: T) {
+        if (value == seen) return
+        seen = value
+        val echo = reported.indexOf(value)
+        if (echo >= 0) {
+            repeat(echo + 1) { reported.removeFirst() }
+        } else {
+            reported.clear()
+            if (parse(text) != value) text = format(value)
+        }
+    }
 }
 
 /**
@@ -287,6 +367,9 @@ fun DeskSearchField(
  * be typed; a number outside the range turns the field red and says the range under it, and
  * [onValueChange] is called only with valid numbers. The arrow keys step by [step]; [steppers] adds
  * − and + buttons. [suffix] is the unit ("ms").
+ *
+ * The field keeps its width while the range shows: the line reaches toward the field's start
+ * instead. [value] may come back late (through a Flow): what is being typed stays as typed.
  */
 @Composable
 fun NumberField(
@@ -301,7 +384,9 @@ fun NumberField(
     steppers: Boolean = false,
     enabled: Boolean = true,
 ) {
-    var text by remember(value) { mutableStateOf(value.toString()) }
+    val field = remember { NumberText(value, { it.toString() }, { it.toIntOrNull() }) }
+    SideEffect { field.sync(value) }
+    val text = field.text
     val parsed = text.toIntOrNull()
     val valid = parsed != null && parsed in min..max
     val locale = LocalConfiguration.current.locales[0]
@@ -313,75 +398,71 @@ fun NumberField(
     }
     val stepBy = { delta: Int ->
         val next = ((parsed ?: value).toLong() + delta).coerceIn(min.toLong(), max.toLong()).toInt()
-        text = next.toString()
-        onValueChange(next)
+        field.text = next.toString()
+        field.report(next, onValueChange)
     }
     val touch = isTouchDensity()
-    // the range goes under the field, aligned with its end, as wide as it needs
-    Column(horizontalAlignment = Alignment.End) {
-        TextFieldImpl(
-            value = text,
-            onValueChange = { input ->
-                val filtered = input.filterIndexed { i, c -> c.isDigit() || (c == '-' && i == 0 && min < 0) }.take(11)
-                text = filtered
-                filtered.toIntOrNull()?.takeIf { it in min..max }?.let(onValueChange)
-            },
-            // the default width goes after the caller's modifier, so a width given there wins
-            modifier = modifier
-                .width(
-                    when {
-                        steppers && touch -> 214.dp
-                        steppers -> 156.dp
-                        touch -> 150.dp
-                        else -> 112.dp
-                    },
-                )
-                .onPreviewKeyEvent { event ->
-                    if (event.type != KeyEventType.KeyDown || !enabled) return@onPreviewKeyEvent false
-                    when (event.key) {
-                        Key.DirectionUp -> { stepBy(step); true }
-                        Key.DirectionDown -> { stepBy(-step); true }
-                        else -> false
-                    }
+    TextFieldImpl(
+        value = text,
+        onValueChange = { input ->
+            val filtered = input.filterIndexed { i, c -> c.isDigit() || (c == '-' && i == 0 && min < 0) }.take(11)
+            field.text = filtered
+            filtered.toIntOrNull()?.takeIf { it in min..max }?.let { field.report(it, onValueChange) }
+        },
+        // the default width goes after the caller's modifier, so a width given there wins
+        modifier = modifier
+            .width(
+                when {
+                    steppers && touch -> 214.dp
+                    steppers -> 156.dp
+                    touch -> 150.dp
+                    else -> 112.dp
                 },
-            hint = "",
-            label = label,
-            leading = null,
-            suffix = suffix,
-            clearable = false,
-            singleLine = true,
-            minLines = 1,
-            maxLines = 1,
-            password = false,
-            error = !valid,
-            supportingText = null,
-            errorDescription = rangeText,
-            enabled = enabled,
-            readOnly = false,
-            mono = true,
-            keyboardType = KeyboardType.Number,
-            imeAction = ImeAction.Default,
-            onImeAction = null,
-            interactionSource = null,
-            trailing = if (!steppers) null else {
-                {
-                    Row {
-                        FieldButton(DeskIcons.Minus, stringResource(R.string.dk_number_decrease), enabled = enabled && (parsed ?: value) > min) { stepBy(-step) }
-                        FieldButton(DeskIcons.Plus, stringResource(R.string.dk_number_increase), enabled = enabled && (parsed ?: value) < max) { stepBy(step) }
-                    }
+            )
+            .onPreviewKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown || !enabled) return@onPreviewKeyEvent false
+                when (event.key) {
+                    Key.DirectionUp -> { stepBy(step); true }
+                    Key.DirectionDown -> { stepBy(-step); true }
+                    else -> false
                 }
             },
-        )
-        if (!valid) {
-            Text(rangeText, style = DeskTheme.type.labelSmall, color = DeskTheme.colors.danger, maxLines = 1,
-                modifier = Modifier.padding(top = 4.dp))
-        }
-    }
+        hint = "",
+        label = label,
+        leading = null,
+        suffix = suffix,
+        clearable = false,
+        singleLine = true,
+        minLines = 1,
+        maxLines = 1,
+        password = false,
+        error = !valid,
+        supportingText = null,
+        errorDescription = rangeText,
+        enabled = enabled,
+        readOnly = false,
+        mono = true,
+        keyboardType = KeyboardType.Number,
+        imeAction = ImeAction.Default,
+        onImeAction = null,
+        interactionSource = null,
+        trailing = if (!steppers) null else {
+            {
+                Row {
+                    FieldButton(DeskIcons.Minus, stringResource(R.string.dk_number_decrease), enabled = enabled && (parsed ?: value) > min) { stepBy(-step) }
+                    FieldButton(DeskIcons.Plus, stringResource(R.string.dk_number_increase), enabled = enabled && (parsed ?: value) < max) { stepBy(step) }
+                }
+            }
+        },
+        // the range goes under the field, aligned with its end, as wide as it needs
+        endMessage = if (valid) null else rangeText,
+    )
 }
 
 /**
  * A number that may be left empty: blank is null. Only digits can be typed. For optional filters
- * ("at least … kB").
+ * ("at least … kB"). A [value] set from outside (a reset) replaces what was typed; the field's own
+ * reports coming back late do not.
  */
 @Composable
 fun OptionalNumberField(
@@ -393,15 +474,14 @@ fun OptionalNumberField(
     label: String? = null,
     enabled: Boolean = true,
 ) {
-    var text by remember { mutableStateOf(value?.toString().orEmpty()) }
-    // a value set from outside (a reset) replaces what was typed
-    if (value != text.toLongOrNull()) text = value?.toString().orEmpty()
+    val field = remember { NumberText(value, { it?.toString().orEmpty() }, { it.toLongOrNull() }) }
+    SideEffect { field.sync(value) }
     DeskTextField(
-        value = text,
+        value = field.text,
         onValueChange = { input ->
             val filtered = input.filter { it.isDigit() }.take(18)
-            text = filtered
-            onValueChange(filtered.toLongOrNull())
+            field.text = filtered
+            field.report(filtered.toLongOrNull(), onValueChange)
         },
         modifier = modifier,
         hint = hint,
@@ -611,10 +691,10 @@ fun SwitchRow(
     )
 }
 
-/** A check box with its text; the whole line toggles. [subtitle] adds a second line. */
+/** A check box with its [title]; the whole line toggles. [subtitle] adds a second line. */
 @Composable
 fun CheckboxRow(
-    text: String,
+    title: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
@@ -623,7 +703,7 @@ fun CheckboxRow(
 ) {
     val interaction = remember { MutableInteractionSource() }
     ToggleRow(
-        title = text,
+        title = title,
         subtitle = subtitle,
         enabled = enabled,
         modifier = modifier
@@ -637,7 +717,7 @@ fun CheckboxRow(
 /** [CheckboxRow] for a three-state check box ("Lossy (2 of 3)"). */
 @Composable
 fun CheckboxRow(
-    text: String,
+    title: String,
     state: ToggleableState,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -646,7 +726,7 @@ fun CheckboxRow(
 ) {
     val interaction = remember { MutableInteractionSource() }
     ToggleRow(
-        title = text,
+        title = title,
         subtitle = subtitle,
         enabled = enabled,
         modifier = modifier

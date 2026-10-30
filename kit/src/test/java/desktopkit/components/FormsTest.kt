@@ -2,6 +2,24 @@ package desktopkit.components
 
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.click
+import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.performImeAction
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.testTag
@@ -55,12 +73,125 @@ class FormsTest {
         }
         compose.onNodeWithTag("buffer").performTextReplacement("9000")
         assertEquals("out of range: not reported", 100, value)
-        compose.onNodeWithTag("buffer").assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Error))
-        compose.onNodeWithText("0 ile 5.000 arasında olmalı").assertExists()
+        // the range under the field is what TalkBack hears as the error
+        compose.onNodeWithTag("buffer").assert(SemanticsMatcher.expectValue(SemanticsProperties.Error, "0 ile 5.000 arasında olmalı"))
 
         compose.onNodeWithTag("buffer").performTextReplacement("4500")
         assertEquals(4500, value)
-        compose.onNodeWithText("0 ile 5.000 arasında olmalı").assertDoesNotExist()
+        compose.onNodeWithTag("buffer").assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Error))
+    }
+
+    @Test
+    fun numberFieldKeepsItsPlaceWhenTheRangeShows() {
+        compose.setContent {
+            DesktopKitTheme(inputMode = InputMode.Pointer) {
+                Row {
+                    NumberField(100, {}, Modifier.testTag("buffer"), min = 0, max = 5000, suffix = "ms")
+                    Box(Modifier.size(20.dp).testTag("next"))
+                }
+            }
+        }
+        val field = compose.onNodeWithTag("buffer").getBoundsInRoot()
+        val next = compose.onNodeWithTag("next").getBoundsInRoot()
+        compose.onNodeWithTag("buffer").performTextReplacement("9000")
+        // the line is wider than the field: it reaches toward the start, the field and its neighbour stay
+        val fieldAfter = compose.onNodeWithTag("buffer").getBoundsInRoot()
+        assertEquals(field.left, fieldAfter.left)
+        assertEquals(field.right, fieldAfter.right)
+        assertEquals(next.left, compose.onNodeWithTag("next").getBoundsInRoot().left)
+    }
+
+    @Test
+    fun numberFieldKeepsWhatIsTypedWhileTheValueComesBackLate() {
+        // the value reaches the field a keystroke late, as state passed through a Flow does
+        var shown by mutableIntStateOf(1)
+        val reported = mutableListOf<Int>()
+        compose.setContent {
+            DesktopKitTheme(inputMode = InputMode.Pointer) {
+                NumberField(shown, { reported += it }, Modifier.testTag("count"), min = 0, max = 99999)
+            }
+        }
+        compose.onNodeWithTag("count").performTextReplacement("12")
+        compose.onNodeWithTag("count").performTextReplacement("123")
+        assertEquals(listOf(12, 123), reported)
+        shown = 12
+        compose.waitForIdle()
+        compose.onNodeWithTag("count").assert(hasText("123"))
+        shown = 123
+        compose.waitForIdle()
+        compose.onNodeWithTag("count").assert(hasText("123"))
+        // a value set from outside replaces the text
+        shown = 7
+        compose.waitForIdle()
+        compose.onNodeWithTag("count").assert(hasText("7"))
+    }
+
+    @Test
+    fun optionalNumberFieldKeepsWhatIsTypedWhileTheValueComesBackLate() {
+        var shown by mutableStateOf<Long?>(null)
+        compose.setContent {
+            DesktopKitTheme(inputMode = InputMode.Pointer) {
+                OptionalNumberField(shown, {}, Modifier.testTag("size"))
+            }
+        }
+        compose.onNodeWithTag("size").performTextReplacement("5")
+        compose.onNodeWithTag("size").performTextReplacement("50")
+        shown = 5
+        compose.waitForIdle()
+        compose.onNodeWithTag("size").assert(hasText("50"))
+        // a reset from outside
+        shown = null
+        compose.waitForIdle()
+        compose.onNodeWithTag("size").assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("")))
+    }
+
+    @Test
+    fun enterAndTheKeyboardsActionKeyRunTheAction() {
+        var searches = 0
+        compose.setContent {
+            DesktopKitTheme(inputMode = InputMode.Pointer) {
+                DeskTextField("Kış", {}, Modifier.testTag("search"), imeAction = ImeAction.Search, onImeAction = { searches++ })
+            }
+        }
+        compose.onNodeWithTag("search").requestFocus()
+        compose.onNodeWithTag("search").performKeyInput { pressKey(Key.Enter) }
+        assertEquals("a hardware Enter, once", 1, searches)
+        compose.onNodeWithTag("search").performImeAction()
+        assertEquals(2, searches)
+    }
+
+    @Test
+    fun withoutAnActionTheKeyboardsKeyDoesItsOwnJob() {
+        compose.setContent {
+            DesktopKitTheme(inputMode = InputMode.Touch) {
+                Column {
+                    DeskTextField("", {}, Modifier.testTag("first"), imeAction = ImeAction.Next)
+                    DeskTextField("", {}, Modifier.testTag("second"))
+                }
+            }
+        }
+        compose.onNodeWithTag("first").requestFocus()
+        compose.onNodeWithTag("first").performImeAction()
+        // Next moved on to the following field
+        compose.onNodeWithTag("second").assertIsFocused()
+    }
+
+    @Test
+    fun aFingerReachesAFieldButtonAroundIt() {
+        var text = "Mavi Hat"
+        compose.setContent {
+            DesktopKitTheme(inputMode = InputMode.Touch) {
+                DeskTextField(text, { text = it }, Modifier.testTag("field").width(240.dp), clearable = true)
+            }
+        }
+        val field = compose.onNodeWithTag("field").getBoundsInRoot()
+        val clear = compose.onNodeWithContentDescription("Temizle").getBoundsInRoot()
+        assertEquals(32f, (clear.right - clear.left).value, 0.5f)
+        // a touch 4 dp past the button's end edge, still within the 48 dp a finger is given
+        compose.onNodeWithTag("field").performTouchInput {
+            click(Offset((clear.right + 4.dp - field.left).toPx(), ((clear.top + clear.bottom) / 2 - field.top).toPx()))
+        }
+        assertEquals("", text)
     }
 
     @Test
