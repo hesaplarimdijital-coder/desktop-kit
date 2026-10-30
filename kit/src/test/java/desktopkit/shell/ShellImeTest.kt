@@ -126,6 +126,7 @@ class ShellImeTest {
         val keyboardTop: Dp = root.bottom - with(compose.density) { keyboardPx.toDp() }
         val status = compose.onNodeWithText("Kopyalanıyor: Yedek.zip").getBoundsInRoot()
         assertTrue("status strip ends at ${status.bottom}, keyboard starts at $keyboardTop", status.bottom <= keyboardTop + 1.dp)
-        assertTrue("status strip sits on the keyboard: ${status.bottom} vs $keyboardTop", status.bottom >= keyboardTop - 1.dp)
+        // the strip (49 dp with its rule) lies right on the keyboard, not higher up
+        assertTrue("status strip sits on the keyboard: ${status.top} vs $keyboardTop", status.top >= keyboardTop - 49.dp)
     }
 }

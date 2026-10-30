@@ -30,6 +30,8 @@ import desktopkit.components.DeskButton
 import desktopkit.components.DeskTextField
 import desktopkit.theme.DesktopKitTheme
 import desktopkit.theme.InputMode
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -50,12 +52,14 @@ class KeyboardDismissTest {
 
     private var text by mutableStateOf("Kış")
     private var other by mutableStateOf("")
+    private lateinit var host: ShellOverlayHost
 
     private fun screen() {
         compose.runOnUiThread { compose.activity.actionBar?.hide() }
         compose.setContent {
             DesktopKitTheme(inputMode = InputMode.Touch) {
                 TestShell(WidthClass.Compact, content = { _, _ ->
+                    host = LocalShellOverlayHost.current!!
                     Column(Modifier.fillMaxSize()) {
                         DeskTextField(text, { text = it }, Modifier.fillMaxWidth().padding(16.dp).testTag("field"), hint = "Ara")
                         DeskTextField(other, { other = it }, Modifier.fillMaxWidth().padding(16.dp).testTag("other"), hint = "Not")
@@ -71,11 +75,18 @@ class KeyboardDismissTest {
         compose.onNodeWithTag("field").performClick()
         compose.waitForIdle()
         compose.onNodeWithTag("field").assertIsFocused()
+        compose.runOnIdle { assertTrue("the shell knows a field has the focus", host.textFields.anyFocused) }
     }
+
+    private fun center(tag: String): Offset = compose.onNodeWithTag(tag).fetchSemanticsNode().boundsInWindow.center
 
     @Test
     fun aTapElsewhereClosesTheKeyboard() {
         screen()
+        compose.runOnIdle {
+            assertTrue("the field is where the shell looks", host.textFields.contains(center("field")))
+            assertFalse("the button is not on a field", host.textFields.contains(center("button")))
+        }
         compose.onNodeWithTag("button").performClick()
         compose.waitForIdle()
         compose.onNodeWithTag("field").assertIsNotFocused()
