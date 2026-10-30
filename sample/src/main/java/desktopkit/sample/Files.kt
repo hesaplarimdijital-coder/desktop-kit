@@ -2,25 +2,32 @@ package desktopkit.sample
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import desktopkit.components.ChipOption
 import desktopkit.components.ColumnWidth
+import desktopkit.components.CoverCell
 import desktopkit.components.DenseTable
 import desktopkit.components.DeskButton
 import desktopkit.components.DeskDragPayload
+import desktopkit.components.DeskGrid
 import desktopkit.components.DeskIconButton
 import desktopkit.components.DeskIcons
 import desktopkit.components.DeskSearchField
@@ -43,6 +50,7 @@ import desktopkit.shell.TopBarAction
 import desktopkit.shell.WidthClass
 import desktopkit.shell.currentWidthClass
 import desktopkit.theme.DeskTheme
+import desktopkit.theme.InputMode
 
 /**
  * Multi-selection (click, Ctrl+click, Shift+click, Ctrl+A, Shift+arrows; "Select" toggles rows
@@ -97,8 +105,12 @@ private fun FilesList(prefs: DeskPreferences, library: LibraryState, inspectorTo
     var kinds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var selected by remember { mutableStateOf<Set<Any>>(emptySet()) }
     var selectMode by remember { mutableStateOf(false) }
+    var grid by rememberSaveable { mutableStateOf(false) }
     var opened by remember { mutableStateOf<String?>(null) }
     val compact = currentWidthClass() == WidthClass.Compact
+    // a finger opens a file with a tap (the kit leaves the selection alone); a mouse click selects,
+    // and "Open" is in the menu
+    val openOnTap = compact || DeskTheme.inputMode == InputMode.Touch
     val files = sampleFiles.filter { it.name !in library.binned }
     DetailTransition(
         detail = files.firstOrNull { it.name == opened },
@@ -111,8 +123,8 @@ private fun FilesList(prefs: DeskPreferences, library: LibraryState, inspectorTo
                 val subtitle = if (selected.isEmpty()) "${files.size} items" else "${selected.size} of ${files.size} selected"
                 PageHeader("Files", subtitle = subtitle) {
                     DeskButton(if (selectMode) "Done" else "Select", { selectMode = !selectMode })
-                    DeskIconButton(DeskIcons.Grid, "Grid", {})
-                    DeskIconButton(DeskIcons.ListView, "List", {}, selected = true)
+                    DeskIconButton(DeskIcons.Grid, "Grid", { grid = true }, selected = grid)
+                    DeskIconButton(DeskIcons.ListView, "List", { grid = false }, selected = !grid)
                     if (!compact) inspectorToggle()
                 }
                 DeskSearchField(filter, { filter = it },
@@ -126,22 +138,84 @@ private fun FilesList(prefs: DeskPreferences, library: LibraryState, inspectorTo
                     onToggle = { kind -> kinds = if (kind in kinds) kinds - kind else kinds + kind },
                     modifier = Modifier.padding(bottom = DeskTheme.dimens.gapS),
                 )
-                FilesTable(
-                    files = files,
-                    prefs = prefs,
-                    filter = filter,
-                    kinds = kinds,
-                    selectedKeys = selected,
-                    onSelectionChange = { selected = it },
-                    toggleOnClick = selectMode,
-                    onOpen = { opened = it.name },
-                    openOnClick = compact,
-                )
+                if (grid) {
+                    FilesGrid(
+                        files = files,
+                        filter = filter,
+                        kinds = kinds,
+                        selectedKeys = selected,
+                        onSelectionChange = { selected = it },
+                        toggleOnClick = selectMode,
+                        onOpen = { opened = it.name },
+                        openOnClick = openOnTap,
+                    )
+                } else {
+                    FilesTable(
+                        files = files,
+                        prefs = prefs,
+                        filter = filter,
+                        kinds = kinds,
+                        selectedKeys = selected,
+                        onSelectionChange = { selected = it },
+                        toggleOnClick = selectMode,
+                        onOpen = { opened = it.name },
+                        openOnClick = openOnTap,
+                    )
+                }
             }
         },
     ) { file ->
         FileDetails(file, onClose = { opened = null })
     }
+}
+
+/** The files as tiles, by kind: the table's selection, menu and drag (with a mouse, onto "Bin"). */
+@Composable
+private fun FilesGrid(
+    files: List<SampleFile>,
+    filter: String,
+    kinds: Set<String>,
+    selectedKeys: Set<Any>,
+    onSelectionChange: (Set<Any>) -> Unit,
+    toggleOnClick: Boolean,
+    onOpen: (SampleFile) -> Unit,
+    openOnClick: Boolean,
+) {
+    val shown = files
+        .filter { filter.isBlank() || it.name.contains(filter.trim(), ignoreCase = true) }
+        .filter { kinds.isEmpty() || it.kind in kinds }
+        .sortedBy { it.name }
+    DeskGrid(
+        items = shown,
+        key = { it.name },
+        onItemClick = { file, _ -> if (openOnClick) onOpen(file) },
+        minCellWidth = 112.dp,
+        selectedKeys = selectedKeys,
+        onSelectionChange = onSelectionChange,
+        toggleOnClick = toggleOnClick,
+        itemMenu = { file, _ -> listOf(MenuEntry.Item("Open", { onOpen(file) }, shortcut = "Enter", icon = DeskIcons.OpenWindow)) },
+        itemMenuLabel = "More actions",
+        itemDrag = { file, _ ->
+            val names = if (file.name in selectedKeys) selectedKeys.map { it as String } else listOf(file.name)
+            DeskDragPayload(DragKinds.FILE, names, if (names.size == 1) names[0] else "${names.size} files")
+        },
+    ) { file ->
+        CoverCell(file.name, subtitle = "${file.kind} · ${file.size}") {
+            Box(Modifier.fillMaxSize().background(DeskTheme.colors.surface), contentAlignment = Alignment.Center) {
+                Icon(kindIcon(file.kind), contentDescription = null, tint = DeskTheme.colors.textSecondary, modifier = Modifier.size(36.dp))
+            }
+        }
+    }
+}
+
+private fun kindIcon(kind: String) = when (kind) {
+    "Folder" -> DeskIcons.Folder
+    "Audio" -> DeskIcons.Music
+    "Text" -> DeskIcons.Lyrics
+    "Spreadsheet" -> DeskIcons.Grid
+    "Presentation" -> DeskIcons.Screenshot
+    "Archive" -> DeskIcons.Downloads
+    else -> DeskIcons.Info
 }
 
 /**

@@ -24,8 +24,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import desktopkit.components.BannerTone
 import desktopkit.components.CoverCell
 import desktopkit.components.DeskButton
 import desktopkit.components.DeskDragPayload
@@ -35,7 +35,6 @@ import desktopkit.components.DeskListRow
 import desktopkit.components.MenuEntry
 import desktopkit.components.MoreButton
 import desktopkit.components.StatusBanner
-import desktopkit.components.BannerTone
 import desktopkit.components.dropZone
 import desktopkit.screens.PageHeader
 import desktopkit.shell.CompactTopBar
@@ -47,6 +46,7 @@ import desktopkit.shell.detailSharedBounds
 import desktopkit.shell.detailSharedElement
 import desktopkit.shell.rememberShellContentPadding
 import desktopkit.theme.DeskTheme
+import desktopkit.theme.InputMode
 import kotlinx.coroutines.delay
 
 /** What a drop of [payload] adds to a playlist: a whole album or single tracks. */
@@ -125,7 +125,7 @@ private fun AlbumPage(album: Album, onBack: () -> Unit, onPlay: (Int) -> Unit) {
     LazyColumn(Modifier.fillMaxSize()) {
         item {
             val cover = @Composable { size: androidx.compose.ui.unit.Dp ->
-                Box(Modifier.detailSharedElement("cover-${album.id}").size(size).clip(RoundedCornerShape(12.dp)).background(album.artwork))
+                Box(Modifier.detailSharedElement("cover-${album.id}", shape = RoundedCornerShape(12.dp)).size(size).background(album.artwork))
             }
             val about = @Composable {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -192,41 +192,85 @@ fun TracksScreen(playing: Int, onPlay: (Int) -> Unit) {
     }
 }
 
-/** Playlists take albums and tracks dropped on them here, or on "Playlists" in the sidebar. */
+/**
+ * Playlists take albums and tracks dropped on them here, or on "Playlists" in the sidebar (with a
+ * mouse: the hint shows only then). A tap opens a playlist's songs.
+ */
 @Composable
-fun PlaylistsScreen(library: LibraryState) {
-    Column(Modifier.fillMaxSize()) {
-        PageHeader("Playlists", subtitle = "${library.playlists.size} playlists")
-        StatusBanner(
-            BannerTone.Info,
-            "With a mouse, drag albums or tracks onto a playlist, or onto “Playlists” in the sidebar.",
-            Modifier.padding(horizontal = DeskTheme.dimens.pagePadding).padding(bottom = DeskTheme.dimens.gapS),
-        )
-        library.playlists.forEachIndexed { index, playlist ->
+fun PlaylistsScreen(library: LibraryState, onPlay: (Int) -> Unit) {
+    var opened by rememberSaveable { mutableStateOf<String?>(null) }
+    DetailTransition(
+        detail = library.playlists.firstOrNull { it.name == opened },
+        onBack = { opened = null },
+        detailKey = { it.name },
+        sharedElements = false,
+        list = {
+            Column(Modifier.fillMaxSize()) {
+                PageHeader("Playlists", subtitle = "${library.playlists.size} playlists")
+                if (DeskTheme.inputMode == InputMode.Pointer) {
+                    StatusBanner(
+                        BannerTone.Info,
+                        "With a mouse, drag albums or tracks onto a playlist, or onto “Playlists” in the sidebar.",
+                        Modifier.padding(horizontal = DeskTheme.dimens.pagePadding).padding(bottom = DeskTheme.dimens.gapS),
+                    )
+                }
+                library.playlists.forEachIndexed { index, playlist ->
+                    DeskListRow(
+                        title = playlist.name,
+                        subtitle = "${playlist.count} songs",
+                        leading = DeskIcons.Queue,
+                        onClick = { opened = playlist.name },
+                        modifier = Modifier.dropZone(
+                            setOf(DragKinds.ALBUM, DragKinds.TRACK),
+                            onDrop = { payload ->
+                                library.addToPlaylist(index, songsIn(payload))
+                                true
+                            },
+                        ),
+                    )
+                }
+            }
+        },
+    ) { playlist ->
+        PlaylistPage(playlist, onBack = { opened = null }, onPlay = onPlay)
+    }
+}
+
+/** A playlist's songs (the sample's tracks over and over, as many as the playlist holds). */
+@Composable
+private fun PlaylistPage(playlist: Playlist, onBack: () -> Unit, onPlay: (Int) -> Unit) {
+    CompactTopBar(
+        title = playlist.name,
+        onBack = onBack,
+        actions = listOf(TopBarAction(DeskIcons.Play, "Play", { onPlay(0) }, primary = true)),
+    )
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = rememberShellContentPadding()) {
+        item {
+            PageHeader(playlist.name, subtitle = "${playlist.count} songs") {
+                DeskButton("Play", { onPlay(0) }, icon = DeskIcons.Play, primary = true)
+                if (currentWidthClass() != WidthClass.Compact) DeskButton("Back", onBack, icon = DeskIcons.ArrowLeft)
+            }
+        }
+        itemsIndexed(List(playlist.count) { tracks[it % tracks.size] }) { i, track ->
             DeskListRow(
-                title = playlist.name,
-                subtitle = "${playlist.count} songs",
-                leading = DeskIcons.Queue,
-                modifier = Modifier.dropZone(
-                    setOf(DragKinds.ALBUM, DragKinds.TRACK),
-                    onDrop = { payload ->
-                        library.addToPlaylist(index, songsIn(payload))
-                        true
-                    },
-                ),
+                title = track.title,
+                subtitle = track.artist,
+                leadingContent = { Box(Modifier.size(40.dp).background(track.artwork, RoundedCornerShape(6.dp))) },
+                trailing = track.length,
+                onClick = { onPlay(i % tracks.size) },
             )
         }
     }
 }
 
-/** Files dropped on "Bin" in the sidebar, with a way back. */
+/** Files dropped on "Bin" in the sidebar (the hint shows with a mouse), with a way back. */
 @Composable
 fun BinScreen(library: LibraryState) {
     Column(Modifier.fillMaxSize()) {
         PageHeader("Bin", subtitle = if (library.binned.isEmpty()) "Empty" else "${library.binned.size} files") {
             if (library.binned.isNotEmpty()) DeskButton("Restore all", { library.binned.clear() }, icon = DeskIcons.Undo)
         }
-        if (library.binned.isEmpty()) {
+        if (library.binned.isEmpty() && DeskTheme.inputMode == InputMode.Pointer) {
             StatusBanner(
                 BannerTone.Info,
                 "With a mouse, drag files from “Files” onto “Bin” in the sidebar.",

@@ -5,11 +5,13 @@ import android.content.ClipDescription
 import android.os.PersistableBundle
 import android.view.DragEvent
 import android.view.View
-import androidx.compose.foundation.draganddrop.dragAndDropSource
 import androidx.compose.foundation.draganddrop.dragAndDropTarget
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -17,18 +19,50 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draganddrop.DragAndDropEvent
+import androidx.compose.ui.draganddrop.DragAndDropSourceModifierNode
+import androidx.compose.ui.draganddrop.DragAndDropStartTransferScope
 import androidx.compose.ui.draganddrop.DragAndDropTarget
 import androidx.compose.ui.draganddrop.DragAndDropTransferData
 import androidx.compose.ui.draganddrop.toAndroidDragEvent
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.input.pointer.PointerType
+import androidx.compose.ui.input.pointer.SuspendingPointerInputModifierNode
+import androidx.compose.ui.input.pointer.isPrimaryPressed
+import androidx.compose.ui.input.pointer.isSecondaryPressed
+import androidx.compose.ui.node.CompositionLocalConsumerModifierNode
+import androidx.compose.ui.node.DelegatingNode
+import androidx.compose.ui.node.ModifierNodeElement
+import androidx.compose.ui.node.currentValueOf
+import androidx.compose.ui.platform.InspectorInfo
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFontFamilyResolver
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import desktopkit.theme.DeskColors
 import desktopkit.theme.DeskTheme
-import desktopkit.theme.InputMode
+import desktopkit.theme.DeskType
+import desktopkit.theme.LocalDeskColors
+import desktopkit.theme.LocalDeskType
 import desktopkit.theme.rememberDeskHaptics
 import java.util.UUID
 
@@ -88,10 +122,17 @@ internal object DragsInFlight {
 
 /**
  * Lets this element be dragged to a [dropZone] (of this window or, with [acrossWindows], of the
- * app's other windows; other apps get the label as text). With a mouse or touchpad a drag starts
- * once the pointer moves with the button held; on touch only when [touch] is true, on a long press
- * (otherwise a long press keeps opening the element's menu). [payload] is asked when the drag
- * starts; null cancels it.
+ * app's other windows; other apps get the label as text). As in Samsung's My Files, the pointer
+ * must first rest on the element for the system's touch and hold delay (Settings › Accessibility,
+ * half a second by default); moving earlier starts nothing, so a quick drag across a list never
+ * picks up a row by accident. With a mouse, touchpad or pen the drag then starts as the pointer
+ * moves, so a slow click (on the element or a button in it) stays a click. With a finger it starts
+ * at the end of the delay, as Android's long press does, and only when [touch] is true (otherwise a
+ * long press keeps opening the element's menu).
+ *
+ * Under the pointer the drag shows a small card with [DeskDragPayload.label] and, for several items,
+ * their number. The element itself keeps drawing as usual while it can be dragged (its hover and
+ * selection change as they always do). [payload] is asked when the drag starts; null cancels it.
  */
 @Composable
 fun Modifier.dragSource(
@@ -100,10 +141,198 @@ fun Modifier.dragSource(
     touch: Boolean = false,
     payload: () -> DeskDragPayload?,
 ): Modifier {
-    val pointer = DeskTheme.inputMode == InputMode.Pointer
-    val latest by rememberUpdatedState(payload)
-    if (!enabled || (!pointer && !touch)) return this
-    return dragAndDropSource { _ -> latest()?.toTransferData(acrossWindows) }
+    val latest = rememberUpdatedState(payload)
+    if (!enabled) return this
+    return this then DragSourceElement(acrossWindows, touch, latest)
+}
+
+private data class DragSourceElement(
+    val acrossWindows: Boolean,
+    val touch: Boolean,
+    val payload: State<() -> DeskDragPayload?>,
+) : ModifierNodeElement<DragSourceNode>() {
+    override fun create() = DragSourceNode(acrossWindows, touch, payload)
+
+    override fun update(node: DragSourceNode) {
+        node.acrossWindows = acrossWindows
+        node.touch = touch
+        node.payload = payload
+    }
+
+    override fun InspectorInfo.inspectableProperties() {
+        name = "dragSource"
+        properties["acrossWindows"] = acrossWindows
+        properties["touch"] = touch
+    }
+}
+
+/**
+ * Waits for the pointer to rest on the element (see [dragSource]) and then starts the platform drag
+ * with a [DragCard]. Unlike Compose's ready-made drag source it does not draw the element through
+ * a picture taken once (that kept rows showing their first look: no hover, a stale selection).
+ */
+private class DragSourceNode(
+    var acrossWindows: Boolean,
+    var touch: Boolean,
+    var payload: State<() -> DeskDragPayload?>,
+) : DelegatingNode(), CompositionLocalConsumerModifierNode {
+
+    private val source = delegate(DragAndDropSourceModifierNode { _ -> startTransfer() })
+
+    init {
+        delegate(SuspendingPointerInputModifierNode { awaitHold() })
+    }
+
+    private suspend fun PointerInputScope.awaitHold() {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            val precise = down.type == PointerType.Mouse || down.type == PointerType.Stylus || down.type == PointerType.Eraser
+            // a finger only where asked; a mouse only with its main button, nothing with the button
+            // that opens menus
+            if (!precise && !touch) return@awaitEachGesture
+            if (down.type == PointerType.Mouse && !currentEvent.buttons.isPrimaryPressed) return@awaitEachGesture
+            if (currentEvent.buttons.isSecondaryPressed) return@awaitEachGesture
+            val slop = viewConfiguration.touchSlop
+            val ledEarly = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                // lifted or moved away before the delay: no drag this time
+                while (true) {
+                    val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id }
+                    if (change == null || !change.pressed || (change.position - down.position).getDistance() > slop) break
+                }
+                true
+            }
+            if (ledEarly != null) return@awaitEachGesture
+            if (!precise) {
+                // a finger held still: the drag starts now, as with Android's long press
+                source.requestDragAndDropTransfer(down.position)
+                return@awaitEachGesture
+            }
+            // a mouse or a pen held still: the drag starts as it moves; let go first and it was a click
+            while (true) {
+                val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id }
+                if (change == null || !change.pressed) return@awaitEachGesture
+                if ((change.position - down.position).getDistance() > slop) {
+                    source.requestDragAndDropTransfer(change.position)
+                    return@awaitEachGesture
+                }
+            }
+        }
+    }
+
+    private fun DragAndDropStartTransferScope.startTransfer() {
+        val data = payload.value() ?: return
+        val card = DragCard(
+            payload = data,
+            colors = currentValueOf(LocalDeskColors),
+            type = currentValueOf(LocalDeskType),
+            density = currentValueOf(LocalDensity),
+            fonts = currentValueOf(LocalFontFamilyResolver),
+            direction = currentValueOf(LocalLayoutDirection),
+        )
+        startDragAndDropTransfer(data.toTransferData(acrossWindows), card.pictureSize) { with(card) { draw() } }
+    }
+}
+
+/**
+ * The card a kit drag carries: the payload's label on the raised surface colour with a soft shadow,
+ * and for several items their number in an accent badge on its corner (like My Files). The platform
+ * puts the middle of the picture under the pointer; the card sits above that point, so the place
+ * the pointer is over stays in sight.
+ */
+private class DragCard(
+    payload: DeskDragPayload,
+    private val colors: DeskColors,
+    type: DeskType,
+    private val density: Density,
+    fonts: FontFamily.Resolver,
+    direction: LayoutDirection,
+) {
+    private val measurer = TextMeasurer(fonts, density, direction, cacheSize = 0)
+    private val label = with(density) {
+        measurer.measure(
+            AnnotatedString(payload.label),
+            style = type.bodyStrong.copy(color = colors.text),
+            overflow = TextOverflow.Ellipsis,
+            softWrap = false,
+            maxLines = 1,
+            constraints = Constraints(maxWidth = LABEL_MAX.roundToPx()),
+        )
+    }
+    private val count = payload.keys.size
+    private val badge = if (count < 2) null else measurer.measure(
+        AnnotatedString(if (count > 99) "99+" else count.toString()),
+        style = type.labelSmall.copy(color = colors.onAccent, fontWeight = FontWeight.SemiBold),
+        maxLines = 1,
+    )
+    private val px = with(density) {
+        Metrics(
+            padding = PADDING.toPx(),
+            height = HEIGHT.toPx(),
+            minWidth = MIN_WIDTH.toPx(),
+            radius = RADIUS.toPx(),
+            margin = MARGIN.toPx(),
+            gap = GAP.toPx(),
+            badge = BADGE.toPx(),
+            shadow = 2.dp.toPx(),
+            line = 1.dp.toPx(),
+        )
+    }
+    private val cardWidth = maxOf(px.minWidth, label.size.width + 2 * px.padding)
+
+    /** Twice the card's height plus the gap, so the card ends [GAP] above the middle (the pointer). */
+    val pictureSize = Size(cardWidth + 2 * px.margin, 2 * (px.height + px.gap + px.margin))
+
+    fun DrawScope.draw() {
+        val topLeft = Offset(px.margin, size.height / 2 - px.gap - px.height)
+        val corner = CornerRadius(px.radius)
+        // a soft shadow: a few widening, fainter outlines under the card
+        for (step in 3 downTo 1) {
+            val grow = step * px.shadow
+            drawRoundRect(
+                Color.Black.copy(alpha = if (colors.isDark) 0.16f / step else 0.08f / step),
+                topLeft = topLeft + Offset(-grow / 2, grow / 2),
+                size = Size(cardWidth + grow, px.height + grow / 2),
+                cornerRadius = CornerRadius(px.radius + grow / 2),
+            )
+        }
+        drawRoundRect(colors.surfaceRaised, topLeft = topLeft, size = Size(cardWidth, px.height), cornerRadius = corner)
+        drawRoundRect(colors.border, topLeft = topLeft, size = Size(cardWidth, px.height), cornerRadius = corner, style = Stroke(px.line))
+        drawText(label, topLeft = topLeft + Offset((cardWidth - label.size.width) / 2, (px.height - label.size.height) / 2))
+        if (badge != null) {
+            val diameter = maxOf(px.badge, badge.size.width + px.padding)
+            val center = topLeft + Offset(cardWidth - diameter / 4, diameter / 4)
+            drawRoundRect(
+                colors.accent,
+                topLeft = center - Offset(diameter / 2, px.badge / 2),
+                size = Size(diameter, px.badge),
+                cornerRadius = CornerRadius(px.badge / 2),
+            )
+            drawText(badge, topLeft = center - Offset(badge.size.width / 2f, badge.size.height / 2f))
+        }
+    }
+
+    private class Metrics(
+        val padding: Float,
+        val height: Float,
+        val minWidth: Float,
+        val radius: Float,
+        val margin: Float,
+        val gap: Float,
+        val badge: Float,
+        val shadow: Float,
+        val line: Float,
+    )
+
+    private companion object {
+        val PADDING = 14.dp
+        val HEIGHT = 40.dp
+        val MIN_WIDTH = 96.dp
+        val LABEL_MAX = 240.dp
+        val RADIUS = 10.dp
+        val MARGIN = 12.dp
+        val GAP = 14.dp
+        val BADGE = 22.dp
+    }
 }
 
 /**

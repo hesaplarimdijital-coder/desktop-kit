@@ -1,7 +1,8 @@
 # 2.0'a geçiş
 
-Bu rehber kiti kullanan uygulamaları 2.0.0'a taşımak için. Soulseek+ ve Walkman Sync şu an 0.1.3 kullanıyor;
-1.0.0'dan geçenler 1. adımdan sonra doğrudan [1.0'dan 2.0'a](#10dan-20a) bölümüne atlayabilir.
+Bu rehber kiti kullanan uygulamaları 2.0'a taşımak için. Soulseek+ ve Walkman Sync şu an 0.1.3 kullanıyor;
+1.0.0'dan geçenler 1. adımdan sonra doğrudan [1.0'dan 2.0'a](#10dan-20a) bölümüne atlayabilir. 2.0.0 kullananlar
+yalnızca [2.0.0'dan 2.1.0'a](#200dan-210a) bölümüne bakar.
 
 Sıra şöyle: önce derleme ortamı (kitin kendisi aynı adımları `7845eb5` gönderisinde attı, örnek olarak
 oraya bakılabilir), sonra uygulamanın kendi yazdığı bileşenler kitinkilerle değiştirilir, en son yeni
@@ -166,3 +167,31 @@ Hepsi isteğe bağlı; hiçbiri açılmadan uygulama 2.0'la eskisi gibi çalış
 - **Yükleniyor görünümü:** `DenseTable(loading = true)`, `DeskGrid(loading = true)`, `SkeletonList()`.
 - **Erişilebilirlik:** `DeskSlider(label = "Ses düzeyi", valueText = { "${(it * 100).roundToInt()} %" })`
   TalkBack'e kaydırıcının adını ve değerini söyler.
+
+## 2.0.0'dan 2.1.0'a
+
+Kod değişmeden derlenir; sürümü `2.1.0` yapmak yeter. Testlerde ve kullanımda fark edilebilecek davranışlar:
+
+- **Sürükle bırak basılı tutunca başlar:** `dragSource`, `rowDrag`, `itemDrag`, `DeskListRow(drag)` ve `DeskTab(drag)`
+  sürüklemeyi işaretçi önce sistemin dokunup basılı tutma süresi kadar durunca başlatır: fare ve kalemde ardından
+  kayınca, parmakta (`touch = true`) süre dolunca. Sürüklemeyi basıp hemen kaydırarak deneyen testler bastıktan sonra
+  saati bu süreden (varsayılan 500 ms) fazla ilerletmeli, örneğin `compose.mainClock.advanceTimeBy(600)`, sonra
+  kaydırmalı.
+- **Bildirimler sıraya girmez:** yeni `toasts.show(…)` ekrandaki bildirimi kapatır; eskisinin `show` çağrısı
+  `ToastResult.Dismissed` döner. Sonucu "geri al"a bağlayan kod değişmez; arka arkaya gösterilmesi gereken iki
+  mesaj varsa tek bildirimde birleştir.
+- **Parmak dokunuşu seçmez:** `DenseTable` ve `DeskGrid` seçim yokken parmak ya da kalem dokunuşunda yalnızca
+  `onRowClick` / `onItemClick`'i çağırır; seçim varken dokunuş seçimi değiştirir. Yerleşim değil işaretçi belirler
+  (fare tıklaması her yerleşimde seçer). Uzun basma eskisi gibi menüyü açar ve satırı seçer, menü üzerinde
+  çalıştığı satırları `selectedKeys`'te bulur. Dokunuşla yalnızca seçip açmayan ekran (geniş pencerede seçilenin
+  ayrıntısını yan panelde gösteren gibi) artık dokunuşu `onRowClick`'te karşılamalı ve açtığı satırı
+  `selectedKeys`'e koymamalı (yoksa bir sonraki dokunuş açmak yerine seçer).
+- **Ekran klavyesi parmakla kapanır:** ekran klavyesi açıkken kabuğun içinde kaydırmak ya da metin alanları
+  dışına dokunmak odağı alır (donanım klavyesi bağlıyken almaz). Klavyeyi açık tutması gereken düğmeye (sohbetteki
+  Gönder) ve uygulamanın kendi `BasicTextField`'larına `Modifier.keepsKeyboardOpen()` ekle; işaretlenen alan
+  kitinkiler gibi sayılır.
+- **Kısayollar dokunmatikte gizli:** menülerde ve "⋯" sayfasında kısayol yalnızca fare ya da donanım klavyesi
+  varken yazılır. Kendi kısayol listen için `hasHardwareKeyboard()`.
+- **"⋯" sayfasında `checked`:** satır sonunda anahtar olur ve dokununca sayfa kapanmaz (menüde eskisi gibi kapanır).
+- **Paylaşılan kapak:** `detailSharedElement` öğeyi verilen biçimle kırpar; kapağı kendi `clip`'iyle yuvarlayan
+  ekran `shape =` verirse uçarken de yuvarlak kalır (`CoverCell` içinde hücrenin biçimi varsayılan).

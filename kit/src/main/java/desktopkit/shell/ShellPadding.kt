@@ -179,6 +179,9 @@ internal class ShellOverlayHost {
 
     /** Where the keyboard focus was before a layer took it: the layer gives it back when it closes. */
     val focusMemory = desktopkit.components.FocusMemory()
+
+    /** The kit's text fields in the content: a tap elsewhere or a scroll closes the keyboard (touch). */
+    val textFields = TextFields()
 }
 
 /**

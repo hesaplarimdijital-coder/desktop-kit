@@ -120,11 +120,19 @@ fun DesktopKitRoot(
         val belowCaption = WindowInsets.statusBars.union(WindowInsets.navigationBars).union(WindowInsets.displayCutout)
             .union(WindowInsets.ime)
         val rootInsets = remember(navigationBottom, captionTop) { RootInsets(navigationBottom, captionTop) }
-        val padding = remember(safeDrawing, belowCaption, rootInsets) { RootPadding(safeDrawing, belowCaption, rootInsets) }
+        // read here, not while measuring: a shell registers while the content is being measured, and
+        // a change made during that pass did not measure the padding again (the phone's first launch
+        // kept a navigation-bar-high gap under the shell until something else relaid the window)
+        val density = LocalDensity.current
+        val shellDrawsNavigation = rootInsets.shells > 0
+        val captionInUse = rootInsets.captionInUse(density)
+        val padding = remember(safeDrawing, belowCaption, navigationBottom, shellDrawsNavigation, captionInUse) {
+            RootPadding(safeDrawing, belowCaption, navigationBottom, shellDrawsNavigation, captionInUse)
+        }
         // the window's caption bar and the system's elements on it, read again whenever the window is
         // laid out (resized, the caption bar shown or hidden) or the caption bar reaches the content
         val view = LocalView.current
-        val captionPx = captionTop.getTop(LocalDensity.current)
+        val captionPx = captionTop.getTop(density)
         DisposableEffect(view, rootInsets, captionPx) {
             val update = { rootInsets.caption = CaptionElements.area(view) }
             val listener = View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> update() }
@@ -178,26 +186,37 @@ internal class RootInsets(
 internal val LocalRootInsets = staticCompositionLocalOf<RootInsets?> { null }
 
 /**
- * `safeDrawing`, without the bottom navigation bar while a shell draws behind it and without the
- * caption bar while a shell's menu bar fills it. Read while measuring.
+ * `safeDrawing`, without the bottom navigation bar while a shell draws behind it
+ * ([shellDrawsNavigation]) and without the caption bar while a shell's menu bar fills it
+ * ([captionInUse]). A new one is made whenever either changes, so the padding is measured again.
  */
 private class RootPadding(
     private val safe: WindowInsets,
     private val belowCaption: WindowInsets,
-    private val root: RootInsets,
+    private val navigationBottom: WindowInsets,
+    private val shellDrawsNavigation: Boolean,
+    private val captionInUse: Boolean,
 ) : WindowInsets {
     override fun getLeft(density: Density, layoutDirection: LayoutDirection) = safe.getLeft(density, layoutDirection)
-    override fun getTop(density: Density) =
-        if (root.captionInUse(density)) belowCaption.getTop(density) else safe.getTop(density)
+    override fun getTop(density: Density) = if (captionInUse) belowCaption.getTop(density) else safe.getTop(density)
     override fun getRight(density: Density, layoutDirection: LayoutDirection) = safe.getRight(density, layoutDirection)
     override fun getBottom(density: Density): Int {
         val bottom = safe.getBottom(density)
-        return if (root.shells > 0) (bottom - root.navigationBottom.getBottom(density)).coerceAtLeast(0) else bottom
+        return if (shellDrawsNavigation) (bottom - navigationBottom.getBottom(density)).coerceAtLeast(0) else bottom
     }
 
     override fun equals(other: Any?) =
-        other is RootPadding && other.safe == safe && other.belowCaption == belowCaption && other.root === root
-    override fun hashCode() = 31 * (31 * safe.hashCode() + belowCaption.hashCode()) + root.hashCode()
+        other is RootPadding && other.safe == safe && other.belowCaption == belowCaption &&
+            other.navigationBottom == navigationBottom && other.shellDrawsNavigation == shellDrawsNavigation &&
+            other.captionInUse == captionInUse
+
+    override fun hashCode(): Int {
+        var result = safe.hashCode()
+        result = 31 * result + belowCaption.hashCode()
+        result = 31 * result + navigationBottom.hashCode()
+        result = 31 * result + shellDrawsNavigation.hashCode()
+        return 31 * result + captionInUse.hashCode()
+    }
 }
 
 /**

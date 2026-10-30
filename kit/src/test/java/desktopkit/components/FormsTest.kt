@@ -266,22 +266,33 @@ class FormsTest {
     }
 
     @Test
-    fun toastsWaitTheirTurn() = runTest {
+    fun aNewToastTakesThePlaceOfTheOneShown() = runTest {
         val toasts = ToastState()
-        val first = async { toasts.show("Pencere sıraya eklendi", actionLabel = "Geri al") }
+        val first = async { toasts.show("Kayıt 14.flac çöpe taşındı", actionLabel = "Geri al") }
         runCurrent()
-        assertEquals("Pencere sıraya eklendi", toasts.current?.message)
+        assertEquals("Kayıt 14.flac çöpe taşındı", toasts.current?.message)
         assertEquals(ToastDuration.Long, toasts.current?.duration)
-        val second = async { toasts.show("Kopyalandı") }
+        // the tablet showed each "moved to the bin" ten seconds after the one before it
+        val second = async { toasts.show("Notlar.md çöpe taşındı", actionLabel = "Geri al") }
         runCurrent()
-        assertEquals("the second waits for the first", "Pencere sıraya eklendi", toasts.current?.message)
+        assertEquals("the first ends as dismissed", ToastResult.Dismissed, first.await())
+        assertEquals("Notlar.md çöpe taşındı", toasts.current?.message)
         toasts.current!!.performAction()
         runCurrent()
-        assertEquals(ToastResult.ActionPerformed, first.await())
-        assertEquals("Kopyalandı", toasts.current?.message)
+        assertEquals(ToastResult.ActionPerformed, second.await())
+        assertNull(toasts.current)
+        // asked for at the same time: only the newest shows
+        val third = async { toasts.show("Kopyalandı") }
+        runCurrent()
+        val fourth = async { toasts.show("Taşındı") }
+        val fifth = async { toasts.show("Yeniden adlandırıldı") }
+        runCurrent()
+        assertEquals(ToastResult.Dismissed, third.await())
+        assertEquals(ToastResult.Dismissed, fourth.await())
+        assertEquals("Yeniden adlandırıldı", toasts.current?.message)
         assertEquals(ToastDuration.Short, toasts.current?.duration)
         toasts.dismissCurrent()
-        assertEquals(ToastResult.Dismissed, second.await())
+        assertEquals(ToastResult.Dismissed, fifth.await())
         assertNull(toasts.current)
     }
 

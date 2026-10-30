@@ -77,6 +77,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import desktopkit.R
 import desktopkit.input.contextMenuGesture
+import desktopkit.shell.LocalSharedElementShape
 import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
 import desktopkit.theme.InputMode
@@ -117,7 +118,10 @@ private class CellScope(
  * Esc none, Shift with the arrow keys extends (Up and Down by a row); the arrow keys move between
  * cells; right click, long press or the Menu key open [itemMenu]. Single selection with
  * [selectedKey], multi-selection with [selectedKeys] and [onSelectionChange]; [toggleOnClick] for a
- * touch "select" mode. [loading] shows breathing placeholder covers while [items] is empty.
+ * touch "select" mode. A tap with a finger or a pen only opens the cover unless items are being
+ * picked: in the select mode, or once some are selected, a tap adds or removes one (a mouse click
+ * selects, whatever the layout). Opening a cover's menu selects it unless it is selected already, so
+ * the menu acts on it. [loading] shows breathing placeholder covers while [items] is empty.
  *
  * Columns are as many as fit [minCellWidth]. Draw each cell with [cell], usually a [CoverCell].
  * [itemDrag] lets covers be dragged with a mouse to a [dropZone], as [DenseTable]'s rowDrag.
@@ -143,6 +147,7 @@ fun <T> DeskGrid(
 ) {
     val multi = onSelectionChange != null
     val selection = selectedKeys ?: emptySet()
+    val touch = DeskTheme.inputMode == InputMode.Touch
     val tracker = remember { SelectionTracker() }
     val focusManager = LocalFocusManager.current
     val keysInOrder = { items.map(key) }
@@ -163,6 +168,7 @@ fun <T> DeskGrid(
                         val mods = event.keyboardModifiers
                         tracker.toggle = mods.pointerCtrl || mods.pointerMeta
                         tracker.range = mods.pointerShift
+                        tracker.press(event)
                     }
                 }
             }
@@ -170,6 +176,7 @@ fun <T> DeskGrid(
         .onPreviewKeyEvent { event ->
             tracker.toggle = event.isCtrlPressed || event.isMetaPressed
             tracker.range = event.isShiftPressed
+            tracker.finger = false
             false
         }
         .onKeyEvent { event ->
@@ -230,22 +237,30 @@ fun <T> DeskGrid(
             GridItem(
                 modifier = Modifier.dragSource(enabled = itemDrag != null) { itemDrag?.invoke(item, index) },
                 selected = itemKey in selection || (selectedKey != null && itemKey == selectedKey),
-                selecting = multi && (toggleOnClick || selection.isNotEmpty()),
+                // the check circles mark a selection being made: in the select mode, while a finger
+                // picks items, or with several picked by mouse (one clicked cover is just selected)
+                selecting = multi && (toggleOnClick || (if (touch) selection.isNotEmpty() else selection.size > 1)),
                 menu = itemMenu?.let { menu -> { menu(item, index) } },
                 menuLabel = itemMenuLabel,
+                // the menu acts on the selection: a cover outside it becomes the selection
                 onMenuOpen = if (!multi) null else ({ update(TableSelection.menu(selection, tracker.anchor, itemKey)) }),
                 onFocused = { focused -> if (focused) tracker.focused = itemKey else if (tracker.focused == itemKey) tracker.focused = null },
                 onClick = {
+                    // the press's pointer when there was one; TalkBack's double tap follows the layout
+                    val finger = tracker.finger ?: touch
                     if (!multi) {
                         onItemClick(item, index)
+                    } else if (finger && !toggleOnClick && selection.isEmpty() && !tracker.toggle && !tracker.range) {
+                        // a tap opens; for a finger, selecting is for the select mode
+                        onItemClick(item, index)
                     } else {
-                        val toggle = toggleOnClick || tracker.toggle
+                        // while a finger is picking items, a tap adds or removes one
+                        val toggle = toggleOnClick || tracker.toggle || finger
                         val range = !toggleOnClick && tracker.range
                         update(TableSelection.click(keysInOrder(), selection, tracker.anchor, itemKey, toggle = toggle, range = range))
                         if (!toggle && !range) onItemClick(item, index)
                     }
-                    tracker.toggle = false
-                    tracker.range = false
+                    tracker.clicked()
                 },
             ) { cell(item) }
         }
@@ -323,7 +338,8 @@ private fun GridItem(
  * the pointer over it (or the keyboard focus, or the selection) rings it in the accent colour and,
  * with a mouse, darkens it and shows [onPlay] at the bottom and "⋯" at the top (the item's menu).
  * While items are being selected a check mark in the corner shows the choice. [titleModifier] goes
- * on the title, e.g. [desktopkit.shell.detailSharedBounds] so it flies into the album's page.
+ * on the title, e.g. [desktopkit.shell.detailSharedBounds] so it flies into the album's page; a
+ * [desktopkit.shell.detailSharedElement] in [cover] keeps the cover's rounded corners in flight.
  *
  * TalkBack finds [onPlay] among the cell's actions ([playLabel], "Play" by default). The Play
  * button itself shows only under a mouse: from the keyboard, put Play in the grid's itemMenu too
@@ -366,8 +382,10 @@ fun GridCellScope.CoverCell(
                 .padding(4.dp)
                 .pressScale(pressed, 0.97f),
         ) {
-            Box(Modifier.fillMaxSize().clip(RoundedCornerShape(radius)).background(colors.surfaceRaised)) {
-                cover()
+            val coverShape = RoundedCornerShape(radius)
+            Box(Modifier.fillMaxSize().clip(coverShape).background(colors.surfaceRaised)) {
+                // a cover that flies to its detail page keeps these corners on the way
+                CompositionLocalProvider(LocalSharedElementShape provides coverShape) { cover() }
                 if (overlay > 0f) Box(Modifier.fillMaxSize().alpha(overlay).background(Color.Black.copy(alpha = 0.35f)))
             }
             if (overlay > 0f && onPlay != null) {

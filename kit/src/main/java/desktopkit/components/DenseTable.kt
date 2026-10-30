@@ -54,8 +54,10 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.Role
@@ -74,6 +76,7 @@ import desktopkit.shell.currentWidthClass
 import desktopkit.theme.DeskGlass
 import desktopkit.theme.DeskTheme
 import desktopkit.theme.GlassThickness
+import desktopkit.theme.InputMode
 import desktopkit.theme.glass
 import desktopkit.theme.glassSource
 import dev.chrisbanes.haze.HazeState
@@ -129,8 +132,12 @@ data class TableSort(val column: Int, val ascending: Boolean)
  * - Shift+click: selects the rows from the last clicked row to this one (Ctrl+Shift adds them);
  * - Ctrl+A on a focused row: selects every row; Shift+Up/Down extends from the focused row; Esc clears;
  * - [toggleOnClick]: every click or tap adds or removes its row, for an app's touch "select" mode;
- * - opening a row's menu on a selected row keeps the selection, on any other row selects just that row.
- * [onRowClick] runs for plain clicks only (not for Ctrl, Shift or [toggleOnClick] clicks).
+ * - opening a row's menu (right click, long press) on a selected row keeps the selection, on any
+ *   other row selects just that row;
+ * - a tap with a finger or a pen only opens the row unless rows are being picked: in the select
+ *   mode, or once some are selected, a tap adds or removes one. The pointer decides, not the
+ *   layout: a mouse click selects in a touch layout too.
+ * [onRowClick] runs for plain clicks and opening taps (not for Ctrl, Shift or [toggleOnClick] clicks).
  * [rowMenu] receives the row it was opened on; the selection it acts on is the app's
  * [selectedKeys], already updated when the menu opens.
  *
@@ -181,6 +188,7 @@ fun <T> DenseTable(
     )
     val multi = onSelectionChange != null
     val selection = selectedKeys ?: emptySet()
+    val touch = DeskTheme.inputMode == InputMode.Touch
     val tracker = remember { SelectionTracker() }
     val focusManager = LocalFocusManager.current
     val keysInOrder = { rows.map(key) }
@@ -206,6 +214,7 @@ fun <T> DenseTable(
                                     val mods = event.keyboardModifiers
                                     tracker.toggle = mods.pointerCtrl || mods.pointerMeta
                                     tracker.range = mods.pointerShift
+                                    tracker.press(event)
                                 }
                             }
                         }
@@ -214,6 +223,7 @@ fun <T> DenseTable(
                         // Enter and Space click the focused row: remember the keys held with them too
                         tracker.toggle = event.isCtrlPressed || event.isMetaPressed
                         tracker.range = event.isShiftPressed
+                        tracker.finger = false
                         false
                     }
                     .onKeyEvent { event ->
@@ -256,16 +266,21 @@ fun <T> DenseTable(
             itemsIndexed(rows, key = { _, item -> key(item) }) { index, item ->
                 val itemKey = key(item)
                 val onClick = {
+                    // the press's pointer when there was one; TalkBack's double tap follows the layout
+                    val finger = tracker.finger ?: touch
                     if (!multi) {
                         onRowClick(item, index)
+                    } else if (finger && !toggleOnClick && selection.isEmpty() && !tracker.toggle && !tracker.range) {
+                        // a tap opens; for a finger, selecting is for the select mode
+                        onRowClick(item, index)
                     } else {
-                        val toggle = toggleOnClick || tracker.toggle
+                        // while a finger is picking rows, a tap adds or removes one
+                        val toggle = toggleOnClick || tracker.toggle || finger
                         val range = !toggleOnClick && tracker.range
                         update(TableSelection.click(keysInOrder(), selection, tracker.anchor, itemKey, toggle = toggle, range = range))
                         if (!toggle && !range) onRowClick(item, index)
                     }
-                    tracker.toggle = false
-                    tracker.range = false
+                    tracker.clicked()
                 }
                 val row = @Composable {
                     TableRow(
@@ -282,6 +297,7 @@ fun <T> DenseTable(
                     ContextMenuArea(
                         entries = { rowMenu(item, index) },
                         accessibilityLabel = rowMenuLabel,
+                        // the menu acts on the selection: a row outside it becomes the selection
                         onOpen = if (!multi) null else ({ update(TableSelection.menu(selection, tracker.anchor, itemKey)) }),
                     ) { row() }
                 } else {
@@ -338,8 +354,25 @@ private class HeaderPadding(
 internal class SelectionTracker {
     var toggle = false
     var range = false
+
+    /**
+     * Whether the press behind the next click was a finger's or a pen's (true) or a mouse's or a
+     * key's (false); null when the click came without one (TalkBack).
+     */
+    var finger: Boolean? = null
     var anchor: Any? = null
     var focused: Any? = null
+
+    fun press(event: PointerEvent) {
+        val down = event.changes.firstOrNull { it.pressed } ?: return
+        finger = down.type != PointerType.Mouse
+    }
+
+    fun clicked() {
+        toggle = false
+        range = false
+        finger = null
+    }
 }
 
 /** The multi-selection rules of [DenseTable], free of Compose so they can be tested on their own. */

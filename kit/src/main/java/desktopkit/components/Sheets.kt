@@ -3,6 +3,7 @@ package desktopkit.components
 import android.graphics.Rect
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -11,6 +12,7 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +28,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
@@ -35,6 +38,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.currentCompositionLocalContext
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -47,17 +51,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -65,11 +77,13 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import desktopkit.R
+import desktopkit.input.showShortcutHints
 import desktopkit.shell.LocalShellOverlayHost
 import desktopkit.shell.ShellOverlayHost
 import desktopkit.shell.WidthClass
@@ -83,6 +97,7 @@ import desktopkit.theme.LocalMotionTier
 import desktopkit.theme.MotionTier
 import desktopkit.theme.glass
 import desktopkit.theme.rememberDeskHaptics
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 /** A titled group of actions for [MoreSheet] and menus ("Play", "Edit", "Share"); a null [title] draws a plain gap. */
@@ -151,25 +166,32 @@ internal fun ActionGroupList(groups: List<ActionGroup>, onDismiss: () -> Unit) {
         }
         group.actions.forEach { action ->
             SheetActionRow(action) {
-                onDismiss()
+                // a switch stays in view while it flips; any other action closes the sheet
+                if (action.checked == null) onDismiss()
                 action.onClick()
             }
         }
     }
 }
 
+/**
+ * One action of [MoreSheet]: its icon, its label and (with a keyboard or a mouse) its shortcut. An
+ * item with `checked` set is a switch at the end of the line, and the whole line flips it.
+ */
 @Composable
 private fun SheetActionRow(item: MenuEntry.Item, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val state = interaction.collectState()
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
+    val haptics = rememberDeskHaptics()
     val shape = RoundedCornerShape(dimens.radiusControl)
     val content = when {
         !item.enabled -> colors.textTertiary
         item.destructive -> colors.danger
         else -> colors.text
     }
+    val checked = item.checked
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -177,22 +199,39 @@ private fun SheetActionRow(item: MenuEntry.Item, onClick: () -> Unit) {
             .heightIn(min = dimens.rowHeight.coerceAtLeast(dimens.minTarget))
             .focusRing(state, shape)
             .background(animatedStateBackground(state).value, shape)
-            .deskClickable(interaction, onClick, enabled = item.enabled)
+            .then(
+                if (checked == null) {
+                    Modifier.deskClickable(interaction, onClick, enabled = item.enabled)
+                } else {
+                    Modifier
+                        .pointerHoverIcon(PointerIcon.Hand)
+                        .hoverable(interaction, item.enabled)
+                        .focusMemory()
+                        .toggleable(checked, interaction, indication = null, enabled = item.enabled, role = Role.Switch) { on ->
+                            haptics.toggle(on)
+                            onClick()
+                        }
+                },
+            )
             .padding(horizontal = dimens.gapM),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // the icon column stays when an item has no icon, so the labels line up
         Box(Modifier.size(dimens.iconLarge), contentAlignment = Alignment.Center) {
-            val icon = if (item.checked == true) DeskIcons.Check else item.icon
-            if (icon != null) {
-                Icon(icon, contentDescription = null, tint = if (item.destructive) colors.danger else colors.textSecondary,
+            if (item.icon != null) {
+                Icon(item.icon, contentDescription = null, tint = if (item.destructive) colors.danger else colors.textSecondary,
                     modifier = Modifier.size(dimens.icon))
             }
         }
         Spacer(Modifier.width(dimens.gapM))
         Text(item.label, style = DeskTheme.type.body, color = content, maxLines = 1, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f))
-        if (item.shortcut != null) {
+        if (item.shortcut != null && showShortcutHints()) {
             Text(item.shortcut, style = DeskTheme.type.mono, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        if (checked != null) {
+            Spacer(Modifier.width(dimens.gapM))
+            DeskSwitch(checked, onCheckedChange = null, enabled = item.enabled, interactionSource = interaction)
         }
     }
 }
@@ -298,8 +337,17 @@ private fun SheetSurface(
     val shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
     val label = title ?: stringResource(R.string.dk_more_options)
     val haptics = rememberDeskHaptics()
-    // dragged past the point where letting go closes the sheet: one tick on the way there
-    var armed by remember { mutableStateOf(false) }
+    val latestDismiss by rememberUpdatedState(onDismiss)
+    // pulled down on the handle, or anywhere on the sheet while its list is at the top
+    val pull = remember(drag) { SheetPull(drag) }
+    val settleSpec = DeskMotion.spatial(tier, tween<Float>(DeskMotion.MEDIUM_MS, easing = DeskMotion.Emphasized))
+    SideEffect {
+        pull.scope = scope
+        pull.flingPx = with(density) { 800.dp.toPx() }
+        pull.settleSpec = settleSpec
+        pull.onThreshold = { haptics.threshold() }
+        pull.onDismiss = { latestDismiss() }
+    }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     Box(Modifier.fillMaxSize()) {
         // the scrim darkens with the sheet and lightens while it is dragged down
@@ -318,7 +366,11 @@ private fun SheetSurface(
                 .align(Alignment.BottomCenter)
                 .widthIn(max = 640.dp)
                 .fillMaxWidth()
-                .onSizeChanged { sheetHeight = it.height }
+                // the pull reads the height here: nothing recomposes the surface when it is measured
+                .onSizeChanged {
+                    sheetHeight = it.height
+                    pull.height = it.height
+                }
                 .graphicsLayer {
                     val hidden = (1f - progress.value) * (if (sheetHeight > 0) sheetHeight.toFloat() else 2000f)
                     translationY = hidden + drag.value
@@ -332,28 +384,22 @@ private fun SheetSurface(
                 }
                 .focusRequester(focus)
                 .focusable()
+                // a finger or a mouse button is down: only then may a scroll at the list's top pull
+                // the sheet (a mouse wheel at the top leaves it where it is)
+                .pointerInput(pull) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            val pressed = event.changes.any { it.pressed }
+                            if (pressed && !pull.pressed) pull.grab()
+                            pull.pressed = pressed
+                        }
+                    }
+                }
                 .draggable(
                     orientation = Orientation.Vertical,
-                    state = rememberDraggableState { delta ->
-                        val next = (drag.value + delta).coerceAtLeast(0f)
-                        val past = sheetHeight > 0 && next > sheetHeight / 3f
-                        if (past != armed) {
-                            armed = past
-                            if (past) haptics.threshold()
-                        }
-                        scope.launch { drag.snapTo(next) }
-                    },
-                    onDragStopped = { velocity ->
-                        armed = false
-                        val far = sheetHeight > 0 && drag.value > sheetHeight / 3f
-                        val flung = velocity > with(density) { 800.dp.toPx() }
-                        if (far || flung) {
-                            onDismiss()
-                        } else {
-                            val spec = DeskMotion.spatial(tier, tween<Float>(DeskMotion.MEDIUM_MS, easing = DeskMotion.Emphasized))
-                            drag.animateTo(0f, spec, initialVelocity = velocity)
-                        }
-                    },
+                    state = rememberDraggableState { delta -> pull.by(delta) },
+                    onDragStopped = { velocity -> pull.release(velocity) },
                 )
                 .padding(bottom = dimens.gapM)
                 // the glass reaches behind the system navigation bar, the last row stays above it
@@ -367,8 +413,80 @@ private fun SheetSurface(
                 Text(title, style = DeskTheme.type.title, color = colors.text, maxLines = 2, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(horizontal = dimens.gapL + 4.dp, vertical = dimens.gapS))
             }
-            Column(Modifier.verticalScroll(rememberScrollState()), content = content)
+            Column(Modifier.nestedScroll(pull).verticalScroll(rememberScrollState()), content = content)
         }
+    }
+}
+
+/**
+ * The sheet pulled down by the finger. On the handle and the title the drag moves it directly; on
+ * the list it comes as nested scrolling: what the list cannot scroll (it is at its top) pulls the
+ * sheet down, and pushing up raises a pulled sheet before the list scrolls again. Letting go past a
+ * third of the height or with a downward fling closes it; otherwise it springs back. On the way
+ * past the closing point there is one haptic tick.
+ */
+private class SheetPull(private val drag: Animatable<Float, AnimationVector1D>) : NestedScrollConnection {
+    lateinit var scope: CoroutineScope
+    var height = 0
+    var flingPx = 0f
+    var settleSpec: AnimationSpec<Float> = tween()
+    var onThreshold: () -> Unit = {}
+    var onDismiss: () -> Unit = {}
+    var pressed = false
+
+    /** Where the sheet is: set at once, while the animatable catches up on the next frame. */
+    private var offset = 0f
+    private var armed = false
+
+    /**
+     * A finger or button went down: the pull starts from where the sheet is drawn (back at the top
+     * after the sheet was reopened, or partway while it springs back).
+     */
+    fun grab() {
+        offset = drag.value.coerceAtLeast(0f)
+        armed = height > 0 && offset > height / 3f
+    }
+
+    /** Moves the sheet by [delta] px (down is positive), never above its place; returns what it used. */
+    fun by(delta: Float): Float {
+        val next = (offset + delta).coerceAtLeast(0f)
+        val used = next - offset
+        if (used == 0f) return 0f
+        offset = next
+        val past = height > 0 && next > height / 3f
+        if (past != armed) {
+            armed = past
+            if (past) onThreshold()
+        }
+        scope.launch { drag.snapTo(next) }
+        return used
+    }
+
+    suspend fun release(velocity: Float) {
+        armed = false
+        val far = height > 0 && offset > height / 3f
+        if (far || velocity > flingPx) {
+            onDismiss()
+        } else {
+            offset = 0f
+            drag.animateTo(0f, settleSpec, initialVelocity = velocity)
+        }
+    }
+
+    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+        if (source != NestedScrollSource.UserInput || !pressed || available.y >= 0f || offset <= 0f) return Offset.Zero
+        return Offset(0f, by(available.y))
+    }
+
+    override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+        if (source != NestedScrollSource.UserInput || !pressed || available.y <= 0f) return Offset.Zero
+        return Offset(0f, by(available.y))
+    }
+
+    override suspend fun onPreFling(available: Velocity): Velocity {
+        if (offset <= 0f) return Velocity.Zero
+        release(available.y)
+        return available
     }
 }
 

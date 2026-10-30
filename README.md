@@ -65,7 +65,7 @@ Uygulama modülünün `build.gradle.kts` dosyası:
 
 ```kotlin
 dependencies {
-    implementation("com.github.hesaplarimdijital-coder:desktop-kit:2.0.0")
+    implementation("com.github.hesaplarimdijital-coder:desktop-kit:2.1.0")
     implementation("androidx.activity:activity-compose:1.13.0")
 }
 ```
@@ -156,7 +156,9 @@ val shortcuts = ShortcutRegistry(
   Ctrl/Alt/Meta'sız tek tuşlar (Boşluk, M) metin kutusuna yazmayı bozmasın diye burada
   atlanır. Onları sahibi olan ekranda `shortcuts.match(event, scopes)` ile yakala.
 - Meta+/ sistem listesi: `onProvideKeyboardShortcuts` içinde `shortcuts.keyboardShortcutGroups(resources)`.
-- Ayarlardaki liste: `ShortcutListSection(shortcuts)`.
+- Ayarlardaki liste: `ShortcutListSection(shortcuts)`. Yalnızca klavye ya da fare varken göstermek için
+  `if (DeskTheme.inputMode == InputMode.Pointer || hasHardwareKeyboard())`. Menüler ve "⋯" sayfası kısayolları
+  zaten yalnızca o zaman yazar.
 - Bir birim testinde `assertTrue(shortcuts.conflicts().isEmpty())` ile aynı tuşa iki iş bağlanmadığını denetle.
 
 ## Görünümü uygulamaya göre değiştirmek
@@ -208,6 +210,8 @@ Değerlere doğrudan erişim için `DeskTheme.colors.text`, `DeskTheme.type.body
 | `SkeletonList`, `SkeletonListRow`, `SkeletonBlock` | Yükleniyor yer tutucuları; tablo ve ızgarada `loading = true` |
 | `rememberDeskHaptics` | Dokunmada titreşim: aç/kapa, tık, eşik, onay, ret |
 | `DeskWindows`, `rememberNewWindow` | Uygulamayı yeni pencerede açmak (aşağıya bak) |
+| `hasHardwareKeyboard` | Donanım klavyesi bağlı ve açık mı (klavye kapağı, Bluetooth, DeX) |
+| `Modifier.keepsKeyboardOpen` | Dokununca ekran klavyesini kapatmayan denetim (aşağıya bak: Ekran klavyesi) |
 
 ### Buzlu cam
 
@@ -305,7 +309,9 @@ MoreButton(groups = {
 })
 ```
 
-Telefonda cam alt sayfa, genişte menü. Klavyeyle gezilir; Esc, Geri ya da aşağı kaydırmak kapatır.
+Telefonda cam alt sayfa, genişte menü. Klavyeyle gezilir; Esc, Geri ya da aşağı çekmek kapatır (liste en
+üstteyken listenin her yerinden). `MenuEntry.Item(checked = …)` sayfada satır sonunda bir anahtardır ve dokununca
+sayfayı kapatmadan değişir; menüde onay işaretidir. Kısayollar yalnızca fare ya da donanım klavyesi varken yazılır.
 
 Telefonda üç sekme ve "⋯": `ShellSpec(bottomBar = listOf("muzik", "podcast", "radyo"), moreStyle = MoreStyle.Sheet)`.
 "⋯" sığmayan ekranları bölümleriyle ve `DesktopShell(moreActions = listOf(ActionGroup(…)))` eylemlerini listeler.
@@ -411,11 +417,15 @@ DenseTable(
 )
 ```
 
-- Tıklama yalnızca o satırı seçer; Ctrl (veya Meta) + tıklama satırı ekler/çıkarır; Shift + tıklama son
+- Farede tıklama yalnızca o satırı seçer; Ctrl (veya Meta) + tıklama satırı ekler/çıkarır; Shift + tıklama son
   tıklanan satırdan bu satıra kadar seçer (Ctrl+Shift ekler).
+- Parmakla ya da kalemle dokunuş, seçim yokken seçmez, yalnızca `onRowClick`'i çağırır (açar); bir satır
+  seçiliyken satırı ekler/çıkarır. Yerleşim değil işaretçi belirler: dokunmatik yerleşimde fare tıklaması seçer,
+  fare yerleşiminde parmak açar.
 - Odak tablodayken Ctrl+A hepsini seçer, Shift+↑/↓ seçimi genişletir.
 - `toggleOnClick = true` iken her dokunuş satırı ekler/çıkarır; `onRowClick` çağrılmaz.
-- Sağ tık / uzun basma seçili bir satırdaysa seçim korunur, başka satırdaysa yalnızca o satır seçilir.
+- Sağ tık ya da uzun basma seçili bir satırdaysa seçim korunur, başka satırdaysa yalnızca o satır seçilir: menü
+  üzerinde çalıştığı satırları seçili bulur.
   `rowMenu` uygulamanın `secili` durumunu okuyarak "3 kitabı sil" gibi menü kurar.
 - `onSelectionChange` verilmezse tablo eskisi gibi tek seçimlidir (`selectedKey`).
 
@@ -424,7 +434,20 @@ DenseTable(
 `DesktopKitRoot` uygulamanın tamamına `WindowInsets.safeDrawing` boşluğu verir (klavye dâhil).
 `enableEdgeToEdge()` ve `android:windowSoftInputMode="adjustResize"` ile içerik klavyenin hemen
 üstünde biter; ekranlarda ayrıca `imePadding()` gerekmez. Telefonda klavye açıkken alt gezinme
-çubuğu gizlenir, kapanınca geri gelir (`DesktopShell(hideNavigationWithKeyboard = false)` ile kapatılır).
+çubuğu gizlenir, kapanınca geri gelir (`DesktopShell(hideNavigationWithKeyboard = false)` ile kapatılır);
+mini oynatıcı klavyenin hemen üstünde durur.
+
+Ekran klavyesi açıkken kabuğun içinde parmakla içeriği kaydırmak ya da metin alanlarının dışına dokunmak alanın
+odağını alır, klavye kapanır. Alanın içinden başlayan hareket (uzun metni kaydırmak), fare tekerleği ve alanın
+görünür kalmak için yaptığı kaydırma klavyeyi açık bırakır. Donanım klavyesi (klavye kapağı) bağlıyken odak yerinde
+kalır, yazmak sürer. Açık bırakması gereken denetimi ya da uygulamanın kendi metin alanını işaretle:
+
+```kotlin
+DeskButton("Gönder", ::gönder, Modifier.keepsKeyboardOpen())   // desktopkit.shell.keepsKeyboardOpen
+```
+
+Fare tıklamasını Compose kendisi yönetir: varsayılan olarak odaktaki öğenin dışına tıklamak odağı alır
+(`ComposeView.autoClearFocusBehavior`).
 
 ### Ekran geçişleri
 
@@ -516,7 +539,8 @@ scope.launch {
 }
 ```
 
-Bildirimler sırayla gösterilir; telefonda alt çubuğun ve oynatıcının, tablet ve DeX'te oynatıcının üstünde çıkar.
+Yeni bildirim ekrandakinin yerini hemen alır (yerine gelinenin `show` çağrısı `ToastResult.Dismissed` döner);
+telefonda alt çubuğun ve oynatıcının, tablet ve DeX'te oynatıcının üstünde çıkar.
 
 ### Komut paleti
 
@@ -547,7 +571,8 @@ DeskGrid(albümler, key = { it.id }, onItemClick = { albüm, _ -> aç(albüm) },
 }
 ```
 
-Seçim kuralları tablonunkiyle aynı (Ctrl/Shift ile tıklama, Shift ile oklar, Ctrl+A, Esc). Oynat düğmesi
+Seçim kuralları tablonunkiyle aynı (Ctrl/Shift ile tıklama, Shift ile oklar, Ctrl+A, Esc; parmak dokunuşu açar,
+seçim modunda ya da seçim varken ekler/çıkarır; uzun basma menüyü açar ve kapağı seçer). Oynat düğmesi
 farenin altında çıkar; TalkBack onu hücrenin eylemlerinde bulur, klavye için `itemMenu`'ye de "Oynat" koy (Menu
 tuşu menüyü açar).
 
@@ -559,8 +584,12 @@ Box(Modifier.dropZone(setOf("file"), onDrop = { yük -> taşı(yük.keys); true 
 DesktopShell(…, navDrop = NavDrop(mapOf("bin" to setOf("file"))) { rota, yük -> çöpeAt(yük.keys); true })
 ```
 
-Farede düğme basılıyken birkaç piksel kayınca başlar; dokunmada uzun basma menüyü açmaya devam eder. Sürükleme
-uygulamanın öbür penceresine de geçer (`DeskDragPayload.from(event)`); başka uygulamalar yalnızca etiketi düz metin
+Samsung Dosyalarım'daki gibi, işaretçi önce öğenin üstünde sistemin dokunup basılı tutma süresi kadar (varsayılan
+yarım saniye) durmalı; daha önce kayarsa sürükleme olmaz. Fare, touchpad ve kalemde sürükleme bundan sonra
+işaretçi kayınca başlar, yavaş bir tıklama tıklama olarak kalır. Parmakta süre dolunca başlar, yalnızca
+`dragSource(touch = true)` ile; yoksa uzun basma menüyü açmaya devam eder. İşaretçinin üstünde etiketi ve birden
+çok öğede sayısını gösteren küçük bir kart taşınır; öğe sürüklenebilirken de üzerine gelmeyi ve seçimi gösterir.
+Sürükleme uygulamanın öbür penceresine de geçer (`DeskDragPayload.from(event)`); başka uygulamalar yalnızca etiketi düz metin
 olarak alır, tür ve anahtarlar uygulamanın dışına çıkmaz.
 
 ### Birden çok pencere ve başlık çubuğu
@@ -574,7 +603,9 @@ DeX'te ve masaüstü pencerelemede pencere ayrı açılır, tablette yan yana. T
 arasında eşitlenir. Kenar çubuklu düzende menü çubuğu pencerenin başlık çubuğuna yerleşir (Android 15+, sistem
 başlık düğmelerinin yerini bildirdiğinde); menüler ve arama dokunuşları uygulamaya gider, çubuğun boş yeri pencereyi
 taşır. Liste–ayrıntı geçişinde kapak ve başlık uçar: listede ve ayrıntıda aynı anahtarla
-`Modifier.detailSharedElement("kapak-$id")` ve `Modifier.detailSharedBounds("başlık-$id")`.
+`Modifier.detailSharedElement("kapak-$id")` ve `Modifier.detailSharedBounds("başlık-$id")`. Köşeleri yuvarlak kapak
+uçarken de yuvarlak kalsın diye biçimini ver: `detailSharedElement("kapak-$id", shape = RoundedCornerShape(12.dp))`
+(`CoverCell` içinde hücrenin biçimi zaten varsayılan).
 
 ## Geliştirme
 
@@ -589,9 +620,9 @@ taşır. Liste–ayrıntı geçişinde kapak ve başlık uçar: listede ve ayrı
 ## Sürüm yayınlamak
 
 1. `CHANGELOG.md` dosyasına ne değiştiğini yaz, `gradle.properties` içindeki `VERSION_NAME`'i güncelle.
-2. GitHub'da **Releases → Draft a new release** ile etiketi (`2.0.0`) `main` üzerinde oluştur; ya da
-   `git tag 2.0.0 && git push origin 2.0.0`.
-3. JitPack ilk istekte derler (`jitpack.yml`, Java 17). Uygulamada sürümü `2.0.0` yapman yeterli.
+2. GitHub'da **Releases → Draft a new release** ile etiketi (`2.1.0`) `main` üzerinde oluştur; ya da
+   `git tag 2.1.0 && git push origin 2.1.0`.
+3. JitPack ilk istekte derler (`jitpack.yml`, Java 17). Uygulamada sürümü `2.1.0` yapman yeterli.
 
 Sürüm numaraları [SemVer](https://semver.org/lang/tr/) kuralına uyar: uyumu bozan değişiklik
 ana sürümü, yeni özellik ikinci sayıyı, düzeltme üçüncüyü artırır.

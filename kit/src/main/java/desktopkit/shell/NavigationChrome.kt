@@ -449,7 +449,7 @@ private fun SidebarItem(item: NavItem, selected: Boolean, collapsed: Boolean, ba
  * On compact
  * windows the shell passes what the current screen asked for with [CompactTopBar]: [onBack] adds a
  * back or close button before the title and [actions] add icon buttons before the search button
- * (more than three: two icons and a "more" menu). The title cross-fades when it changes.
+ * (more than three: two icons and a "more" menu). A new title fades in once the old one is gone.
  */
 @Composable
 fun PageTopBar(
@@ -467,10 +467,15 @@ fun PageTopBar(
     val latestOnBack by rememberUpdatedState(onBack)
     val (shown, overflow) = remember(actions) { splitTopBarActions(actions) }
     // content scrolled beneath: the bar takes the chrome colour (or turns to glass over content lying
-    // under it) and a rule fades in, as Android's top app bar does
+    // under it) and a rule fades in, as Android's top app bar does. Toward glass only the opacity of
+    // the background changes: a fade to Color.Transparent (transparent black) passes through grey.
     val rest = if (glass) colors.background else Color.Transparent
     val background by animateColorAsState(
-        if (scrolled) (if (glass) Color.Transparent else colors.chrome) else colors.background,
+        when {
+            !scrolled -> colors.background
+            glass -> colors.background.copy(alpha = 0f)
+            else -> colors.chrome
+        },
         tween(DeskMotion.MEDIUM_MS), label = "topBar",
     )
     val ruleAlpha by animateFloatAsState(if (scrolled) 1f else 0f, tween(DeskMotion.MEDIUM_MS), label = "topBarRule")
@@ -494,7 +499,10 @@ fun PageTopBar(
         ) {
             AnimatedContent(
                 targetState = TopBarHeading(title, if (onBack != null) backIcon else null),
-                transitionSpec = { fadeIn(tween(TOP_BAR_FADE_MS)) togetherWith fadeOut(tween(TOP_BAR_FADE_MS)) },
+                // the old title is gone before the new one fades in: two titles never overlap
+                transitionSpec = {
+                    fadeIn(tween(TOP_BAR_FADE_MS, delayMillis = TOP_BAR_FADE_OUT_MS)) togetherWith fadeOut(tween(TOP_BAR_FADE_OUT_MS))
+                },
                 contentAlignment = Alignment.CenterStart,
                 label = "topBarHeading",
                 modifier = Modifier.weight(1f),
@@ -529,6 +537,7 @@ fun PageTopBar(
 private data class TopBarHeading(val title: String, val back: TopBarBackIcon?)
 
 private const val TOP_BAR_FADE_MS = 150
+private const val TOP_BAR_FADE_OUT_MS = 90
 
 /** Colour changes of navigation items (selection, hover, press) ease over [NAV_COLOR_MS]. */
 private const val NAV_COLOR_MS = 150

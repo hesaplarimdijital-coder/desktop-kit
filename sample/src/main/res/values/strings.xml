@@ -5,4 +5,5 @@
     <string name="action_new_folder">New folder</string>
     <string name="action_open">Open</string>
     <string name="action_refresh">Refresh</string>
+    <string name="not_in_sample">“%1$s” is not part of the sample</string>
 </resources>
