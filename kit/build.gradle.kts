@@ -55,6 +55,13 @@ android {
     }
 }
 
+// The kit's public API is kept in kit/api and compared on every CI build (checkKotlinAbi): a change
+// to it fails the build until the dump is updated with ./gradlew :kit:updateKotlinAbi, so every API
+// change shows up in the pull request.
+kotlin {
+    abiValidation()
+}
+
 dependencies {
     api(platform(libs.compose.bom))
     api(libs.compose.ui)

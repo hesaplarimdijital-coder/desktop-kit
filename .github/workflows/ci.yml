@@ -35,9 +35,16 @@ jobs:
 
       - name: Build and test
         run: |
-          ./gradlew :kit:testDebugUnitTest :kit:publishToMavenLocal :sample:assembleDebug \
+          ./gradlew :kit:testDebugUnitTest :kit:checkKotlinAbi :kit:publishToMavenLocal :sample:assembleDebug \
             --continue --stacktrace --console=plain 2>&1 | tee build.log
           exit ${PIPESTATUS[0]}
+
+      - name: Public API dump
+        # kit/api is the kit's public API; checkKotlinAbi fails when the code no longer matches it. The
+        # dump of the code as it stands goes to the logs branch (pull requests), to compare or to take
+        # over; ./gradlew :kit:updateKotlinAbi does the same locally.
+        if: failure()
+        run: ./gradlew :kit:updateKotlinAbi --console=plain > api-update.log 2>&1 || true
 
       - name: Annotate errors
         if: failure()
@@ -56,6 +63,8 @@ jobs:
           rm -rf "$out" && mkdir -p "$out"
           [ -f build.log ] && cp build.log "$out/"
           [ -d kit/build/test-results ] && cp -r kit/build/test-results "$out/"
+          [ -d kit/api ] && cp -r kit/api "$out/api"
+          [ -f api-update.log ] && cp api-update.log "$out/"
           echo "${HEAD_SHA}" > "$out/HEAD_SHA"
           cd "$out"
           git init -q && git checkout -q --orphan "$TARGET"
