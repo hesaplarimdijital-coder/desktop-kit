@@ -10,8 +10,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.InputModeManager
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -33,9 +36,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import androidx.compose.ui.input.InputMode as ComposeInputMode
 
 /** The cover grid (K5): the table's selection rules in two dimensions, and its pictures. */
-@OptIn(ExperimentalTestApi::class)
+@OptIn(ExperimentalTestApi::class, ExperimentalComposeUiApi::class)
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = "tr-w1000dp-h700dp-mdpi")
@@ -49,7 +53,9 @@ class GridTest {
     @Test
     fun shiftDownSelectsARowFurther() {
         var selection: Set<Any> = emptySet()
+        lateinit var inputModeManager: InputModeManager
         compose.setContent {
+            inputModeManager = LocalInputModeManager.current
             DesktopKitTheme(inputMode = InputMode.Pointer) {
                 var selected by remember { mutableStateOf<Set<Any>>(emptySet()) }
                 DeskGrid(albums, key = { it }, onItemClick = { _, _ -> }, selectedKeys = selected,
@@ -58,6 +64,8 @@ class GridTest {
                 }
             }
         }
+        // cells take the focus from a keyboard, as on DeX
+        compose.runOnIdle { inputModeManager.requestInputMode(ComposeInputMode.Keyboard) }
         compose.onNodeWithText("Albüm 1").requestFocus()
         compose.onNodeWithText("Albüm 1").performKeyInput { withKeyDown(Key.ShiftLeft) { pressKey(Key.DirectionDown) } }
         compose.waitForIdle()
