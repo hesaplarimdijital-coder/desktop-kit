@@ -138,8 +138,8 @@ private fun Examples(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun Caption(text: String) {
-    Text(text, style = DeskTheme.type.labelSmall, color = DeskTheme.colors.textTertiary)
+private fun Caption(text: String, modifier: Modifier = Modifier) {
+    Text(text, style = DeskTheme.type.labelSmall, color = DeskTheme.colors.textTertiary, modifier = modifier)
 }
 
 // ------------------------------------------------------------------ buttons
@@ -331,8 +331,8 @@ private fun Structure(toasts: ToastState) {
     }
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Caption("List rows (phones and any list that is not a table)")
-            Spacer(Modifier.weight(1f))
+            // the caption takes what the button leaves (on a phone it wraps instead of pushing the button out)
+            Caption("List rows (phones and any list that is not a table)", Modifier.weight(1f))
             DeskButton(if (selecting) "Done" else "Select", { selecting = !selecting })
         }
         albums.take(4).forEachIndexed { i, album ->

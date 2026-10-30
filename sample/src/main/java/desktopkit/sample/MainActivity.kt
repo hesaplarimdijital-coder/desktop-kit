@@ -4,7 +4,6 @@ import android.os.Bundle
 import android.view.KeyEvent
 import android.view.KeyboardShortcutGroup
 import android.view.Menu
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -44,6 +43,7 @@ import desktopkit.input.KeyChord
 import desktopkit.input.Shortcut
 import desktopkit.input.ShortcutGroup
 import desktopkit.input.ShortcutRegistry
+import desktopkit.input.hasHardwareKeyboard
 import desktopkit.screens.MessageScreen
 import desktopkit.screens.PageHeader
 import desktopkit.settings.AppearanceSection
@@ -62,6 +62,7 @@ import desktopkit.shell.ShellSpec
 import desktopkit.shell.WidthClass
 import desktopkit.theme.Accent
 import desktopkit.theme.DeskTheme
+import desktopkit.theme.InputMode
 import kotlinx.coroutines.launch
 
 // ------------------------------------------------------------------ 1. keyboard shortcuts
@@ -113,7 +114,11 @@ class MainActivity : ComponentActivity() {
                     CommonShortcuts.SETTINGS -> navigator.navigate("settings")
                     CommonShortcuts.SHORTCUT_LIST -> navigator.navigate("settings")
                     CommonShortcuts.TOGGLE_SIDEBAR -> prefs.updateSidebarCollapsed(!prefs.sidebarCollapsed)
-                    else -> Toast.makeText(context, id, Toast.LENGTH_SHORT).show()
+                    // the File menu's commands are only there to show the menu bar: say so, by their name
+                    else -> scope.launch {
+                        val name = shortcuts.getOrNull(id)?.let { context.getString(it.label) } ?: id
+                        toasts.show(context.getString(R.string.not_in_sample, name))
+                    }
                 }
                 true
             }
@@ -209,7 +214,8 @@ class MainActivity : ComponentActivity() {
                     // phone: three tabs and "⋯"; the sheet lists the other screens, then these
                     moreActions = listOf(
                         ActionGroup("App", listOf(
-                            MenuEntry.Item("Follow artwork colour", { followArtwork = !followArtwork }, checked = followArtwork),
+                            MenuEntry.Item("Follow artwork colour", { followArtwork = !followArtwork }, icon = DeskIcons.Albums,
+                                checked = followArtwork),
                             MenuEntry.Item("About", { about = true }, icon = DeskIcons.Info),
                         )),
                     ),
@@ -233,14 +239,18 @@ class MainActivity : ComponentActivity() {
                         "catalog" -> CatalogScreen(prefs, toasts, onDialog = { about = true }, accentLabel = accentLabel)
                         "albums" -> AlbumsScreen(openAlbum, onOpen = { openAlbum = it }, onPlay = { track = it })
                         "tracks" -> TracksScreen(playing = track, onPlay = { track = it })
-                        "playlists" -> PlaylistsScreen(library)
+                        "playlists" -> PlaylistsScreen(library, onPlay = { track = it })
                         "files" -> FilesScreen(prefs, library)
                         "bin" -> BinScreen(library)
-                        "settings" -> LazyColumn(Modifier.fillMaxSize()) {
-                            item { PageHeader(stringResource(desktopkit.R.string.dk_settings)) }
-                            item { AppearanceSection(prefs, accentLabel = accentLabel) }
-                            item { InputSection(prefs) }
-                            item { ShortcutListSection(shortcuts) }
+                        "settings" -> {
+                            // the shortcut table only where there is a keyboard (or a mouse) to use it
+                            val keys = DeskTheme.inputMode == InputMode.Pointer || hasHardwareKeyboard()
+                            LazyColumn(Modifier.fillMaxSize()) {
+                                item { PageHeader(stringResource(desktopkit.R.string.dk_settings)) }
+                                item { AppearanceSection(prefs, accentLabel = accentLabel) }
+                                item { InputSection(prefs) }
+                                if (keys) item { ShortcutListSection(shortcuts) }
+                            }
                         }
                         else -> MessageScreen(
                             title = "Coming soon",
