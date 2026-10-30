@@ -98,13 +98,14 @@ fun DeskButton(
     Row(
         modifier = modifier
             .defaultMinSize(minHeight = dimens.minTarget.coerceAtLeast(dimens.controlHeight))
+            // disabled: the whole button at half strength, fill and border too
+            .alpha(if (enabled) 1f else 0.5f)
             .pressScale(state.pressed)
             .focusRing(state, shape)
             .background(background, shape)
             .then(if (primary) Modifier else Modifier.border(1.dp, colors.borderStrong, shape))
             .deskClickable(interaction, onClick, enabled = enabled, role = role)
-            .padding(start = dimens.gapM, end = if (trailingIcon != null) dimens.gapS else dimens.gapM)
-            .alpha(if (enabled) 1f else 0.5f),
+            .padding(start = dimens.gapM, end = if (trailingIcon != null) dimens.gapS else dimens.gapM),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {

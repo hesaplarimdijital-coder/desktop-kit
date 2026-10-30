@@ -30,21 +30,21 @@ import androidx.compose.ui.unit.dp
 import desktopkit.theme.DeskTheme
 import desktopkit.theme.InputMode
 import desktopkit.theme.rememberDeskHaptics
+import java.util.UUID
 
 /**
  * What one of the kit's drags carries: a [kind] the drop targets choose by ("track", "file"), the
- * app's [keys] of the dragged items and a [label] ("3 tracks"). Other apps receive the label as
- * plain text; the app's own windows (DeX, split screen) receive all of it.
+ * app's [keys] of the dragged items and a [label] ("3 tracks"). Other apps receive only the label,
+ * as plain text; the app's own windows (DeX, split screen) receive all of it.
  */
 @Immutable
 data class DeskDragPayload(val kind: String, val keys: List<String>, val label: String) {
 
     internal fun toTransferData(acrossWindows: Boolean): DragAndDropTransferData {
+        // what the system shows every window is the label and a token; the app's own windows,
+        // which run in this process, look the payload up by the token
         val description = ClipDescription(label, arrayOf(ClipDescription.MIMETYPE_TEXT_PLAIN))
-        description.extras = PersistableBundle().apply {
-            putString(EXTRA_KIND, kind)
-            putStringArray(EXTRA_KEYS, keys.toTypedArray())
-        }
+        description.extras = PersistableBundle().apply { putString(EXTRA_TOKEN, DragsInFlight.add(this@DeskDragPayload)) }
         return DragAndDropTransferData(
             clipData = ClipData(description, ClipData.Item(label)),
             localState = this,
@@ -53,22 +53,37 @@ data class DeskDragPayload(val kind: String, val keys: List<String>, val label: 
     }
 
     companion object {
-        private const val EXTRA_KIND = "desktopkit.drag.kind"
-        private const val EXTRA_KEYS = "desktopkit.drag.keys"
+        private const val EXTRA_TOKEN = "desktopkit.drag"
 
-        /** The kind of a drag, as soon as it starts; null for drags that are not the kit's. */
-        fun kindOf(event: DragEvent): String? = event.clipDescription?.extras?.getString(EXTRA_KIND)
+        /** The kind of a drag, as soon as it starts; null for drags that are not this app's kit drags. */
+        fun kindOf(event: DragEvent): String? = from(event)?.kind
 
-        /** The payload of a dropped drag, also when it comes from another window of the app. */
-        fun from(event: DragEvent): DeskDragPayload? {
-            (event.localState as? DeskDragPayload)?.let { return it }
-            val description = event.clipDescription ?: return null
-            val extras = description.extras ?: return null
-            val kind = extras.getString(EXTRA_KIND) ?: return null
-            val keys = extras.getStringArray(EXTRA_KEYS)?.toList().orEmpty()
-            return DeskDragPayload(kind, keys, description.label?.toString().orEmpty())
+        /** The payload of a drag or a drop, also when it comes from another window of the app. */
+        fun from(event: DragEvent): DeskDragPayload? = from(event.localState, event.clipDescription)
+
+        internal fun from(localState: Any?, description: ClipDescription?): DeskDragPayload? {
+            (localState as? DeskDragPayload)?.let { return it }
+            val token = description?.extras?.getString(EXTRA_TOKEN) ?: return null
+            return DragsInFlight[token]
         }
     }
+}
+
+/**
+ * The drags this process started, by token. The app's other windows (another activity: the
+ * drag's local state does not reach it) find the payload here; another app, even one built on the
+ * kit, finds nothing and does not take the drop.
+ */
+internal object DragsInFlight {
+    private val drags = object : LinkedHashMap<String, DeskDragPayload>() {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, DeskDragPayload>?): Boolean = size > 8
+    }
+
+    @Synchronized
+    fun add(payload: DeskDragPayload): String = UUID.randomUUID().toString().also { drags[it] = payload }
+
+    @Synchronized
+    operator fun get(token: String): DeskDragPayload? = drags[token]
 }
 
 /**
