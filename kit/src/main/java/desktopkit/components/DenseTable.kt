@@ -6,6 +6,7 @@ import androidx.compose.runtime.State
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -33,6 +34,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -138,10 +140,14 @@ data class TableSort(val column: Int, val ascending: Boolean)
  * - a tap with a finger or a pen only opens the row unless rows are being picked: in the select
  *   mode, or once some are selected, a tap adds or removes one. The pointer decides, not the
  *   layout: a mouse click selects in a touch layout too.
- * - Back (the system's gesture or button) clears the selection, as Esc does, unless
- *   [clearSelectionOnBack] is false; with nothing selected Back goes on as usual. Compose asks the
- *   most recently composed back handler first: usually the table's, which sits inside the screen,
- *   while a handler composed later (a dialog's, a sheet's) comes before it.
+ * - Back (the system's gesture or button) clears a selection being made, as Esc does: on a touch
+ *   layout or in the select mode any selection, with a mouse several rows (one clicked row is just
+ *   selected, and Back goes on). With [clearSelectionOnBack] false Back is left to the app, and a
+ *   clear the app does not take (it keeps the rows) hands Back on to it. Compose asks the most
+ *   recently composed back handler first and the table's is composed with the table: inside a
+ *   [desktopkit.shell.DetailTransition] detail the detail closes first, and an app's own handler on
+ *   the same screen may come before or after it. When the app's must come first, turn this off and
+ *   clear the selection in it.
  * [onRowClick] runs for plain clicks and opening taps (not for Ctrl, Shift or [toggleOnClick] clicks).
  * [rowMenu] receives the row it was opened on; the selection it acts on is the app's
  * [selectedKeys], already updated when the menu opens.
@@ -206,8 +212,7 @@ fun <T> DenseTable(
         tracker.anchor = result.anchor
         if (result.selection != selection) onSelectionChange?.invoke(result.selection)
     }
-    // Back leaves the selection first, as in Android's action mode (Esc does the same from the keyboard)
-    BackHandler(enabled = multi && clearSelectionOnBack && selection.isNotEmpty()) { update(TableSelection.clear()) }
+    if (multi && clearSelectionOnBack) ClearSelectionOnBack(selection, touch, toggleOnClick) { update(TableSelection.clear()) }
     Box(
         modifier
             .fillMaxSize()
@@ -359,6 +364,24 @@ private class HeaderPadding(
 }
 
 /** Keys held at the last press, the anchor of Shift ranges and the focused row; not state, nothing redraws from it. */
+/**
+ * Back leaves a selection being made, as in Android's action mode: on a touch layout or in the select
+ * mode any selection, with a mouse several (one row a mouse clicked is just selected). A clear the app
+ * does not take (it keeps the same rows) hands Back on to it. Nothing where there is no back dispatcher
+ * (a window of a service, a screenshot test).
+ */
+@Composable
+internal fun ClearSelectionOnBack(selection: Set<Any>, touch: Boolean, toggleOnClick: Boolean, clear: () -> Unit) {
+    if (LocalOnBackPressedDispatcherOwner.current == null) return
+    var refused by remember { mutableStateOf<Set<Any>?>(null) }
+    if (selection.isEmpty() && refused != null) SideEffect { refused = null }
+    val selecting = selection.isNotEmpty() && (toggleOnClick || touch || selection.size > 1)
+    BackHandler(enabled = selecting && selection != refused) {
+        refused = selection
+        clear()
+    }
+}
+
 internal class SelectionTracker {
     var toggle = false
     var range = false

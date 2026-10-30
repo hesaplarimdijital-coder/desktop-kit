@@ -128,16 +128,17 @@ class TouchSelectionTest {
         assertEquals(emptyList<String>(), opened)
     }
 
-    private fun table(clearSelectionOnBack: Boolean = true) {
+    private fun table(clearSelectionOnBack: Boolean = true, mode: InputMode = InputMode.Touch, takesClear: Boolean = true) {
         compose.setContent {
-            DesktopKitTheme(inputMode = InputMode.Touch) {
+            DesktopKitTheme(inputMode = mode) {
                 DenseTable(
                     columns = listOf(TableColumn<String>("Ad", ColumnWidth.Weight(1f)) { it }),
                     rows = listOf("Yedek.zip", "Kayıt 14.flac"),
                     key = { it },
                     onRowClick = { row, _ -> opened += row },
                     selectedKeys = selection,
-                    onSelectionChange = { selection = it },
+                    // an app that never lets the selection go empty (a list beside its details, say)
+                    onSelectionChange = { if (takesClear || it.isNotEmpty()) selection = it },
                     clearSelectionOnBack = clearSelectionOnBack,
                 )
             }
@@ -172,6 +173,31 @@ class TouchSelectionTest {
         table()
         back()
         assertEquals(emptySet<Any>(), selection)
+    }
+
+    @Test
+    fun oneRowAMouseClickedLeavesBackAlone() {
+        // on DeX a click selects the row it opens: the next Back is for going back, not for that row
+        selection = setOf("Yedek.zip")
+        table(mode = InputMode.Pointer)
+        assertFalse(backIsTaken())
+    }
+
+    @Test
+    fun severalRowsPickedByMouseAreClearedByBack() {
+        selection = setOf("Yedek.zip", "Kayıt 14.flac")
+        table(mode = InputMode.Pointer)
+        back()
+        assertEquals(emptySet<Any>(), selection)
+    }
+
+    @Test
+    fun aClearTheAppRefusesHandsBackOn() {
+        selection = setOf("Yedek.zip")
+        table(takesClear = false)
+        back()
+        assertEquals("the app kept its row", setOf<Any>("Yedek.zip"), selection)
+        assertFalse("the next Back is the app's", backIsTaken())
     }
 
     @Test
