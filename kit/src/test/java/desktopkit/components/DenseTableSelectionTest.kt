@@ -15,6 +15,7 @@ import androidx.compose.ui.input.InputModeManager
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isPopup
@@ -101,10 +102,11 @@ class DenseTableSelectionTest {
 
     @Test
     fun clickSelectsOnlyThatRow() {
+        // a mouse click (a finger's tap opens the row without selecting it: TouchSelectionTest)
         table()
-        row(1).performClick()
+        row(1).performMouseInput { click() }
         assertEquals(setOf(names[1]), selection)
-        row(3).performClick()
+        row(3).performMouseInput { click() }
         assertEquals(setOf(names[3]), selection)
         assertEquals(listOf(names[1], names[3]), clicked)
     }

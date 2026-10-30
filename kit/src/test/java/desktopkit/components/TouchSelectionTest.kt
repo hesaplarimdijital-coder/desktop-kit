@@ -9,10 +9,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import desktopkit.theme.DesktopKitTheme
@@ -24,10 +27,13 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 
 /**
- * On a phone a tap on a cover or a table row opens it and selects nothing (the S24 showed "1 of 18
+ * A finger's tap on a cover or a table row opens it and selects nothing (the S24 showed "1 of 18
  * selected" and check circles on every cover after opening an album); picking items is for the
- * select mode, or goes on once some are selected.
+ * select mode, or goes on once some are selected. A long press selects what its menu acts on. The
+ * pointer decides, not the layout: a mouse click selects in a touch layout, a finger opens in a
+ * pointer layout.
  */
+@OptIn(ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
 @Config(qualifiers = "tr-w411dp-h891dp-hdpi")
 class TouchSelectionTest {
@@ -41,9 +47,9 @@ class TouchSelectionTest {
 
     private val albums = listOf("Kış Bahçesi", "Mavi Hat", "Gece Treni")
 
-    private fun grid() {
+    private fun grid(mode: InputMode = InputMode.Touch) {
         compose.setContent {
-            DesktopKitTheme(inputMode = InputMode.Touch) {
+            DesktopKitTheme(inputMode = mode) {
                 DeskGrid(
                     albums,
                     key = { it },
@@ -51,7 +57,8 @@ class TouchSelectionTest {
                     selectedKeys = selection,
                     onSelectionChange = { selection = it },
                     toggleOnClick = selectMode,
-                    itemMenu = { _, _ -> listOf(MenuEntry.Item("Sıraya ekle", {})) },
+                    // built as the menu opens, from the selection it acts on
+                    itemMenu = { _, _ -> listOf(MenuEntry.Item("${selection.size} albümü sıraya ekle", {})) },
                 ) { title ->
                     CoverCell(title) { Box(Modifier.fillMaxSize().background(Color.Gray)) }
                 }
@@ -74,11 +81,28 @@ class TouchSelectionTest {
     }
 
     @Test
-    fun aLongPressOpensTheMenuAndSelectsNothing() {
+    fun aLongPressSelectsWhatItsMenuActsOn() {
         grid()
         compose.onNodeWithText("Mavi Hat").performTouchInput { longClick() }
         compose.waitForIdle()
-        compose.onNodeWithText("Sıraya ekle").assertExists()
+        assertEquals(setOf<Any>("Mavi Hat"), selection)
+        compose.onNodeWithText("1 albümü sıraya ekle").assertExists()
+        assertEquals(emptyList<String>(), opened)
+    }
+
+    @Test
+    fun aMouseClickSelectsInATouchLayout() {
+        grid(InputMode.Touch)
+        compose.onNodeWithText("Mavi Hat").performMouseInput { click() }
+        compose.waitForIdle()
+        assertEquals(setOf<Any>("Mavi Hat"), selection)
+    }
+
+    @Test
+    fun aFingerTapOpensInAPointerLayout() {
+        grid(InputMode.Pointer)
+        tap("Gece Treni")
+        assertEquals(listOf("Gece Treni"), opened)
         assertEquals(emptySet<Any>(), selection)
     }
 

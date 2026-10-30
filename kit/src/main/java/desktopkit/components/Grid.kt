@@ -118,9 +118,10 @@ private class CellScope(
  * Esc none, Shift with the arrow keys extends (Up and Down by a row); the arrow keys move between
  * cells; right click, long press or the Menu key open [itemMenu]. Single selection with
  * [selectedKey], multi-selection with [selectedKeys] and [onSelectionChange]; [toggleOnClick] for a
- * touch "select" mode. On touch a tap only opens the cover (and a long press only opens its menu)
- * unless items are being picked: in the select mode, or once the app has selected some, a tap adds
- * or removes one. [loading] shows breathing placeholder covers while [items] is empty.
+ * touch "select" mode. A tap with a finger or a pen only opens the cover unless items are being
+ * picked: in the select mode, or once some are selected, a tap adds or removes one (a mouse click
+ * selects, whatever the layout). Opening a cover's menu selects it unless it is selected already, so
+ * the menu acts on it. [loading] shows breathing placeholder covers while [items] is empty.
  *
  * Columns are as many as fit [minCellWidth]. Draw each cell with [cell], usually a [CoverCell].
  * [itemDrag] lets covers be dragged with a mouse to a [dropZone], as [DenseTable]'s rowDrag.
@@ -167,6 +168,7 @@ fun <T> DeskGrid(
                         val mods = event.keyboardModifiers
                         tracker.toggle = mods.pointerCtrl || mods.pointerMeta
                         tracker.range = mods.pointerShift
+                        tracker.press(event)
                     }
                 }
             }
@@ -174,6 +176,7 @@ fun <T> DeskGrid(
         .onPreviewKeyEvent { event ->
             tracker.toggle = event.isCtrlPressed || event.isMetaPressed
             tracker.range = event.isShiftPressed
+            tracker.finger = false
             false
         }
         .onKeyEvent { event ->
@@ -239,26 +242,25 @@ fun <T> DeskGrid(
                 selecting = multi && (toggleOnClick || (if (touch) selection.isNotEmpty() else selection.size > 1)),
                 menu = itemMenu?.let { menu -> { menu(item, index) } },
                 menuLabel = itemMenuLabel,
-                onMenuOpen = if (!multi) null else ({
-                    // a finger's long press acts on the cover; it does not start a selection
-                    if (!touch || selection.isNotEmpty()) update(TableSelection.menu(selection, tracker.anchor, itemKey))
-                }),
+                // the menu acts on the selection: a cover outside it becomes the selection
+                onMenuOpen = if (!multi) null else ({ update(TableSelection.menu(selection, tracker.anchor, itemKey)) }),
                 onFocused = { focused -> if (focused) tracker.focused = itemKey else if (tracker.focused == itemKey) tracker.focused = null },
                 onClick = {
+                    // the press's pointer when there was one; TalkBack's double tap follows the layout
+                    val finger = tracker.finger ?: touch
                     if (!multi) {
                         onItemClick(item, index)
-                    } else if (touch && !toggleOnClick && selection.isEmpty() && !tracker.toggle && !tracker.range) {
-                        // a tap opens; on touch, selecting is for the select mode
+                    } else if (finger && !toggleOnClick && selection.isEmpty() && !tracker.toggle && !tracker.range) {
+                        // a tap opens; for a finger, selecting is for the select mode
                         onItemClick(item, index)
                     } else {
                         // while a finger is picking items, a tap adds or removes one
-                        val toggle = toggleOnClick || tracker.toggle || touch
+                        val toggle = toggleOnClick || tracker.toggle || finger
                         val range = !toggleOnClick && tracker.range
                         update(TableSelection.click(keysInOrder(), selection, tracker.anchor, itemKey, toggle = toggle, range = range))
                         if (!toggle && !range) onItemClick(item, index)
                     }
-                    tracker.toggle = false
-                    tracker.range = false
+                    tracker.clicked()
                 },
             ) { cell(item) }
         }
