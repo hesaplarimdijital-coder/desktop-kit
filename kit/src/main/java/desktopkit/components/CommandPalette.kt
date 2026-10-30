@@ -75,7 +75,9 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -434,8 +436,11 @@ private fun PalettePanel(
     Column(
         modifier
             .then(if (compact) Modifier.fillMaxSize() else Modifier.padding(top = 48.dp).widthIn(max = 680.dp).fillMaxWidth(0.9f))
-            .glass(DeskGlass.raised(colors, GlassThickness.Regular), shape)
-            .then(if (compact) Modifier else Modifier.border(1.dp, colors.borderStrong, shape))
+            // on a phone the palette is the whole window: a plain page, nothing shows through
+            .then(
+                if (compact) Modifier.background(colors.background)
+                else Modifier.glass(DeskGlass.raised(colors, GlassThickness.Regular), shape).border(1.dp, colors.borderStrong, shape),
+            )
             .semantics { paneTitle = label }
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
@@ -468,9 +473,15 @@ private fun PalettePanel(
             Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                 val style = DeskTheme.type.title.copy(fontWeight = FontWeight.Normal, fontSize = if (compact) DeskTheme.type.body.fontSize else 17.sp)
                 if (state.query.isEmpty()) Text(placeholder, style = style, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                // the typed text with the cursor; a query given to open() starts with the cursor at its end
+                var field by remember { mutableStateOf(TextFieldValue(state.query, TextRange(state.query.length))) }
+                if (field.text != state.query) field = TextFieldValue(state.query, TextRange(state.query.length))
                 BasicTextField(
-                    value = state.query,
-                    onValueChange = { state.query = it },
+                    value = field,
+                    onValueChange = {
+                        field = it
+                        state.query = it.text
+                    },
                     singleLine = true,
                     textStyle = style.copy(color = colors.text),
                     cursorBrush = SolidColor(colors.accent),
