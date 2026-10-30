@@ -363,7 +363,8 @@ fun Sidebar(
                 if (!collapsed) {
                     Box(Modifier.weight(1f)) {
                         if (footer != null) {
-                            SidebarItem(footer, currentRoute == footer.route, collapsed = false, badge = null, open = open) { onSelect(footer.route) }
+                            SidebarItem(footer, currentRoute == footer.route, collapsed = false, badge = badges[footer.route], open = open,
+                                navDrop = navDrop) { onSelect(footer.route) }
                         }
                     }
                 }
@@ -375,7 +376,8 @@ fun Sidebar(
             }
             if (collapsed && footer != null) {
                 Box(Modifier.padding(start = 6.dp, end = 6.dp, bottom = 6.dp)) {
-                    SidebarItem(footer, currentRoute == footer.route, collapsed = true, badge = null, open = open) { onSelect(footer.route) }
+                    SidebarItem(footer, currentRoute == footer.route, collapsed = true, badge = badges[footer.route], open = open,
+                        navDrop = navDrop) { onSelect(footer.route) }
                 }
             }
         }

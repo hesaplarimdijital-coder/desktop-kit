@@ -107,7 +107,10 @@ fun <T : Any> DetailTransition(
             contentKey = { it?.let(detailKey) },
             label = "detailTransition",
         ) { target ->
-            val scopes = if (shared != null && animate && tier != MotionTier.Reduced) DetailSharedScopes(shared, this, tier) else null
+            // one object per side: a new one on every recomposition would recompose everything under it
+            val scopes = remember(shared, this, animate, tier) {
+                if (shared != null && animate && tier != MotionTier.Reduced) DetailSharedScopes(shared, this, tier) else null
+            }
             CompositionLocalProvider(LocalDetailSharedScopes provides scopes) {
                 if (target == null) {
                     // opaque, so the shade left behind a closed detail never shows through the list

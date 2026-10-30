@@ -36,6 +36,11 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
@@ -91,6 +96,9 @@ interface GridCellScope {
     val selecting: Boolean
     fun openMenu()
 }
+
+/** Accessibility actions a cell's content adds to its cell (a cover's Play), next to the menu's. */
+internal val LocalCellActions = staticCompositionLocalOf<SnapshotStateList<CustomAccessibilityAction>?> { null }
 
 private class CellScope(
     override val hovered: Boolean,
@@ -271,6 +279,8 @@ private fun GridItem(
         }
     }
     val moreLabel = menuLabel ?: stringResource(R.string.dk_more_options)
+    val cellActions = remember { mutableStateListOf<CustomAccessibilityAction>() }
+    val extraActions = cellActions.toList()
     Box(
         modifier
             .onSizeChanged { height = it.height }
@@ -285,10 +295,16 @@ private fun GridItem(
             .deskClickable(interaction, onClick)
             .semantics {
                 this.selected = selected
-                if (menu != null) customActions = listOf(CustomAccessibilityAction(moreLabel) { open(IntOffset(0, height)); true })
+                val actions = buildList {
+                    if (menu != null) add(CustomAccessibilityAction(moreLabel) { open(IntOffset(0, height)); true })
+                    addAll(extraActions)
+                }
+                if (actions.isNotEmpty()) customActions = actions
             },
     ) {
-        CellScope(state.hovered, state.pressed, state.focused, selected, selecting) { open(IntOffset(0, height)) }.content()
+        CompositionLocalProvider(LocalCellActions provides cellActions) {
+            CellScope(state.hovered, state.pressed, state.focused, selected, selecting) { open(IntOffset(0, height)) }.content()
+        }
         if (menu != null) {
             key(menuState.generation) {
                 MenuPopup(
@@ -308,6 +324,10 @@ private fun GridItem(
  * with a mouse, darkens it and shows [onPlay] at the bottom and "⋯" at the top (the item's menu).
  * While items are being selected a check mark in the corner shows the choice. [titleModifier] goes
  * on the title, e.g. [desktopkit.shell.detailSharedBounds] so it flies into the album's page.
+ *
+ * TalkBack finds [onPlay] among the cell's actions ([playLabel], "Play" by default). The Play
+ * button itself shows only under a mouse: from the keyboard, put Play in the grid's itemMenu too
+ * (the Menu key opens it).
  */
 @Composable
 fun GridCellScope.CoverCell(
@@ -327,6 +347,16 @@ fun GridCellScope.CoverCell(
     val ring = selected || focused || (hovered && pointer)
     val ringAlpha by animateFloatAsState(if (ring) 1f else 0f, tween(DeskMotion.SHORT_MS), label = "coverRing")
     val overlay by animateFloatAsState(if (hovered && pointer) 1f else 0f, tween(DeskMotion.SHORT_MS), label = "coverOverlay")
+    val play = playLabel ?: stringResource(R.string.dk_play)
+    val cellActions = LocalCellActions.current
+    if (onPlay != null && cellActions != null) {
+        val latestPlay by rememberUpdatedState(onPlay)
+        DisposableEffect(cellActions, play) {
+            val action = CustomAccessibilityAction(play) { latestPlay(); true }
+            cellActions.add(action)
+            onDispose { cellActions.remove(action) }
+        }
+    }
     Column(modifier.fillMaxWidth()) {
         Box(
             Modifier
@@ -348,10 +378,10 @@ fun GridCellScope.CoverCell(
                         .alpha(overlay)
                         .size(40.dp)
                         .background(colors.accent, CircleShape)
-                        .deskClickable(remember { MutableInteractionSource() }, onPlay, onClickLabel = playLabel),
+                        .deskClickable(remember { MutableInteractionSource() }, onPlay, onClickLabel = play),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(DeskIcons.Play, contentDescription = playLabel, tint = colors.onAccent, modifier = Modifier.size(18.dp))
+                    Icon(DeskIcons.Play, contentDescription = play, tint = colors.onAccent, modifier = Modifier.size(18.dp))
                 }
             }
             if (overlay > 0f && showMore) {

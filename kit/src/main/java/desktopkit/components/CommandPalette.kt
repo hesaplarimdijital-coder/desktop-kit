@@ -51,6 +51,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
@@ -340,6 +341,7 @@ fun CommandPalette(
     val host = LocalShellOverlayHost.current
     if (host != null) {
         OverlayLayer(host, content)
+        ReturnFocusOnClose(host, state.isOpen)
     } else {
         Popup(onDismissRequest = { state.close() }, properties = PopupProperties(focusable = true)) { content() }
     }
@@ -449,10 +451,12 @@ private fun PalettePanel(
                     Key.DirectionUp -> { if (results.isNotEmpty()) selected = (selected - 1 + results.size) % results.size; true }
                     Key.Enter, Key.NumPadEnter -> { run(event.isCtrlPressed || event.isMetaPressed); true }
                     Key.Escape -> { state.close(); true }
+                    // the focus stays in the field: Tab goes through the filters, if any
                     Key.Tab -> {
-                        if (chips.isEmpty()) return@onPreviewKeyEvent false
-                        val at = chips.indexOf(state.filter)
-                        state.filter = chips[(at + if (event.isShiftPressed) chips.size - 1 else 1) % chips.size]
+                        if (chips.isNotEmpty()) {
+                            val at = chips.indexOf(state.filter)
+                            state.filter = chips[(at + if (event.isShiftPressed) chips.size - 1 else 1) % chips.size]
+                        }
                         true
                     }
                     else -> false
@@ -473,11 +477,11 @@ private fun PalettePanel(
             Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                 val style = DeskTheme.type.title.copy(fontWeight = FontWeight.Normal, fontSize = if (compact) DeskTheme.type.body.fontSize else 17.sp)
                 if (state.query.isEmpty()) Text(placeholder, style = style, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                // the typed text with the cursor; a query given to open() starts with the cursor at its end
+                // the typed text with the cursor; a query set from outside (open("…"), clear) puts the cursor at its end
                 var field by remember { mutableStateOf(TextFieldValue(state.query, TextRange(state.query.length))) }
-                if (field.text != state.query) field = TextFieldValue(state.query, TextRange(state.query.length))
+                val shown = if (field.text == state.query) field else TextFieldValue(state.query, TextRange(state.query.length))
                 BasicTextField(
-                    value = field,
+                    value = shown,
                     onValueChange = {
                         field = it
                         state.query = it.text
@@ -555,6 +559,8 @@ private fun PaletteResultRow(row: PaletteRow.Result, chosen: Boolean, onHover: (
             .background(if (chosen) colors.selection else if (state.pressed) colors.pressed else androidx.compose.ui.graphics.Color.Transparent, shape)
             .pointerHoverIcon(PointerIcon.Hand)
             .hoverable(interaction)
+            // the keyboard stays in the field and chooses with the arrows: rows never take the focus
+            .focusProperties { canFocus = false }
             .deskClickable(interaction, onClick, role = Role.Button)
             .semantics { selected = chosen }
             .padding(horizontal = 12.dp),

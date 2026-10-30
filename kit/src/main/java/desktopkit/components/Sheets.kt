@@ -233,6 +233,7 @@ fun GlassBottomSheet(
     val host = LocalShellOverlayHost.current
     if (host != null) {
         OverlayLayer(host) { SheetSurface(progress, drag, tier, title, modifier, { latestDismiss() }, content, host.systemBottomPx) }
+        ReturnFocusOnClose(host, visible)
         BackHandler(enabled = visible) { latestDismiss() }
     } else {
         val view = LocalView.current
@@ -246,6 +247,20 @@ fun GlassBottomSheet(
             onDismissRequest = { latestDismiss() },
             properties = PopupProperties(focusable = true),
         ) { sheet() }
+    }
+}
+
+/**
+ * While a layer is [open], remembers the element that had the keyboard focus when it opened; when
+ * the layer closes the focus goes back there, so Tab goes on from where it was (a layer in the
+ * shell's window would otherwise leave the focus nowhere).
+ */
+@Composable
+internal fun ReturnFocusOnClose(host: ShellOverlayHost, open: Boolean) {
+    val scope = rememberCoroutineScope()
+    DisposableEffect(host, open) {
+        val previous = if (open) host.focusMemory.current() else null
+        onDispose { if (previous != null) scope.launch { previous.restore() } }
     }
 }
 

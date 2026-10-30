@@ -190,6 +190,7 @@ internal fun TextFieldImpl(
         value = value,
         onValueChange = onValueChange,
         modifier = modifier
+            .focusMemory()
             .hoverable(interaction, enabled)
             .then(
                 // a hardware Enter in one line runs the action itself: the field would run its

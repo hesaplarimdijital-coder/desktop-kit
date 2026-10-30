@@ -41,6 +41,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -435,7 +436,9 @@ fun DeskTab(
     val underline by animateFloatAsState(if (selected) 1f else 0f, DeskMotion.spatial(), label = "tabUnderline")
     val textColor by animateInteractionColor(if (selected) colors.text else colors.textSecondary, selected)
     val accent = colors.accent
-    val showClose = onClose != null && (touch || selected || state.hovered || state.focused)
+    // the focus within the tab counts: Tab moves it on into the close button, which must stay
+    var focusWithin by remember { mutableStateOf(false) }
+    val showClose = onClose != null && (touch || selected || state.hovered || focusWithin)
     val haptics = rememberDeskHaptics()
     val latestClose by rememberUpdatedState(onClose)
     val closeByMiddleClick: () -> Unit = remember { { latestClose?.invoke() } }
@@ -460,11 +463,16 @@ fun DeskTab(
             }
             .middleClick(onClose != null, closeByMiddleClick)
             .dragSource(enabled = drag != null) { drag?.invoke() }
+            .onFocusChanged { focusWithin = it.hasFocus }
             .deskClickable(interaction, {
                 if (!selected) haptics.tick()
                 onClick()
             }, role = Role.Tab)
-            .semantics { this.selected = selected }
+            .semantics {
+                this.selected = selected
+                // TalkBack can close a tab whose button is hidden (DeX, not selected)
+                if (onClose != null) customActions = listOf(CustomAccessibilityAction(closeLabel) { onClose(); true })
+            }
             .padding(start = 12.dp, end = if (onClose != null) 4.dp else 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(dimens.gapS - 2.dp),
@@ -475,9 +483,9 @@ fun DeskTab(
         if (busy) Box(Modifier.size(6.dp).background(colors.accentText, CircleShape))
         CountBadge(badge)
         if (onClose != null) {
-            Box(Modifier.size(if (touch) 32.dp else 20.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(if (touch) 32.dp else 24.dp), contentAlignment = Alignment.Center) {
                 if (showClose) {
-                    DeskIconButton(DeskIcons.Close, closeLabel, onClose, size = if (touch) 32.dp else 20.dp, iconSize = if (touch) 16.dp else 12.dp)
+                    DeskIconButton(DeskIcons.Close, closeLabel, onClose, size = if (touch) 32.dp else 24.dp, iconSize = if (touch) 16.dp else 12.dp)
                 }
             }
         }

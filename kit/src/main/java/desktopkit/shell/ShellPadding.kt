@@ -176,6 +176,9 @@ internal class ShellOverlayHost {
      * sheets and the expanded player keep their controls above it.
      */
     var systemBottomPx: () -> Int by mutableStateOf({ 0 })
+
+    /** Where the keyboard focus was before a layer took it: the layer gives it back when it closes. */
+    val focusMemory = desktopkit.components.FocusMemory()
 }
 
 /**
