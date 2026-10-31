@@ -36,6 +36,9 @@ import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -110,7 +113,24 @@ fun DeskChip(
             .padding(start = if (touch) 12.dp else 10.dp, end = if (touch) 14.dp else 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AnimatedVisibility(
+        if (icon != null && tier == MotionTier.Gesture) {
+            // phone: the check mark takes the icon's place, cross-fading in the same slot, so the chip keeps
+            // its width (the icon went at once while the check grew: the label jumped left, then right)
+            val check by animateFloatAsState(if (selected) 1f else 0f, tween(DeskMotion.MEDIUM_MS, easing = DeskMotion.Standard), label = "chipCheck")
+            Box(contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(iconSize).graphicsLayer {
+                    alpha = 1f - check
+                    scaleX = 1f - 0.4f * check
+                    scaleY = 1f - 0.4f * check
+                })
+                Icon(DeskIcons.Check, contentDescription = null, tint = content, modifier = Modifier.size(iconSize).graphicsLayer {
+                    alpha = check
+                    scaleX = 0.6f + 0.4f * check
+                    scaleY = 0.6f + 0.4f * check
+                })
+            }
+            Spacer(Modifier.width(6.dp))
+        } else AnimatedVisibility(
             visible = selected,
             enter = if (tier == MotionTier.Reduced) EnterTransition.None else
                 expandHorizontally(tween(DeskMotion.MEDIUM_MS, easing = DeskMotion.EmphasizedDecelerate)) +
@@ -124,7 +144,7 @@ fun DeskChip(
                 Spacer(Modifier.width(6.dp))
             }
         }
-        if (icon != null && !selected) {
+        if (icon != null && !selected && tier != MotionTier.Gesture) {
             Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(iconSize))
             Spacer(Modifier.width(6.dp))
         }
