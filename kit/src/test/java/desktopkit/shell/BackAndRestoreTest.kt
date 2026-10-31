@@ -66,7 +66,7 @@ class BackAndRestoreTest {
             dispatcher.dispatchOnBackProgressed(back(0.5f))
         }
         compose.waitForIdle()
-        // half way: the detail has shrunk toward 90 % (95 % now) and leans toward the edge the swipe came from
+        // half way: the detail has shrunk toward 90 % (95 % now) and leans away from the edge the swipe came from
         val half = compose.onNodeWithTag("detail").getBoundsInRoot()
         val ratio = (half.right - half.left) / (full.right - full.left)
         assertTrue("width at half way: $ratio of full", abs(ratio - 0.95f) < 0.01f)

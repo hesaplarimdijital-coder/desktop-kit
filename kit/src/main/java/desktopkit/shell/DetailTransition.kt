@@ -8,6 +8,7 @@ import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.SeekableTransitionState
@@ -16,6 +17,7 @@ import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.rememberTransition
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -49,6 +51,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.geometry.CornerRadius
@@ -67,6 +70,7 @@ import desktopkit.theme.MotionTier
 import androidx.compose.runtime.withFrameNanos
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -81,11 +85,12 @@ import kotlinx.coroutines.launch
  *   edge while fading in, the list slides the other way and fades out (emphasized curve);
  * - closing ([detail] becomes null): the same, reversed;
  * - Back gesture (Android 14 and later with `android:enableOnBackInvokedCallback="true"`): while the
- *   finger moves, the detail shrinks toward 90 %, rounds its corners and leans toward the edge the
- *   swipe came from, and the list is really there behind it, rising and brightening with the
- *   finger; letting go closes it with [onBack] and the detail slides out toward that edge from
- *   wherever the finger left it, swiping back cancels and everything springs back. With a
- *   three-button Back only the way out plays.
+ *   finger moves, the detail shrinks toward 90 %, rounds its corners and leans away from the edge
+ *   the swipe came from, with the finger. On a phone the list is really there behind it, rising
+ *   and brightening with the finger; letting go closes it with [onBack] and the detail slides out
+ *   the way it was leaning from wherever the finger left it, swiping back cancels and everything
+ *   springs back. With a three-button Back only the way out plays. From tablet width up the 2.2.0
+ *   gesture stays: the detail shrinks over a shade and, let go of, closes with the shared axis.
  *
  * With reduced motion the detail simply appears. Works in every width class. The Back gesture is taken over while a detail is shown, also from a
  * [CompactTopBar] inside it (both normally call the same close function), unless [handleBack] is false.
@@ -119,12 +124,17 @@ fun <T : Any> DetailTransition(
     val latestDetail by rememberUpdatedState(detail)
     val cards = remember { DetailSharedState() }
     val page = colors.background
+    val behind = colors.pressed
     val animated = animate && tier != MotionTier.Reduced
-    // the transition is seekable, so the Back gesture can play the closing along with the finger
+    // the phone's transition is seekable, so the Back gesture can play the closing along with the finger; wider
+    // up the 2.2.0 transition stays as it was, the gesture shrinking the detail over a shade
+    val phone = tier == MotionTier.Gesture
     val seekable = remember { SeekableTransitionState<T?>(detail) }
-    val transition = rememberTransition(seekable, label = "detailTransition")
-    // a closing driven by the Back gesture: the detail shrinks with the fraction, the list rises behind it
+    val transition = if (phone) rememberTransition(seekable, label = "detailTransition") else updateTransition(detail, label = "detailTransition")
+    // a closing driven by the Back gesture: the detail shrinks with the fraction, the list rises behind it (phone)
     var gestureClose by remember { mutableStateOf(false) }
+    // the Back gesture's progress, shrinking the detail over the shade (wider up)
+    val backProgress = remember { Animatable(0f) }
     var swipeEdge by remember { mutableIntStateOf(BackEventCompat.EDGE_LEFT) }
     // the run back after a cancelled gesture; a change of the detail takes over from it
     var undoing by remember { mutableStateOf<Job?>(null) }
@@ -132,14 +142,20 @@ fun <T : Any> DetailTransition(
     // still: in between, its partners would wait for an overlay that no longer draws them and vanish for a frame
     var dropped by remember { mutableStateOf(false) }
 
-    val container = modifier.fillMaxSize().background(page)
+    val container = modifier
+        .fillMaxSize()
+        // wider up, a shade behind the shrinking detail, so its edges show during the Back gesture
+        .drawBehind {
+            val p = if (phone) 0f else backProgress.value
+            drawRect(if (p > 0f) lerp(page, behind, p) else page)
+        }
     val content: @Composable (SharedTransitionScope?) -> Unit = { shared ->
         transition.AnimatedContent(
             modifier = Modifier.fillMaxSize(),
             transitionSpec = {
                 // a card registered by the list carries the opening and, remembered here, the closing too
                 if (initialState == null && targetState != null) cards.openedWithCard = cards.registered > 0
-                detailTransform(initialState, targetState, animated, tier, card = cards.openedWithCard, gesture = gestureClose, swipeEdge = swipeEdge)
+                detailTransform(initialState, targetState, animated, tier, card = cards.openedWithCard, gesture = phone && gestureClose, swipeEdge = swipeEdge)
             },
             contentKey = { it?.let(detailKey) },
         ) { target ->
@@ -148,18 +164,22 @@ fun <T : Any> DetailTransition(
             val scopes = remember(shared, this, animated, side) {
                 if (shared != null && animated) DetailSharedScopes(shared, this, tier, side, cards) else null
             }
-            val held = dropped && target?.let(detailKey) != seekable.currentState?.let(detailKey)
+            val held = phone && dropped && target?.let(detailKey) != seekable.currentState?.let(detailKey)
             CompositionLocalProvider(LocalDetailSharedScopes provides (if (held) null else scopes)) {
                 if (target == null) {
+                    // opaque, so the shade left behind a closed detail never shows through the list
                     Box(Modifier.fillMaxSize().background(page)) { list() }
                 } else {
+                    // the detail as the app has it now: the transition holds the object it was opened with, and an
+                    // app that re-emits its detail under the same key (a count, a progress) expects the new one shown
+                    val shown = latestDetail.takeIf { it != null && detailKey(it) == detailKey(target) } ?: target
                     Box(
                         Modifier
                             .fillMaxSize()
                             .graphicsLayer {
-                                // the Back gesture: toward 90 %, rounded, leaning to the edge the swipe came
-                                // from, with the finger (and on to the end once the finger lets go)
-                                val p = if (gestureClose) (seekable.fraction / GESTURE_END).coerceIn(0f, 1f) else 0f
+                                // the Back gesture: toward 90 %, rounded, leaning away from the edge the swipe came
+                                // from, with the finger (and, on the phone, on to the end once the finger lets go)
+                                val p = if (phone) (if (gestureClose) (seekable.fraction / GESTURE_END).coerceIn(0f, 1f) else 0f) else backProgress.value
                                 if (p > 0f) {
                                     val scale = 1f - 0.1f * p
                                     scaleX = scale
@@ -171,73 +191,111 @@ fun <T : Any> DetailTransition(
                                 }
                             }
                             .background(page),
-                    ) { detailContent(target) }
+                    ) { detailContent(shown) }
                 }
             }
         }
     }
     if (sharedElements) SharedTransitionLayout(container) { content(this) } else Box(container) { content(null) }
 
-    /**
-     * The transition turned around: run back to where it came from, the content that was on its way
-     * lets its shared elements go (a composition), then the transition stands still at its current state.
-     */
-    suspend fun undo(spec: FiniteAnimationSpec<Float>) {
-        seekable.runBack(spec)
-        dropped = true
-        withFrameNanos { }
-        withFrameNanos { }
-        seekable.snapTo(seekable.currentState)
-        gestureClose = false
-    }
-
-    // the app's detail drives the transition; a Back gesture that was let go finishes from where the finger left it
-    LaunchedEffect(detail?.let(detailKey)) {
-        undoing?.cancel()
-        undoing = null
-        dropped = false
-        val target = detail
-        when {
-            !animated -> seekable.snapTo(target)
-            gestureClose && target == null -> {
-                seekable.animateTo(null, tween(COMMIT_MS, easing = DeskMotion.EmphasizedAccelerate))
+    if (phone) {
+        /**
+         * The transition turned around: run back to where it came from, the content that was on its way
+         * lets its shared elements go (a composition), then the transition stands still at its current state.
+         */
+        suspend fun undo(spec: FiniteAnimationSpec<Float>) {
+            try {
+                seekable.runBack(spec)
+                dropped = true
+                withFrameNanos { }
+                withFrameNanos { }
                 gestureClose = false
-            }
-            // a change of mind on the way (Back right after the tap, the tap again right after Back): the way is run
-            // back from where it is
-            seekable.targetState != seekable.currentState && seekable.currentState?.let(detailKey) == target?.let(detailKey) ->
-                undo(DeskMotion.spatial(tier, tween(COMMIT_MS, easing = DeskMotion.Standard), FRACTION))
-            else -> {
+                seekable.snapTo(seekable.currentState)
+                // the content that was on its way leaves with this composition; only then may the next transition
+                // register shared elements again
+                withFrameNanos { }
+            } finally {
+                dropped = false
                 gestureClose = false
-                seekable.animateTo(target)
             }
         }
-    }
 
-    // registered after the detail's own handlers (key changes with the detail), so the gesture comes here first
-    key(detail?.let(detailKey)) {
-        PredictiveBackHandler(enabled = handleBack && detail != null) { events ->
-            try {
-                events.collectLatest { event ->
-                    swipeEdge = event.swipeEdge
-                    // (a gesture while the opening is still on its way leaves it be: letting go runs the opening back)
-                    if (animated && seekable.currentState != null) {
-                        gestureClose = true
-                        // the finger seeks the closing as far as GESTURE_END; the rest is the way out
-                        seekable.seekTo(event.progress * GESTURE_END, null)
-                    }
+        // the app's detail drives the transition; a Back gesture that was let go finishes from where the finger left it
+        LaunchedEffect(detail?.let(detailKey)) {
+            undoing?.cancel()
+            undoing = null
+            val target = detail
+            when {
+                !animated -> seekable.snapTo(target)
+                gestureClose && target == null -> {
+                    // let go early, the finger's part of the way is finished first, quickly, then the way out
+                    seekable.seekOn(GESTURE_END, (COMMIT_MS * (GESTURE_END - seekable.fraction) / GESTURE_END).toInt())
+                    seekable.animateTo(null, tween(COMMIT_MS, easing = DeskMotion.EmphasizedAccelerate))
+                    gestureClose = false
                 }
-                latestOnBack()
-                // an app that keeps its detail: the gesture is undone
-                if (animated) {
-                    undoing = scope.launch {
-                        withFrameNanos { }
-                        if (latestDetail != null && gestureClose) undo(DeskMotion.gesture(FRACTION))
-                    }
+                // a change of mind on the way (Back right after the tap, the tap again right after Back): the way is
+                // run back from where it is
+                seekable.targetState != seekable.currentState && seekable.currentState?.let(detailKey) == target?.let(detailKey) ->
+                    undo(DeskMotion.spatial(tier, tween(COMMIT_MS, easing = DeskMotion.Standard), FRACTION))
+                else -> {
+                    gestureClose = false
+                    seekable.animateTo(target)
                 }
-            } catch (e: CancellationException) {
-                if (animated) undoing = scope.launch { undo(DeskMotion.gesture(FRACTION)) }
-                throw e
+            }
+        }
+
+        // registered after the detail's own handlers (key changes with the detail), so the gesture comes here first
+        key(detail?.let(detailKey)) {
+            PredictiveBackHandler(enabled = handleBack && detail != null) { events ->
+                try {
+                    events.collectLatest { event ->
+                        swipeEdge = event.swipeEdge
+                        // (a gesture while the opening is still on its way leaves it be: letting go runs the opening back)
+                        if (animated && seekable.currentState != null) {
+                            gestureClose = true
+                            // the finger seeks the closing as far as GESTURE_END; the rest is the way out
+                            seekable.seekTo(event.progress * GESTURE_END, null)
+                        }
+                    }
+                    latestOnBack()
+                    // an app that keeps its detail: the gesture is undone
+                    if (animated) {
+                        undoing = scope.launch {
+                            withFrameNanos { }
+                            if (latestDetail != null && gestureClose) undo(DeskMotion.gesture(FRACTION))
+                        }
+                    }
+                } catch (e: CancellationException) {
+                    if (animated) undoing = scope.launch { undo(DeskMotion.gesture(FRACTION)) }
+                    throw e
+                }
+            }
+        }
+    } else {
+        // a newly opened detail always starts at full size
+        LaunchedEffect(detail?.let(detailKey)) {
+            if (detail != null && !backProgress.isRunning) backProgress.snapTo(0f)
+        }
+
+        key(detail?.let(detailKey)) {
+            PredictiveBackHandler(enabled = handleBack && detail != null) { events ->
+                backProgress.snapTo(0f)
+                try {
+                    events.collect { event ->
+                        swipeEdge = event.swipeEdge
+                        backProgress.snapTo(event.progress)
+                    }
+                    latestOnBack()
+                    // the detail leaves from where the finger let it go; the shade is cleared once it has gone
+                    scope.launch {
+                        delay(DeskMotion.LONG_MS + 100L)
+                        backProgress.snapTo(0f)
+                    }
+                } catch (e: CancellationException) {
+                    // back to full size as in 2.2.0 (a jump with reduced motion)
+                    scope.launch { backProgress.animateTo(0f, DeskMotion.fade(tier, DeskMotion.spatial())) }
+                    throw e
+                }
             }
         }
     }
@@ -257,6 +315,22 @@ private suspend fun <S> SeekableTransitionState<S>.runBack(spec: FiniteAnimation
     val held = targetState
     if (held == currentState || fraction <= 0f) return
     val way = TargetBasedAnimation(spec, Float.VectorConverter, fraction, 0f)
+    val start = withFrameNanos { it }
+    while (true) {
+        val played = withFrameNanos { it } - start
+        seekTo(way.getValueFromNanos(played).coerceIn(0f, 1f), held)
+        if (way.isFinishedFromNanos(played)) break
+    }
+}
+
+/**
+ * The fraction run on to [to] over [millis] (frame by frame, the target held), for the finger's part of
+ * the way a Back gesture let go of early: the way out then starts where the finger would have taken it.
+ */
+private suspend fun <S> SeekableTransitionState<S>.seekOn(to: Float, millis: Int) {
+    val held = targetState
+    if (fraction >= to || millis <= 0) return
+    val way = TargetBasedAnimation(tween<Float>(millis, easing = DeskMotion.StandardAccelerate), Float.VectorConverter, fraction, to)
     val start = withFrameNanos { it }
     while (true) {
         val played = withFrameNanos { it } - start
@@ -289,7 +363,7 @@ private fun <T> detailTransform(
     if (closing && gesture) {
         // the Back gesture seeks this: the list rises behind the shrinking detail from the first
         // frame, the detail stays whole until GESTURE_END and only then (once the finger has let go)
-        // slides out toward the edge the swipe came from and fades
+        // slides out away from the edge the swipe came from, with the finger, and fades
         val wayOut = Easing { fraction -> DeskMotion.EmphasizedAccelerate.transform(((fraction - GESTURE_END) / (1f - GESTURE_END)).coerceIn(0f, 1f)) }
         val direction = if (swipeEdge == BackEventCompat.EDGE_RIGHT) -1 else 1
         val enter = scaleIn(tween(GESTURE_MS, easing = DeskMotion.Standard), initialScale = 0.94f) + fadeIn(tween(GESTURE_MS, easing = DeskMotion.Standard))
@@ -449,9 +523,10 @@ fun Modifier.detailSharedCard(key: Any, shape: CornerBasedShape = RoundedCornerS
     val surface = if (list) colors.surface else colors.background
     val clip = remember(scopes) { CornerClip(cornerPx) }
     return with(scopes.transition) {
+        val state = rememberSharedContentState(key)
         this@detailSharedCard
             .sharedBounds(
-                sharedContentState = rememberSharedContentState(key),
+                sharedContentState = state,
                 animatedVisibilityScope = scopes.visibility,
                 enter = fadeIn(tween(DeskMotion.MEDIUM_MS + 10, delayMillis = DeskMotion.SHORT_MS - 10, easing = DeskMotion.StandardDecelerate)),
                 exit = fadeOut(tween(DeskMotion.SHORT_MS - 10, easing = DeskMotion.StandardAccelerate)),
@@ -459,9 +534,9 @@ fun Modifier.detailSharedCard(key: Any, shape: CornerBasedShape = RoundedCornerS
                 resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds(ContentScale.FillWidth, Alignment.TopStart),
                 clipInOverlayDuringTransition = clip,
             )
-            // a surface only while it flies: the card is as bare as before at rest
+            // a surface only while this card flies (the others in the list stay as bare as before)
             .drawBehind {
-                if (isTransitionActive) drawRoundRect(surface, cornerRadius = CornerRadius(cornerPx()))
+                if (isTransitionActive && state.isMatchFound) drawRoundRect(surface, cornerRadius = CornerRadius(cornerPx()))
             }
     }
 }
