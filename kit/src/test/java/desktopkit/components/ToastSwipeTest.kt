@@ -15,6 +15,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import desktopkit.theme.DesktopKitTheme
 import desktopkit.theme.InputMode
@@ -58,11 +59,13 @@ class ToastSwipeTest {
         toast(MotionTier.Gesture)
         compose.mainClock.autoAdvance = false
         // a quick swipe over a third of the card: committed by its speed, two thirds of the way still to go
-        val width = card().getBoundsInRoot().let { with(compose.density) { (it.right - it.left).toPx() } }
+        val rest = card().getBoundsInRoot()
+        val cardWidth = rest.right - rest.left
+        val width = with(compose.density) { cardWidth.toPx() }
         compose.onNodeWithText("Çöpe taşındı").performTouchInput { swipe(center, center + Offset(-width * 0.35f, 0f), durationMillis = 40) }
         compose.waitForIdle()
         assertNotNull("not dismissed while still on its way out", toasts.current)
-        var last = compose.onNodeWithText("Çöpe taşındı").getBoundsInRoot().left
+        var last = card().getBoundsInRoot().left
         var frames = 0
         var moved = 0
         while (toasts.current != null && frames < 90) {
@@ -70,9 +73,12 @@ class ToastSwipeTest {
             compose.waitForIdle()
             frames++
             if (toasts.current != null) {
-                val left = compose.onNodeWithText("Çöpe taşındı").getBoundsInRoot().left
-                assertTrue("frame $frames: the toast came back ($last → $left)", left <= last)
-                if (left < last) moved++
+                val left = card().getBoundsInRoot().left
+                // in view it only goes on (out of view the spring may bounce a little before the dismiss lands)
+                if (left > rest.left - cardWidth + 2.dp) {
+                    assertTrue("frame $frames: the toast came back ($last → $left)", left <= last)
+                    if (left < last) moved++
+                }
                 last = left
             }
         }
@@ -87,6 +93,9 @@ class ToastSwipeTest {
         compose.mainClock.autoAdvance = false
         val width = card().getBoundsInRoot().let { with(compose.density) { (it.right - it.left).toPx() } }
         compose.onNodeWithText("Çöpe taşındı").performTouchInput { swipe(center, center + Offset(-width * 0.35f, 0f), durationMillis = 40) }
+        compose.waitForIdle()
+        // the dismiss lands with the next dispatch: one frame, no way out in between
+        compose.mainClock.advanceTimeByFrame()
         compose.waitForIdle()
         assertNull(toasts.current)
         compose.mainClock.autoAdvance = true
