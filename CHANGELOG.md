@@ -99,6 +99,33 @@ DeX'in süreleri ve görünümü değişmedi (ekran görüntüleri aynı). Uygul
 - **Basma:** telefonda basma istenenin dörtte üçü derinliğinde (varsayılan 0,96 → 0,97: parmak denetimi örter,
   küçülme görülmekten çok hissedilir), bırakınca 0,75 sönümlü 1200 yayla biraz üstüne sekip yerleşir.
 - **Anahtar:** tutamağın yayı yolun yüzde birinde (yarım piksel) durur; binde birde görünmeden çalışıyordu.
+- **Tam oynatıcıda iç içe kaydırma:** 2.0'ın KDoc'u söz veriyordu, hiçbir şey yapmıyordu: tam oynatıcıdaki bir liste
+  (sözler, sıra) her sürüklemeyi alıyordu. Artık içerik önce kayar; en üstteyken aşağı çekmek oynatıcıyı parmakla
+  indirir, geri itmek içerik yeniden kaymadan önce oynatıcıyı kaldırır, bırakınca sayfanın kendi fırlatma kuralı
+  karar verir (yarı yol, fırlatma). En üste çarpan bir içerik fırlatması oynatıcıyı yerinde bırakır.
+- **Chip:** ikonlu bir chip seçilince ikon bir anda gidip onay işareti büyüyordu: etiket ikonun genişliği kadar sola
+  sıçrayıp sağa kayıyordu. Telefonda onay işareti ikonun yerinde belirir (solup büyüyerek), chip'in genişliği
+  değişmez.
+- **Sekmeler arası öngörülü geri:** hareketle gezinmede Navigation, `NavHost`'un öngörülü geri geçişlerini parmakla
+  oynatır ve kabuk ona hiç vermemişti: sekme Navigation'ın varsayılanıyla (yüzde 70'e küçülme) dönüyordu, her
+  katmanda ve azaltılmış harekette de. Telefonda ayrıntınınki gibi: bırakılan sekme parmakla yüzde 90'a doğru küçülüp
+  kaydırmanın geldiği kenardan uzağa yaslanır, yolun son onda birine kadar bütün kalır; başlangıç sekmesi arkasında
+  yüzde 94'ten yükselir. Üç düğmeli Geri fade-through'la kalır; azaltılmış harekette ve `ShellTransitions.None` ile
+  hiçbir şey oynamaz.
+- **Vurgu rengi değişimi:** renkler statik bir yerel değerle veriliyordu; statik yerel değişince altındaki her şey
+  atlanmadan yeniden kompoze olur: 150 ms'lik geçişin her karesinde (dokuz kez) bütün uygulama. Renkler artık dinamik
+  bir yerel değer (`LocalDeskColors`'un türü aynı); geçiş boyunca yalnızca `DeskTheme.colors` okuyanlar yeniden
+  kompoze olur, geri kalanı değişimin başladığı karede bir kez. Material'ın renk şeması (o da statik) yeni paleti bir
+  anda alır; kitin bileşenleri yine solarak geçer.
+- **Lookahead:** paylaşılan öğeli bir `DetailTransition`'da durağan kaydırılan liste her karede iki kez ölçülüyordu
+  (ölçüldü: 57 lookahead, 57 asıl ölçüm), hiçbir geçiş yokken. Telefonda içerik durağanken düz bir `Box` içindedir,
+  geçiş ya da Geri hareketi başlayınca durumuyla birlikte (`movableContentOf`: kaydırma yeri, metin, efektler)
+  `SharedTransitionLayout`'a taşınır, bitince geri çıkar; kartlar durağanken de kayıtlı kalır.
+- **Tek alt cam:** telefonda oynatıcı şeridi, alt çubuk ve sistem düğmelerinin arkasındaki bant üst üste üç cam
+  yüzeydi, altlarındaki kaydırmanın her karesinde her biri ayrı bulanıklaştırıyordu; çubuklar katman kaydırmasıyla
+  kaydığından camları kayarken ekranın yanlış yerini bulanıklaştırıyordu (Haze konumu yerleşimde okur). Kabuk artık
+  şeridin (şerit yoksa çubuğun) üstünden pencerenin altına tek cam çizer, çubuklarla birlikte yerleşimle kaydırır;
+  bandın içine kayan çubuk orada kesilir. Üç bulanıklık yerine bir, doğru yerden. Ekran görüntülerinin hepsi aynı.
 
 ### Tablet ve DeX
 
@@ -107,7 +134,9 @@ Süreler ve görünüm değişmedi; ekran görüntüleri aynı. Ayrıntı 0.2.0'
 ister ve olduğu yerden gider, menü sol üst köşesinden büyür, bildirim bir anda gider ve erken bırakılınca 2.2.0'ın
 yayıyla döner, basma eskisi gibi. Ortak olanlar: yayların eşik düzeltmesi (süreli eğrilerde etkisi yok), alt sayfanın
 katman yerine yerleşimle kayması (sayfa kayarken cam arkasındakini doğru yerden bulanıklaştırır; süre aynı),
-"Animasyonları kaldır" açıkken her şeyin bir anda olması ve anahtarın tutamağının yarım pikselde durması. Bir de
+"Animasyonları kaldır" açıkken her şeyin bir anda olması, anahtarın tutamağının yarım pikselde durması ve vurgu
+değişiminde yalnızca rengi okuyanın yeniden kompoze olması (Material bileşenlerinin rengi bir anda değişir). Sekmeler
+arası öngörülü geri azaltılmış harekette ve `ShellTransitions.None` ile artık oynamaz. Bir de
 örnek uygulamanın Ayarlar listesi ile kitin "Diğer" ekranı: yüzen oynatıcı varken liste onun altına kadar uzanır ve
 dolgusunu kendi verir (eskiden ekran oynatıcının üstünde bitiyordu); kısa listelerde görünüm aynı.
 
@@ -128,7 +157,10 @@ dolgusunu kendi verir (eskiden ekran oynatıcının üstünde bitiyordu); kısa 
   menünün büyüme köşesi, satırların sırayla gelişi ve telefonun basması. İncelemeden sonra: vazgeçilen geri
   hareketinden sonraki ikinci hareketin kartı yine uçurması, aynı anahtarla yeniden verilen ayrıntının en son
   nesnesini göstermesi, tablet genişliğinde geri hareketinin 2.2.0'daki gibi kalması (liste arkada değil) ve açık
-  başlayan oynatıcının ilk inişinde kapağın uçması.
+  başlayan oynatıcının ilk inişinde kapağın uçması. Sonra: tam oynatıcıda içeriğin önce kayıp sonra oynatıcıyı
+  çekmesi, telefonda ikonlu chip'in genişliğini kare kare koruması, sekmeler arası öngörülü geri, vurgu değişiminde
+  rengi okumayanın yeniden kompoze olmaması (dokuz kezden bire), durağan kaydırmada lookahead ölçümü olmaması, tek alt
+  camın şeritten pencerenin altına uzanıp çubuklarla kayması.
 - `MotionStripsTest`: her geçişin kare şeridi (sekme geçişi, ayrıntının açılışı, yolda dönüşü, geri hareketi ve
   vazgeçilen hareket, oynatıcının açılışı, kapanışı ve geri hareketi, çubuklar gizliyken açılış ve kapanış, alt
   sayfanın açılışı ve kapanışı, satırların gelişi) `kit/build/outputs/screenshots/motion` altına yazılır, CI çekme
@@ -139,18 +171,11 @@ dolgusunu kendi verir (eskiden ekran oynatıcının üstünde bitiyordu); kısa 
 
 ### Bu sürümde olmayan
 
-- **Vurgu rengi değişimi:** `animatePalette` paleti kompozisyonda 150 ms boyunca her karede yeniden kurar; o
-  sürede `DeskTheme.colors` okuyan her şey yeniden kompoze olur. Rengi çizim aşamasında okuyan bir yol daha büyük bir
-  yeniden yapılanma.
-- **Lookahead maliyeti:** `SharedTransitionLayout` liste ve ayrıntıyı geçiş sürerken her yerleşimde iki kez ölçer
-  (lookahead); uzun listelerde paylaşılan öğelerin bedeli bu, olduğu gibi kaldı.
-- **Dört cam yüzey:** üst çubuk, alt çubuk, mini oynatıcının şeridi ve kaplama katmanındaki sayfalar her biri
-  kendi bulanıklığını çizer; altlarında bir şey hareket ederken kare başına birkaç bulanıklık geçişi. Tek paylaşılan
-  bulanıklık ayrı bir tasarım.
-- **Tam oynatıcıda iç içe kaydırma:** `ExpandablePlayer`'ın KDoc'u tam oynatıcının kaydırılabilir içeriğinin önce
-  kayıp en üstte sayfayı çekeceğini söylüyordu; böyle bir bağlantı yok, cümle silindi. Bağlantının kendisi açık iş.
-- Hareketle gezinmede sekmeler arası öngörülü geri bu turda ele alınmadı (S24 üç düğmeli gezinmede); chip'lerin
-  genişlik değişimi animasyonsuz.
+- Hareketle gezinmede sekmeler arası öngörülü geri tablet ve DeX'te Navigation'ın kendi geçişiyle kalır (2.2.0'daki
+  gibi); kitin kendi geçişi telefonun.
+- Ayrıntı geçişinin lookahead tasarrufu telefonun: tablet ve DeX'te paylaşılan öğe düzeni 2.2.0'daki gibi hep
+  açık (geçiş orada aynı karede başladığı için düzeni o anda kurmak kapağın uçuşunu kaçırıyordu).
+- Üst çubuğun camı ayrı kalır (alttakilere bitişik değil).
 
 ## 2.2.0 (2026-10-30)
 

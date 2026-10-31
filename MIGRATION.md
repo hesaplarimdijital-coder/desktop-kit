@@ -294,9 +294,13 @@ CHANGELOG'un "Tablet ve DeX" bölümünde. Ayrıntılar [CHANGELOG](CHANGELOG.md
   `Modifier.listAppear(gelis, index)` ver. Anahtar, satırların ne zaman geldiğini söyleyen şeydir (yüklenme bayrağı,
   gösterilen albüm); anahtarsız yalnızca listenin ilk görünüşü sayılır. `DetailTransition` listesinde `rememberListAppear`'ı
   `list` lambda'sının dışında al ki ayrıntıdan dönüşte satırlar yeniden gelmesin.
-- **`ExpandablePlayer` belgesi:** tam oynatıcının kaydırılabilir içeriğinin önce kayıp en üstte sayfayı çekeceği
-  cümlesi silindi; böyle bir bağlantı hiç yoktu. Tam oynatıcıda kaydırılabilir içerik varsa aşağı çekme içeriğe
-  gider; sayfayı içeriğin üstünden çekmek için uygulama kendi `NestedScrollConnection`'ını kurar.
+- **Tam oynatıcıda kaydırılabilir içerik:** artık önce içerik kayar, en üstteyken aşağı çekmek oynatıcıyı indirir
+  (KDoc'un 2.0'dan beri söz verdiği). Bunun için kendi `NestedScrollConnection`'ını kurduysan kaldır; ikisi birden
+  aynı sürüklemeyi paylaşır.
+- **Vurgu rengi:** `LocalDeskColors` artık dinamik bir `compositionLocalOf` (türü aynı). Geçiş boyunca yalnızca rengi
+  okuyanlar yeniden kompoze olur; tema içindeki Material bileşenleri yeni renk şemasını bir anda alır.
+- **Telefonun alt camı:** `BottomNavBar` ve `ExpandablePlayer`'ın şeridi kabuğun içinde kendi camlarını çizmez,
+  kabuk hepsinin arkasına tek cam çizer. Kabuğun dışında eskisi gibi kendi camları vardır.
 - **Yeni:** `Modifier.detailSharedCard`, `Modifier.playerSharedElement`, `rememberListAppear`/`Modifier.listAppear`
   (`ListAppear.ROWS`, `STAGGER_MS`, `DURATION_MS`), `DeskMotion.open`, `DeskMotion.PIXEL`,
   `DeskMotion.gesture(visibilityThreshold)`, `DeskMotion.spatial(tier, timed, visibilityThreshold)`.

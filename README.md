@@ -312,6 +312,7 @@ DesktopShell(…, bottomBar = { tur ->
   işaretlenen öğeler (kapak, başlık) şeritteki yerinden tam oynatıcıdaki yerine uçar ve geri; değiştiricilerde ilk
   sırada, boyuttan önce. Öğe çizildiği gibi kaydedilir (donanım bitmap'i olan bir kapak da); açık başlayan oynatıcıda
   da ilk inişte uçar.
+- Tam oynatıcıdaki kaydırılabilir içerik (sözler, sıra) önce kayar; en üstteyken aşağı çekmek oynatıcıyı indirir.
 - Öngörülü geri hareketi tam oynatıcıyı küçültür ve kapatır; küçülme sayfayla birlikte şeride iner.
 - Mini oynatıcıyı sola kaydırmak `onNext`, sağa `onPrevious`; şerit parmağı izler, eşikte titreşir, eşiğe
   varmazsa yaylanarak geri gelir.
@@ -376,7 +377,8 @@ Başlığın yanındaki kapatma işareti klavye bağlıyken "Esc", dokunmatikte 
 
 ### Vurgu rengi
 
-Vurgu (ve camın tonu) değişince renkler 150 ms'de geçer. Çalan parçanın kapağından vurgu almak için
+Vurgu (ve camın tonu) değişince renkler 150 ms'de geçer; o karelerde yalnızca `DeskTheme.colors` okuyanlar yeniden
+kompoze olur (tema içindeki Material bileşenleri yeni rengi bir anda alır). Çalan parçanın kapağından vurgu almak için
 `DesktopKitRoot(prefs, accent = Accent.custom("Kapak", kapakRengi))`; saklanan vurgu değişmez. Duvar kâğıdının
 rengini ayarlarda sunmak için `rememberDeskPreferences(dynamicAccent = true)` (`Accent.dynamic(context)`); duvar
 kâğıdı değişince renk de değişir.
@@ -494,8 +496,9 @@ geçiş olmaz). Alt çubuk, ray ve kenar çubuğundaki seçim rengi 150 ms'de yu
 
 0.2.0 ile telefon ve tablette (alt çubuk, ray) Android'in fade-through geçişi kullanılır: eski ekran 90 ms'de
 solar, yenisi 210 ms'de %96 (telefon) ya da %98'den (tablet) büyüyerek belirir. Kenar çubuklu düzende (DeX)
-150 ms'lik sade geçiş kalır. Manifestte `android:enableOnBackInvokedCallback="true"` varsa öngörülü geri
-hareketi geçişi parmakla oynatır.
+150 ms'lik sade geçiş kalır. Manifestte `android:enableOnBackInvokedCallback="true"` varsa hareketle gezinmede
+sekmeler arası öngörülü geri parmakla oynar: telefonda sekme yüzde 90'a doğru küçülüp yaslanır, başlangıç sekmesi
+arkasında yükselir; genişte Navigation'ın kendi geçişi.
 
 ### Telefonda kaydırma ve boyutlar
 
