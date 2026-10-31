@@ -80,8 +80,9 @@ class ListAppearAndPressTest {
             if (row3Arrived < 0 && top("row3").value <= 3 * 40f + 0.5f) row3Arrived = f
         }
         assertTrue("row 0 arrived ($row0Arrived) before row 3 ($row3Arrived)", row0Arrived in 0 until row3Arrived)
-        // a row added once the list has settled is simply there
+        // a row added once the list has settled is simply there (two frames: the recomposer wakes with the first)
         compose.runOnIdle { rows = 7 }
+        frame()
         frame()
         assertEquals(6 * 40f, top("row6").value, 0.5f)
     }
