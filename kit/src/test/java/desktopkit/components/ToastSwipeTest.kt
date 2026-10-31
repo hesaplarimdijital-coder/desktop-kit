@@ -39,12 +39,15 @@ class ToastSwipeTest {
 
     private val toasts = ToastState()
 
+    /** A long message: a wide card, with way to go after the fling that commits it. */
+    private val message = "On iki dosya ve üç klasör çöpe taşındı, geri almak için dokun"
+
     private fun toast(tier: MotionTier) {
         compose.setContent {
             DesktopKitTheme(inputMode = InputMode.Touch) {
                 CompositionLocalProvider(LocalMotionTier provides tier) {
                     Box(Modifier.fillMaxSize()) { ToastHost(toasts, Modifier.align(Alignment.BottomCenter)) }
-                    LaunchedEffect(Unit) { toasts.show("Çöpe taşındı", duration = ToastDuration.Indefinite) }
+                    LaunchedEffect(Unit) { toasts.show(message, duration = ToastDuration.Indefinite) }
                 }
             }
         }
@@ -58,10 +61,10 @@ class ToastSwipeTest {
     fun onAPhoneASwipedToastCarriesOnBeforeItIsDismissed() {
         toast(MotionTier.Gesture)
         compose.mainClock.autoAdvance = false
-        // the fling the sheet's test commits with: 150 px in 60 ms, some of the way still to go
+        // the fling the sheet's test commits with: 150 px in 60 ms; the wide card has most of its way still to go
         val rest = card().getBoundsInRoot()
         val cardWidth = rest.right - rest.left
-        compose.onNodeWithText("Çöpe taşındı").performTouchInput { swipe(center, center + Offset(-150f, 0f), durationMillis = 60) }
+        compose.onNodeWithText(message).performTouchInput { swipe(center, center + Offset(-150f, 0f), durationMillis = 60) }
         compose.waitForIdle()
         assertNotNull("not dismissed while still on its way out", toasts.current)
         var last = card().getBoundsInRoot().left
@@ -83,14 +86,14 @@ class ToastSwipeTest {
         }
         compose.mainClock.autoAdvance = true
         assertNull("the toast was dismissed once it was out", toasts.current)
-        assertTrue("the toast moved on after the finger lifted ($moved frames)", moved >= 1)
+        assertTrue("the toast moved on after the finger lifted ($moved frames)", moved >= 2)
     }
 
     @Test
     fun widerUpASwipedToastGoesAtOnce() {
         toast(MotionTier.Timed)
         compose.mainClock.autoAdvance = false
-        compose.onNodeWithText("Çöpe taşındı").performTouchInput { swipe(center, center + Offset(-150f, 0f), durationMillis = 60) }
+        compose.onNodeWithText(message).performTouchInput { swipe(center, center + Offset(-150f, 0f), durationMillis = 60) }
         compose.waitForIdle()
         // the dismiss lands with the next dispatch: one frame, no way out in between
         compose.mainClock.advanceTimeByFrame()
