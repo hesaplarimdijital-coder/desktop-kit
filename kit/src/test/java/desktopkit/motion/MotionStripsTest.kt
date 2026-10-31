@@ -58,7 +58,12 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -142,13 +147,16 @@ class MotionStripsTest {
         return bitmap
     }
 
-    /** The window before [change] and [times] ms after it, as one strip. */
-    private fun strip(name: String, change: () -> Unit) {
+    /**
+     * The window before [change] and [at] ms after it, as one strip. [change] runs on the UI thread
+     * unless it drives the test's own input ([onUiThread] false), which synchronises itself.
+     */
+    private fun strip(name: String, at: List<Long> = times, onUiThread: Boolean = true, change: () -> Unit) {
         compose.mainClock.autoAdvance = false
         val frames = mutableListOf("önce" to shot())
-        compose.runOnIdle { change() }
+        if (onUiThread) compose.runOnIdle { change() } else change()
         var now = 0L
-        for (t in times) {
+        for (t in at) {
             compose.mainClock.advanceTimeBy(t - now)
             now = t
             compose.waitForIdle()
@@ -172,24 +180,26 @@ class MotionStripsTest {
         strip("tab-switch-current") { navigator?.navigate("podcasts") }
     }
 
+    /** A: the scale starts with the fade, as Material's fade-through does. */
     @Test
-    fun tabSwitchProposals() {
-        tabProposal("tab-switch-a-aligned") {
-            // A: the scale starts with the fade, as Material's fade-through does
-            (fadeIn(tween(210, delayMillis = 90, easing = DeskMotion.EmphasizedDecelerate)) +
-                scaleIn(tween(210, delayMillis = 90, easing = DeskMotion.EmphasizedDecelerate), initialScale = 0.96f))
-                .togetherWith(fadeOut(tween(90, easing = DeskMotion.EmphasizedAccelerate)))
-        }
-        tabProposal("tab-switch-b-crossfade") {
-            // B: a calm cross-fade, no movement
-            fadeIn(tween(180, easing = DeskMotion.StandardDecelerate)) togetherWith fadeOut(tween(120, easing = DeskMotion.StandardAccelerate))
-        }
-        tabProposal("tab-switch-c-depth") {
-            // C: the old screen sinks (shrinks and fades), the new one rises from 94 % on a spring
-            (fadeIn(tween(200, delayMillis = 40, easing = DeskMotion.EmphasizedDecelerate)) +
-                scaleIn(spring(dampingRatio = 0.9f, stiffness = 600f), initialScale = 0.94f))
-                .togetherWith(fadeOut(tween(110, easing = DeskMotion.EmphasizedAccelerate)) + scaleOut(tween(110, easing = DeskMotion.EmphasizedAccelerate), targetScale = 0.97f))
-        }
+    fun tabSwitchProposalA() = tabProposal("tab-switch-a-aligned") {
+        (fadeIn(tween(210, delayMillis = 90, easing = DeskMotion.EmphasizedDecelerate)) +
+            scaleIn(tween(210, delayMillis = 90, easing = DeskMotion.EmphasizedDecelerate), initialScale = 0.96f))
+            .togetherWith(fadeOut(tween(90, easing = DeskMotion.EmphasizedAccelerate)))
+    }
+
+    /** B: a calm cross-fade, no movement. */
+    @Test
+    fun tabSwitchProposalB() = tabProposal("tab-switch-b-crossfade") {
+        fadeIn(tween(180, easing = DeskMotion.StandardDecelerate)) togetherWith fadeOut(tween(120, easing = DeskMotion.StandardAccelerate))
+    }
+
+    /** C: the old screen sinks (shrinks and fades), the new one rises from 94 % on a spring. */
+    @Test
+    fun tabSwitchProposalC() = tabProposal("tab-switch-c-depth") {
+        (fadeIn(tween(200, delayMillis = 40, easing = DeskMotion.EmphasizedDecelerate)) +
+            scaleIn(spring(dampingRatio = 0.9f, stiffness = 600f), initialScale = 0.94f))
+            .togetherWith(fadeOut(tween(110, easing = DeskMotion.EmphasizedAccelerate)) + scaleOut(tween(110, easing = DeskMotion.EmphasizedAccelerate), targetScale = 0.97f))
     }
 
     private fun tabProposal(name: String, transform: () -> ContentTransform) {
@@ -217,23 +227,26 @@ class MotionStripsTest {
         strip("detail-open-current") { detail = albums[2] }
     }
 
+    private val offsetSpring = spring(dampingRatio = 0.9f, stiffness = 700f, visibilityThreshold = IntOffset(1, 1))
+
+    /** A: depth. The detail slides in 12 % and fades; the list sinks to 95 % under it. */
     @Test
-    fun detailOpenProposals() {
-        val offsetSpring = spring(dampingRatio = 0.9f, stiffness = 700f, visibilityThreshold = IntOffset(1, 1))
-        detailProposal("detail-open-a-depth", card = false) {
-            // A: depth. The detail slides in 12 % and fades; the list sinks to 95 % under it.
-            (slideInHorizontally(offsetSpring) { it * 12 / 100 } + fadeIn(tween(200, delayMillis = 40, easing = DeskMotion.StandardDecelerate)))
-                .togetherWith(scaleOut(tween(300, easing = DeskMotion.Emphasized), targetScale = 0.95f) + fadeOut(tween(160, easing = DeskMotion.StandardAccelerate)))
-        }
-        detailProposal("detail-open-b-card", card = true) {
-            // B: the card grows into the detail's header; the rest of the detail fades in after it
-            fadeIn(tween(220, delayMillis = 60, easing = DeskMotion.StandardDecelerate)) togetherWith fadeOut(tween(120, easing = DeskMotion.StandardAccelerate))
-        }
-        detailProposal("detail-open-c-axis", card = false) {
-            // C: shared axis with a longer way: 30 % in from the end, the list 30 % out
-            (slideInHorizontally(offsetSpring) { it * 3 / 10 } + fadeIn(tween(200, delayMillis = 40, easing = DeskMotion.StandardDecelerate)))
-                .togetherWith(slideOutHorizontally(offsetSpring) { -it * 3 / 10 } + fadeOut(tween(120, easing = DeskMotion.StandardAccelerate)))
-        }
+    fun detailOpenProposalA() = detailProposal("detail-open-a-depth", card = false) {
+        (slideInHorizontally(offsetSpring) { it * 12 / 100 } + fadeIn(tween(200, easing = DeskMotion.StandardDecelerate)))
+            .togetherWith(scaleOut(tween(300, easing = DeskMotion.Emphasized), targetScale = 0.95f) + fadeOut(tween(160, easing = DeskMotion.StandardAccelerate)))
+    }
+
+    /** B: the card grows into the detail's header; the rest of the detail fades in after it. */
+    @Test
+    fun detailOpenProposalB() = detailProposal("detail-open-b-card", card = true) {
+        fadeIn(tween(220, delayMillis = 60, easing = DeskMotion.StandardDecelerate)) togetherWith fadeOut(tween(120, easing = DeskMotion.StandardAccelerate))
+    }
+
+    /** C: shared axis with a longer way: 30 % in from the end, the list 30 % out. */
+    @Test
+    fun detailOpenProposalC() = detailProposal("detail-open-c-axis", card = false) {
+        (slideInHorizontally(offsetSpring) { it * 3 / 10 } + fadeIn(tween(200, easing = DeskMotion.StandardDecelerate)))
+            .togetherWith(slideOutHorizontally(offsetSpring) { -it * 3 / 10 } + fadeOut(tween(120, easing = DeskMotion.StandardAccelerate)))
     }
 
     @OptIn(ExperimentalSharedTransitionApi::class)
@@ -301,7 +314,7 @@ class MotionStripsTest {
             compose.waitForIdle()
             frames += "parmak $p" to shot()
         }
-        compose.runOnIdle { scope?.launch { state.animateTo(null) } }
+        compose.runOnIdle { scope?.launch { state.animateTo(null, tween(220, easing = DeskMotion.EmphasizedAccelerate)) } }
         var now = 0L
         for (t in listOf(16L, 64L, 144L, 304L)) {
             compose.mainClock.advanceTimeBy(t - now)
@@ -324,10 +337,12 @@ class MotionStripsTest {
         transition.AnimatedContent(
             transitionSpec = {
                 val closing = targetState == null
+                // the list comes up behind while the finger moves; the detail only leaves in the last
+                // part, so letting go slides it out from where the finger left it
                 val spec = (fadeIn(tween(300, easing = DeskMotion.StandardDecelerate)) + scaleIn(tween(300, easing = DeskMotion.Emphasized), initialScale = 0.94f))
                     .togetherWith(
-                        slideOutHorizontally(tween(300, easing = DeskMotion.EmphasizedAccelerate)) { it / 4 } +
-                            fadeOut(tween(300, easing = CubicBezierEasing(0.8f, 0f, 1f, 0.2f))),
+                        slideOutHorizontally(tween(300, easing = CubicBezierEasing(0.9f, 0f, 1f, 0f))) { it / 2 } +
+                            fadeOut(tween(90, delayMillis = 210, easing = DeskMotion.StandardAccelerate)),
                     )
                 // the shrinking detail stays above the list that shows behind it
                 spec.apply { targetContentZIndex = if (closing) -1f else 1f }
@@ -372,6 +387,49 @@ class MotionStripsTest {
             ) { _, _ -> SampleTrackList() }
         }
         strip("player-expand-current") { scope?.launch { player?.expand() } }
+    }
+
+    /**
+     * Finding 1: the bars were hidden by a scroll, so the mini player sits at the bottom edge; a tap
+     * on it snaps the bars back at once (the strip jumps up) and the sheet opens from the old place.
+     */
+    @Test
+    fun playerTapWithBarsHiddenCurrent() {
+        playerWithBarsHidden()
+        strip("player-tap-bars-hidden-current", onUiThread = false) { compose.onNodeWithTag("mini").performClick() }
+    }
+
+    /** Finding 1, the way back: where the sheet lands and where the strip then appears. */
+    @Test
+    fun playerCollapseWithBarsHiddenCurrent() {
+        val player = playerWithBarsHidden()
+        compose.onNodeWithTag("mini").performClick()
+        compose.waitForIdle()
+        strip("player-collapse-bars-hidden-current", at = listOf(16L, 96L, 208L, 304L, 448L, 608L, 800L)) {
+            playerScope?.launch { player.collapse() }
+        }
+    }
+
+    private var playerScope: CoroutineScope? = null
+
+    /** The phone shell with the player, after a long swipe up that hides the bars. */
+    private fun playerWithBarsHidden(): ExpandablePlayerState {
+        var player: ExpandablePlayerState? = null
+        phoneContent {
+            player = rememberExpandablePlayerState()
+            playerScope = rememberCoroutineScope()
+            TestShell(
+                WidthClass.Compact,
+                startRoute = "music",
+                spec = mediaSpec,
+                bottomBar = {
+                    ExpandablePlayer(player!!, mini = { SampleMiniPlayer(2) }, full = { SampleFullPlayer(2) }, modifier = Modifier.testTag("mini"))
+                },
+            ) { _, _ -> SampleTrackList() }
+        }
+        compose.onNodeWithTag("tracks").performTouchInput { swipeUp(startY = centerY + 300f, endY = top + 200f, durationMillis = 800) }
+        compose.waitForIdle()
+        return player!!
     }
 
     @Test
@@ -419,8 +477,9 @@ class MotionStripsTest {
                     .graphicsLayer {
                         val p = progress.value
                         translationY = collapsedTop * (1f - p)
-                        // rounded while it travels, square at both ends
-                        shape = RoundedCornerShape((20f * 4f * p * (1f - p)).dp)
+                        // rounded while it travels, square at both ends (the spring may overshoot 1)
+                        val travel = p.coerceIn(0f, 1f)
+                        shape = RoundedCornerShape((20f * 4f * travel * (1f - travel)).dp)
                         clip = true
                     }
                     .background(stripColor),
@@ -508,10 +567,10 @@ class MotionStripsTest {
     }
 
     @Test
-    fun sheetOpenProposals() {
-        sheetProposal("sheet-open-a-scale", scale = true, dampingRatio = 0.9f, stiffness = 600f)
-        sheetProposal("sheet-open-b-quick", scale = false, dampingRatio = 0.92f, stiffness = 800f)
-    }
+    fun sheetOpenProposalA() = sheetProposal("sheet-open-a-scale", scale = true, dampingRatio = 0.9f, stiffness = 600f)
+
+    @Test
+    fun sheetOpenProposalB() = sheetProposal("sheet-open-b-quick", scale = false, dampingRatio = 0.92f, stiffness = 800f)
 
     private fun sheetProposal(name: String, scale: Boolean, dampingRatio: Float, stiffness: Float) {
         val progress = Animatable(0f)
