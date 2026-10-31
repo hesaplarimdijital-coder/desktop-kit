@@ -41,6 +41,7 @@ import desktopkit.components.MenuEntry
 import desktopkit.components.MenuSpec
 import desktopkit.components.TableColumn
 import desktopkit.components.TableSort
+import desktopkit.components.playerSharedElement
 import desktopkit.screens.MessageScreen
 import desktopkit.screens.PageHeader
 import desktopkit.shell.DesktopShell
@@ -221,16 +222,20 @@ val sampleArtwork = listOf(
     Color(0xFFE0574B), Color(0xFFF2B84B), Color(0xFF59D49A), Color(0xFF8AB0FF), Color(0xFFB07AFF), Color(0xFFFF8FB1),
 )
 
-/** The mini player of the samples: artwork, title, artist, play button. */
+/** The mini player of the samples: artwork, title, artist, play button. The artwork and the title fly into the full player. */
 @Composable
 fun SampleMiniPlayer(track: Int = 0) {
     Row(Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         androidx.compose.foundation.layout.Box(
-            Modifier.size(44.dp).background(sampleArtwork[track % sampleArtwork.size], androidx.compose.foundation.shape.RoundedCornerShape(8.dp)),
+            Modifier
+                .playerSharedElement("cover", androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                .size(44.dp)
+                .background(sampleArtwork[track % sampleArtwork.size], androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                .testTag("cover-mini"),
         )
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(sampleTracks[track % sampleTracks.size].first, style = DeskTheme.type.bodyStrong, color = DeskTheme.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(sampleTracks[track % sampleTracks.size].first, Modifier.playerSharedElement("title"), style = DeskTheme.type.bodyStrong, color = DeskTheme.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(sampleTracks[track % sampleTracks.size].second, style = DeskTheme.type.labelSmall, color = DeskTheme.colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         DeskIconButton(DeskIcons.Pause, "Duraklat", {})
@@ -244,10 +249,15 @@ fun SampleFullPlayer(track: Int = 0) {
     Column(Modifier.fillMaxSize().padding(24.dp).testTag("full-player"), horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(48.dp))
         androidx.compose.foundation.layout.Box(
-            Modifier.fillMaxWidth().aspectRatio(1f).background(sampleArtwork[track % sampleArtwork.size], androidx.compose.foundation.shape.RoundedCornerShape(16.dp)),
+            Modifier
+                .playerSharedElement("cover", androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .background(sampleArtwork[track % sampleArtwork.size], androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                .testTag("cover-full"),
         )
         Spacer(Modifier.height(24.dp))
-        Text(sampleTracks[track % sampleTracks.size].first, style = DeskTheme.type.headline, color = DeskTheme.colors.text)
+        Text(sampleTracks[track % sampleTracks.size].first, Modifier.playerSharedElement("title"), style = DeskTheme.type.headline, color = DeskTheme.colors.text)
         Text(sampleTracks[track % sampleTracks.size].second, style = DeskTheme.type.body, color = DeskTheme.colors.textSecondary)
         Spacer(Modifier.height(24.dp))
         // a plain progress line: a focusable slider would take the test window's first (keyboard) focus

@@ -31,6 +31,7 @@ import desktopkit.components.DeskIcons
 import desktopkit.components.DeskSlider
 import desktopkit.components.MenuEntry
 import desktopkit.components.MoreButton
+import desktopkit.components.playerSharedElement
 import desktopkit.theme.DeskTheme
 import kotlin.math.roundToInt
 
@@ -55,14 +56,17 @@ private fun positionText(track: Track, fraction: Float): String {
     return "%d:%02d of %s".format(at / 60, at % 60, track.length)
 }
 
-/** The phone's mini player: swipe sideways to skip, drag up (or tap) to open the full player. */
+/**
+ * The phone's mini player: swipe sideways to skip, drag up (or tap) to open the full player. The
+ * artwork and the title are shared with [FullPlayer]: they fly between the two as the player opens.
+ */
 @Composable
 fun MiniPlayer(index: Int) {
     val track = tracks[index]
     Row(Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(44.dp).background(track.artwork, RoundedCornerShape(8.dp)))
+        Box(Modifier.playerSharedElement("cover", RoundedCornerShape(8.dp)).size(44.dp).background(track.artwork, RoundedCornerShape(8.dp)))
         Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-            Text(track.title, style = DeskTheme.type.bodyStrong, color = DeskTheme.colors.text, maxLines = 1)
+            Text(track.title, Modifier.playerSharedElement("title"), style = DeskTheme.type.bodyStrong, color = DeskTheme.colors.text, maxLines = 1)
             Text(track.artist, style = DeskTheme.type.labelSmall, color = DeskTheme.colors.textSecondary, maxLines = 1)
         }
         DeskIconButton(DeskIcons.Pause, "Pause", {})
@@ -80,9 +84,9 @@ fun FullPlayer(index: Int, onCollapse: () -> Unit, onPrevious: () -> Unit, onNex
             MoreButton({ trackActions(track) }, title = track.title)
         }
         Spacer(Modifier.height(24.dp))
-        Box(Modifier.fillMaxWidth().aspectRatio(1f).background(track.artwork, RoundedCornerShape(16.dp)))
+        Box(Modifier.playerSharedElement("cover", RoundedCornerShape(16.dp)).fillMaxWidth().aspectRatio(1f).background(track.artwork, RoundedCornerShape(16.dp)))
         Spacer(Modifier.height(24.dp))
-        Text(track.title, style = DeskTheme.type.headline, color = DeskTheme.colors.text)
+        Text(track.title, Modifier.playerSharedElement("title"), style = DeskTheme.type.headline, color = DeskTheme.colors.text)
         Text(track.artist, style = DeskTheme.type.body, color = DeskTheme.colors.textSecondary)
         Spacer(Modifier.height(16.dp))
         DeskSlider(position, { position = it }, Modifier.fillMaxWidth(), label = "Position", valueText = { positionText(track, it) })
