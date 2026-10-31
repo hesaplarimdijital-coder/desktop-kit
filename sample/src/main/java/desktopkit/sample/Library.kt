@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -45,6 +46,8 @@ import desktopkit.shell.currentWidthClass
 import desktopkit.shell.detailSharedBounds
 import desktopkit.shell.detailSharedElement
 import desktopkit.shell.rememberShellContentPadding
+import desktopkit.shell.plus
+import desktopkit.shell.shellContentPadding
 import desktopkit.theme.DeskTheme
 import desktopkit.theme.InputMode
 import kotlinx.coroutines.delay
@@ -74,13 +77,18 @@ fun AlbumsScreen(opened: String?, onOpen: (String?) -> Unit, onPlay: (Int) -> Un
         onBack = { onOpen(null) },
         detailKey = { it.id },
         list = {
-            Column(Modifier.fillMaxSize()) {
+            // laid out under the phone's glass bars: the header clears the top bar, the grid's last row the bottom ones
+            val shell = rememberShellContentPadding()
+            val dimens = DeskTheme.dimens
+            Column(Modifier.fillMaxSize().padding(top = shell.calculateTopPadding())) {
                 val subtitle = if (selected.isEmpty()) "${albums.size} albums" else "${selected.size} of ${albums.size} selected"
                 PageHeader("Albums", subtitle = subtitle)
                 DeskGrid(
                     items = if (loading) emptyList() else albums,
                     key = { it.id },
                     onItemClick = { album, _ -> onOpen(album.id) },
+                    contentPadding = PaddingValues(horizontal = dimens.pagePadding, vertical = dimens.gapL) +
+                        PaddingValues(bottom = shell.calculateBottomPadding()),
                     selectedKeys = selected,
                     onSelectionChange = { selected = it },
                     itemMenu = { album, _ ->
@@ -122,7 +130,7 @@ private fun AlbumPage(album: Album, onBack: () -> Unit, onPlay: (Int) -> Unit) {
         onBack = onBack,
         actions = listOf(TopBarAction(DeskIcons.Play, "Play", { onPlay(0) }, primary = true)),
     )
-    LazyColumn(Modifier.fillMaxSize()) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = rememberShellContentPadding()) {
         item {
             val cover = @Composable { size: androidx.compose.ui.unit.Dp ->
                 Box(Modifier.detailSharedElement("cover-${album.id}", shape = RoundedCornerShape(12.dp)).size(size).background(album.artwork))
@@ -205,7 +213,7 @@ fun PlaylistsScreen(library: LibraryState, onPlay: (Int) -> Unit) {
         detailKey = { it.name },
         sharedElements = false,
         list = {
-            Column(Modifier.fillMaxSize()) {
+            Column(Modifier.fillMaxSize().shellContentPadding()) {
                 PageHeader("Playlists", subtitle = "${library.playlists.size} playlists")
                 if (DeskTheme.inputMode == InputMode.Pointer) {
                     StatusBanner(
@@ -266,7 +274,7 @@ private fun PlaylistPage(playlist: Playlist, onBack: () -> Unit, onPlay: (Int) -
 /** Files dropped on "Bin" in the sidebar (the hint shows with a mouse), with a way back. */
 @Composable
 fun BinScreen(library: LibraryState) {
-    Column(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().shellContentPadding()) {
         PageHeader("Bin", subtitle = if (library.binned.isEmpty()) "Empty" else "${library.binned.size} files") {
             if (library.binned.isNotEmpty()) DeskButton("Restore all", { library.binned.clear() }, icon = DeskIcons.Undo)
         }
