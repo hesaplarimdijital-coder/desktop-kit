@@ -74,16 +74,19 @@ object DeskMotion {
 
     /**
      * The phone's spring for everything a finger lets go of: bars, sheets, the player, a swiped
-     * strip. Critically damped at 600, so a new touch can catch it anywhere, a fling hands over its
-     * speed, and it settles in about 300 ms without the long soft tail of the 0.2.0 spring.
+     * strip. All but critically damped (0.92) at 600, so a new touch can catch it anywhere, a fling
+     * hands over its speed, and it settles in about 300 ms without the long soft tail of the 0.2.0
+     * spring.
      *
      * [visibilityThreshold] is where the spring counts as arrived: half a pixel for pixel values,
      * [androidx.compose.animation.core.VisibilityThreshold] for offsets and rects, a thousandth for
      * fractions. Without one Compose uses 0.01 in the value's own unit, and a spring that looks
      * settled after 300 ms keeps running for another 300 ms to shave the last hundredth of a pixel:
      * both screens of a transition stay composed, a hidden bar keeps redrawing, a fraction of a
-     * sheet's height is left to jump at the end.
+     * sheet's height is left to jump at the end. (Without the argument this is the 2.2.0 call, so
+     * code built against 2.2.0 still links.)
      */
+    @JvmOverloads
     fun <T> gesture(visibilityThreshold: T? = null): SpringSpec<T> =
         spring(dampingRatio = 0.92f, stiffness = 600f, visibilityThreshold = visibilityThreshold)
 
@@ -92,6 +95,7 @@ object DeskMotion {
      * sheet. Android's own standard spatial spring (0.9 at 700): quicker than [gesture], settled in
      * about 250 ms, its overshoot too small to see. [visibilityThreshold] as for [gesture].
      */
+    @JvmOverloads
     fun <T> open(visibilityThreshold: T? = null): SpringSpec<T> =
         spring(dampingRatio = 0.9f, stiffness = 700f, visibilityThreshold = visibilityThreshold)
 
@@ -105,8 +109,10 @@ object DeskMotion {
     /**
      * A spatial animation (position, size, scale) for [tier]: the [gesture] spring on a phone (with
      * [visibilityThreshold], see there), [timed] (the 0.2.0 curve) on wider windows, a jump to the
-     * end with reduced motion.
+     * end with reduced motion. (Without the threshold this is the 2.2.0 call, so code built against
+     * 2.2.0 still links.)
      */
+    @JvmOverloads
     fun <T> spatial(tier: MotionTier, timed: FiniteAnimationSpec<T>, visibilityThreshold: T? = null): FiniteAnimationSpec<T> = when (tier) {
         MotionTier.Gesture -> gesture(visibilityThreshold)
         MotionTier.Timed -> timed
