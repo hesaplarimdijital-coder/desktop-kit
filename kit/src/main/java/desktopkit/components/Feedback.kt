@@ -398,6 +398,7 @@ private fun ToastCard(toast: DeskToast) {
     val touch = DeskTheme.inputMode == InputMode.Touch
     val shape = RoundedCornerShape(dimens.radiusCard)
     val scope = rememberCoroutineScope()
+    val tier = LocalMotionTier.current
     val swipe = remember(toast) { Animatable(0f) }
     var width by remember { mutableStateOf(1) }
     val glassy = DeskGlass.source != null && DeskGlass.mode != GlassMode.Solid
@@ -425,9 +426,15 @@ private fun ToastCard(toast: DeskToast) {
                     state = rememberDraggableState { delta -> scope.launch { swipe.snapTo(swipe.value + delta) } },
                     onDragStopped = { velocity ->
                         if (abs(swipe.value) > width * 0.3f || abs(velocity) > 1200f) {
+                            // on a phone the card carries on the way it was going, at the finger's speed, and is
+                            // dismissed once it is out (it used to stop and fade where the finger left it)
+                            if (tier == MotionTier.Gesture) {
+                                val out = if (swipe.value < 0f || (swipe.value == 0f && velocity < 0f)) -width.toFloat() else width.toFloat()
+                                swipe.animateTo(out, DeskMotion.gesture(0.5f), initialVelocity = velocity)
+                            }
                             toast.dismiss()
                         } else {
-                            swipe.animateTo(0f, DeskMotion.gesture(0.5f))
+                            swipe.animateTo(0f, DeskMotion.gesture(0.5f), initialVelocity = velocity)
                         }
                     },
                 ),

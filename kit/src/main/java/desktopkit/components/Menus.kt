@@ -10,8 +10,9 @@ import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -105,6 +106,8 @@ class MenuSpec(val title: String, val entries: () -> List<MenuEntry>)
  *
  * Like Android's own pop-up menus it grows in from its corner while fading in (150 ms) and fades
  * out where it is when closed (100 ms); with animations turned off in the system it simply appears.
+ * On a phone it grows from the point it was opened at: from its bottom corner when it had to flip
+ * above the finger, from under the finger when it was pushed in from the window's edge.
  * Inside [desktopkit.shell.DesktopShell] the menu is frosted glass over the screen
  * ([desktopkit.theme.DeskGlass]); elsewhere a solid raised surface with a shadow.
  *
@@ -141,8 +144,9 @@ fun MenuPopup(
     val dimens = DeskTheme.dimens
     val shape = RoundedCornerShape(dimens.radiusCard.coerceAtMost(10.dp))
     val glassy = DeskGlass.source != null && DeskGlass.mode != GlassMode.Solid
+    val provider = remember(shown.offset) { ClampedOffsetPositionProvider(shown.offset) }
     Popup(
-        popupPositionProvider = remember(shown.offset) { ClampedOffsetPositionProvider(shown.offset) },
+        popupPositionProvider = provider,
         onDismissRequest = dismiss,
         // while it fades out it no longer holds the focus or catches clicks meant for the window below
         properties = PopupProperties(focusable = target),
@@ -157,21 +161,40 @@ fun MenuPopup(
                 root.removeOnUnhandledKeyEventListener(escape)
             }
         }
-        val reduced = LocalMotionTier.current == MotionTier.Reduced
+        val tier = LocalMotionTier.current
+        val reduced = tier == MotionTier.Reduced
         AnimatedVisibility(
             visibleState = transition,
-            enter = if (reduced) EnterTransition.None else
-                fadeIn(tween(DeskMotion.SHORT_MS + 50, easing = DeskMotion.StandardDecelerate)) +
-                    scaleIn(tween(DeskMotion.SHORT_MS + 50, easing = DeskMotion.EmphasizedDecelerate), initialScale = 0.92f,
-                        transformOrigin = TransformOrigin(0f, 0f)),
-            exit = if (reduced) ExitTransition.None else
-                fadeOut(tween(DeskMotion.SHORT_MS, easing = DeskMotion.StandardAccelerate)) +
-                    scaleOut(tween(DeskMotion.SHORT_MS, easing = DeskMotion.EmphasizedAccelerate), targetScale = 0.96f,
-                        transformOrigin = TransformOrigin(0f, 0f)),
+            enter = if (reduced) EnterTransition.None else fadeIn(tween(DeskMotion.SHORT_MS + 50, easing = DeskMotion.StandardDecelerate)),
+            exit = if (reduced) ExitTransition.None else fadeOut(tween(DeskMotion.SHORT_MS, easing = DeskMotion.StandardAccelerate)),
             label = "menuPopup",
         ) {
+            // the growth is drawn here rather than with scaleIn: its origin is only known once the pop-up is
+            // placed (flipped above, pushed in from an edge), and a layer reads it at draw time
+            val scale by this.transition.animateFloat(
+                transitionSpec = {
+                    when {
+                        reduced -> snap()
+                        targetState == EnterExitState.Visible -> tween(DeskMotion.SHORT_MS + 50, easing = DeskMotion.EmphasizedDecelerate)
+                        else -> tween(DeskMotion.SHORT_MS, easing = DeskMotion.EmphasizedAccelerate)
+                    }
+                },
+                label = "menuScale",
+            ) { state ->
+                when (state) {
+                    EnterExitState.PreEnter -> 0.92f
+                    EnterExitState.Visible -> 1f
+                    EnterExitState.PostExit -> 0.96f
+                }
+            }
             Column(
                 modifier = Modifier
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                        // wider windows keep the top-left corner, as before
+                        transformOrigin = if (tier == MotionTier.Gesture) provider.origin else TransformOrigin(0f, 0f)
+                    }
                     .widthIn(min = minWidth, max = 420.dp)
                     .width(IntrinsicSize.Max)
                     // a shadow would show through glass; solid menus keep it
@@ -330,14 +353,23 @@ fun RowScope.MenuBarMenus(menus: List<MenuSpec>) {
 }
 
 internal class ClampedOffsetPositionProvider(private val offset: IntOffset) : PopupPositionProvider {
+    /**
+     * Where the point the menu was asked for lies in the placed menu, 0..1 on each axis: the corner
+     * the menu grows from (the top-left while nothing moved it). Known once the pop-up is placed.
+     */
+    var origin by mutableStateOf(TransformOrigin(0f, 0f))
+        private set
+
     override fun calculatePosition(
         anchorBounds: IntRect,
         windowSize: IntSize,
         layoutDirection: LayoutDirection,
         popupContentSize: IntSize,
     ): IntOffset {
-        var x = anchorBounds.left + offset.x
-        var y = anchorBounds.top + offset.y
+        val askedX = anchorBounds.left + offset.x
+        val askedY = anchorBounds.top + offset.y
+        var x = askedX
+        var y = askedY
         if (x + popupContentSize.width > windowSize.width) x = windowSize.width - popupContentSize.width
         if (y + popupContentSize.height > windowSize.height) {
             // a drop-down under its anchor (a menu button) goes above the anchor, not over it; a menu
@@ -346,7 +378,13 @@ internal class ClampedOffsetPositionProvider(private val offset: IntOffset) : Po
             val above = (if (dropDown) anchorBounds.top else anchorBounds.top + offset.y) - popupContentSize.height
             y = if (above >= 0) above else windowSize.height - popupContentSize.height
         }
-        return IntOffset(x.coerceAtLeast(0), y.coerceAtLeast(0))
+        x = x.coerceAtLeast(0)
+        y = y.coerceAtLeast(0)
+        origin = TransformOrigin(
+            if (popupContentSize.width > 0) ((askedX - x).toFloat() / popupContentSize.width).coerceIn(0f, 1f) else 0f,
+            if (popupContentSize.height > 0) ((askedY - y).toFloat() / popupContentSize.height).coerceIn(0f, 1f) else 0f,
+        )
+        return IntOffset(x, y)
     }
 }
 

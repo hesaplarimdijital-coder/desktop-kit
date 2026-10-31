@@ -5,6 +5,9 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
@@ -23,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -99,6 +103,7 @@ import desktopkit.theme.glass
 import desktopkit.theme.rememberDeskHaptics
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 /** A titled group of actions for [MoreSheet] and menus ("Play", "Edit", "Share"); a null [title] draws a plain gap. */
 @Immutable
@@ -258,12 +263,12 @@ fun GlassBottomSheet(
     LaunchedEffect(visible) {
         if (visible) {
             drag.snapTo(0f)
-            progress.animateTo(1f, DeskMotion.spatial(tier, tween(DeskMotion.LONG_MS, easing = DeskMotion.EmphasizedDecelerate), 0.001f))
+            progress.animateTo(1f, sheetWay(tier, tween(DeskMotion.LONG_MS, easing = DeskMotion.EmphasizedDecelerate)))
         } else if (drag.value > 0f) {
             // pulled or flung out by the finger: it is already gone, nothing to animate
             progress.snapTo(0f)
         } else {
-            progress.animateTo(0f, DeskMotion.spatial(tier, tween(DeskMotion.MEDIUM_MS, easing = DeskMotion.EmphasizedAccelerate), 0.001f))
+            progress.animateTo(0f, sheetWay(tier, tween(DeskMotion.MEDIUM_MS, easing = DeskMotion.EmphasizedAccelerate)))
         }
     }
     val showing = visible || progress.value > 0f || progress.isRunning
@@ -290,6 +295,16 @@ fun GlassBottomSheet(
             properties = PopupProperties(focusable = true),
         ) { sheet() }
     }
+}
+
+/**
+ * The sheet's way in and out: on a phone one firm spring both ways (a sheet is a small thing; the
+ * screen transitions' springs would be slow on it), the timed curve wider up, a jump with reduced motion.
+ */
+private fun sheetWay(tier: MotionTier, timed: FiniteAnimationSpec<Float>): FiniteAnimationSpec<Float> = when (tier) {
+    MotionTier.Gesture -> spring(dampingRatio = 0.92f, stiffness = 800f, visibilityThreshold = 0.001f)
+    MotionTier.Timed -> timed
+    MotionTier.Reduced -> snap()
 }
 
 /**
@@ -374,9 +389,11 @@ private fun SheetSurface(
                     sheetHeight = it.height
                     pull.height = it.height
                 }
-                .graphicsLayer {
+                // placed, not translated in a layer: the glass blurs what is behind the sheet where it is now
+                // (Haze reads positions at placement, a layer's translation it would not see)
+                .offset {
                     val hidden = (1f - progress.value) * (if (sheetHeight > 0) sheetHeight.toFloat() else 2000f)
-                    translationY = hidden + drag.value
+                    IntOffset(0, (hidden + drag.value).roundToInt())
                 }
                 .glass(DeskGlass.raised(colors, GlassThickness.Regular), shape)
                 .semantics { paneTitle = label }
