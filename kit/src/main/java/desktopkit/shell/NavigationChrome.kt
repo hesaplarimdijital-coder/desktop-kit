@@ -484,10 +484,13 @@ fun PageTopBar(
     )
     val ruleAlpha by animateFloatAsState(if (scrolled) 1f else 0f, DeskMotion.fade(tier, tween(DeskMotion.MEDIUM_MS)), label = "topBarRule")
     val rule = colors.border
+    // the glass stays until the page colour has faded back over it, so the way back is a fade too
+    // (it used to switch to the flat colour in one frame under a fade nobody could see)
+    val glassOn = glass && (scrolled || background.alpha < 0.999f)
     Column(
         modifier
             .fillMaxWidth()
-            .glass(DeskGlass.chrome(colors, GlassThickness.Regular), enabled = glass && scrolled, rest = rest)
+            .glass(DeskGlass.chrome(colors, GlassThickness.Regular), enabled = glassOn, rest = rest)
             .background(background)
             // drawn over the bottom edge, so the bar keeps its height whether or not the rule shows
             .drawBehind {
