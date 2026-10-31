@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.theme.TokensTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-10-31T15:30:07.197Z" hostname="runnervmnwato" time="0.007">
+  <properties/>
+  <testcase name="stepEnlargesEveryPointerStyleOnly" classname="desktopkit.theme.TokensTest" time="0.006"/>
+  <testcase name="touchIsLargerThanPointer" classname="desktopkit.theme.TokensTest" time="0.0"/>
+  <testcase name="growAddsToEveryStyleAndKeepsLineHeightRatio" classname="desktopkit.theme.TokensTest" time="0.001"/>
+  <testcase name="textIsAtLeast11sp" classname="desktopkit.theme.TokensTest" time="0.0"/>
+  <testcase name="compactWindowSizesKeepTouchTargets" classname="desktopkit.theme.TokensTest" time="0.0"/>
+  <testcase name="headingsUseTheHeadingFamily" classname="desktopkit.theme.TokensTest" time="0.0"/>
+  <testcase name="customFontsKeepTheSizes" classname="desktopkit.theme.TokensTest" time="0.0"/>
+  <testcase name="targetsMeetTheirMinimum" classname="desktopkit.theme.TokensTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

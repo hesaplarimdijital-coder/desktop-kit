@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.shell.LookaheadCostTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-31T15:30:05.541Z" hostname="runnervmnwato" time="0.189">
+  <properties/>
+  <testcase name="aListScrolledAtRestIsMeasuredOnceAFrame" classname="desktopkit.shell.LookaheadCostTest" time="0.088"/>
+  <testcase name="withoutSharedElementsAsBefore" classname="desktopkit.shell.LookaheadCostTest" time="0.099"/>
+  <system-out><![CDATA[LOOKAHEAD-COST shared=true lookahead=0 main=57
+LOOKAHEAD-COST shared=false lookahead=0 main=57
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

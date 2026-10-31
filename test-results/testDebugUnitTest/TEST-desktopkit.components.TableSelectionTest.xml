@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.components.TableSelectionTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-31T15:29:52.953Z" hostname="runnervmnwato" time="0.003">
+  <properties/>
+  <testcase name="shiftClickWithoutAnchorActsLikeAClick" classname="desktopkit.components.TableSelectionTest" time="0.0"/>
+  <testcase name="shiftArrowsExtendFromTheAnchor" classname="desktopkit.components.TableSelectionTest" time="0.0"/>
+  <testcase name="shiftClickSelectsTheRangeFromTheAnchorEitherWay" classname="desktopkit.components.TableSelectionTest" time="0.0"/>
+  <testcase name="ctrlClickTogglesAndMovesTheAnchor" classname="desktopkit.components.TableSelectionTest" time="0.0"/>
+  <testcase name="selectAllKeepsTheRowOrderAndAnchor" classname="desktopkit.components.TableSelectionTest" time="0.0"/>
+  <testcase name="shiftArrowsStopAtTheEnds" classname="desktopkit.components.TableSelectionTest" time="0.0"/>
+  <testcase name="plainClickSelectsOnlyThatRow" classname="desktopkit.components.TableSelectionTest" time="0.0"/>
+  <testcase name="menuKeepsASelectionThatContainsTheRow" classname="desktopkit.components.TableSelectionTest" time="0.003"/>
+  <testcase name="ctrlShiftClickAddsTheRange" classname="desktopkit.components.TableSelectionTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

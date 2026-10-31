@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.components.CommandPaletteTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-31T15:29:45.119Z" hostname="runnervmnwato" time="0.682">
+  <properties/>
+  <testcase name="keyboardChoosesAndRuns" classname="desktopkit.components.CommandPaletteTest" time="0.583"/>
+  <testcase name="startsBeatWordsBeatInsidesBeatLetters" classname="desktopkit.components.CommandPaletteTest" time="0.028"/>
+  <testcase name="bestMatchFirstThenGroups" classname="desktopkit.components.CommandPaletteTest" time="0.032"/>
+  <testcase name="turkishLettersFold" classname="desktopkit.components.CommandPaletteTest" time="0.035"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

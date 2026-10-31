@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.components.ListAppearAndPressTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-31T15:29:49.155Z" hostname="runnervmnwato" time="0.272">
+  <properties/>
+  <testcase name="widerUpThePressIsAsBefore" classname="desktopkit.components.ListAppearAndPressTest" time="0.061"/>
+  <testcase name="aPhonesPressIsLighterAndBouncesBack" classname="desktopkit.components.ListAppearAndPressTest" time="0.068"/>
+  <testcase name="widerUpTheRowsAreThereAtOnce" classname="desktopkit.components.ListAppearAndPressTest" time="0.038"/>
+  <testcase name="theFirstRowsRiseIntoPlaceInTurnAndLaterRowsAreThere" classname="desktopkit.components.ListAppearAndPressTest" time="0.058"/>
+  <testcase name="onlyTheFirstEightRowsArriveInTurn" classname="desktopkit.components.ListAppearAndPressTest" time="0.044"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

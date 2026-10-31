@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.shell.CaptionBarTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-31T15:30:03.200Z" hostname="runnervmnwato" time="0.294">
+  <properties/>
+  <testcase name="theRailLeavesTheCaptionBarToTheSystem" classname="desktopkit.shell.CaptionBarTest" time="0.062"/>
+  <testcase name="withoutElementsTheSystemKeepsItsCaptionBar" classname="desktopkit.shell.CaptionBarTest" time="0.039"/>
+  <testcase name="darkButtonsOnTheLightTheme" classname="desktopkit.shell.CaptionBarTest" time="0.077"/>
+  <testcase name="anOpaqueCaptionBarIsNotFilledYet" classname="desktopkit.shell.CaptionBarTest" time="0.044"/>
+  <testcase name="menusAndSearchLieBetweenTheSystemsElements" classname="desktopkit.shell.CaptionBarTest" time="0.068"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

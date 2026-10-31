@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.theme.AccentRecompositionTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-31T15:30:06.871Z" hostname="runnervmnwato" time="0.036">
+  <properties/>
+  <testcase name="onlyWhatReadsTheColoursRecomposesWhileTheyCrossFade" classname="desktopkit.theme.AccentRecompositionTest" time="0.035"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

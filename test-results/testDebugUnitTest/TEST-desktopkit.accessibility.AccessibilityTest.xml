@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.accessibility.AccessibilityTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-31T15:29:32.653Z" hostname="runnervmnwato" time="9.417">
+  <properties/>
+  <testcase name="everyControlOfTheDexShellHasAName" classname="desktopkit.accessibility.AccessibilityTest" time="4.546"/>
+  <testcase name="phoneAtTwiceTheTextSize" classname="desktopkit.accessibility.AccessibilityTest" time="0.659"/>
+  <testcase name="controlsAtTwiceTheTextSize" classname="desktopkit.accessibility.AccessibilityTest" time="0.219"/>
+  <testcase name="everyControlHasANameOnTouch" classname="desktopkit.accessibility.AccessibilityTest" time="0.119"/>
+  <testcase name="dexAtTwiceTheTextSize" classname="desktopkit.accessibility.AccessibilityTest" time="0.239"/>
+  <testcase name="everyControlOfThePhoneShellHasAName" classname="desktopkit.accessibility.AccessibilityTest" time="0.073"/>
+  <testcase name="tabWalksADexWindowInReadingOrder" classname="desktopkit.accessibility.AccessibilityTest" time="0.311"/>
+  <system-out><![CDATA[a11y-phone-text-200, shortened at 200 %: [Dönüştür, USB DAC, 1,2 GB, 3,4 MB, Ana sayfa, Belgeler, Videolar, Daha fazla]
+a11y-controls-text-200, shortened at 200 %: []
+a11y-dex-text-200, shortened at 200 %: [Son kullanılanlar, İndirilenler]
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.theme.GlassTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-31T15:30:06.909Z" hostname="runnervmnwato" time="0.015">
+  <properties/>
+  <testcase name="thickerGlassIsMoreOpaque" classname="desktopkit.theme.GlassTest" time="0.004"/>
+  <testcase name="textOnGlassOverTheWorstContent" classname="desktopkit.theme.GlassTest" time="0.008"/>
+  <testcase name="paletteCrossFadeEndsAtTheTarget" classname="desktopkit.theme.GlassTest" time="0.003"/>
+  <testcase name="solidIsTheOpaqueSurface" classname="desktopkit.theme.GlassTest" time="0.0"/>
+  <testcase name="modeFollowsTheDevice" classname="desktopkit.theme.GlassTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

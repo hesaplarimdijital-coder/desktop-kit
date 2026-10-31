@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.components.TouchSelectionTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-10-31T15:29:53.131Z" hostname="runnervmnwato" time="0.66">
+  <properties/>
+  <testcase name="backClearsTheSelection" classname="desktopkit.components.TouchSelectionTest" time="0.053"/>
+  <testcase name="aMouseClickSelectsInATouchLayout" classname="desktopkit.components.TouchSelectionTest" time="0.056"/>
+  <testcase name="aLongPressSelectsWhatItsMenuActsOn" classname="desktopkit.components.TouchSelectionTest" time="0.096"/>
+  <testcase name="inTheSelectModeTapsPickAndDrop" classname="desktopkit.components.TouchSelectionTest" time="0.063"/>
+  <testcase name="oneRowAMouseClickedLeavesBackAlone" classname="desktopkit.components.TouchSelectionTest" time="0.045"/>
+  <testcase name="severalRowsPickedByMouseAreClearedByBack" classname="desktopkit.components.TouchSelectionTest" time="0.04"/>
+  <testcase name="aTapOnATableRowOpensItAndSelectsNothing" classname="desktopkit.components.TouchSelectionTest" time="0.044"/>
+  <testcase name="aTapOnACoverOpensItAndSelectsNothing" classname="desktopkit.components.TouchSelectionTest" time="0.041"/>
+  <testcase name="aClearTheAppRefusesHandsBackOn" classname="desktopkit.components.TouchSelectionTest" time="0.047"/>
+  <testcase name="onceSomethingIsPickedATapPicksToo" classname="desktopkit.components.TouchSelectionTest" time="0.043"/>
+  <testcase name="anAppCanKeepBackForItself" classname="desktopkit.components.TouchSelectionTest" time="0.039"/>
+  <testcase name="backClearsATablesSelection" classname="desktopkit.components.TouchSelectionTest" time="0.045"/>
+  <testcase name="aFingerTapOpensInAPointerLayout" classname="desktopkit.components.TouchSelectionTest" time="0.043"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

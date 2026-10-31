@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.theme.MotionTierTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-31T15:30:07.026Z" hostname="runnervmnwato" time="0.025">
+  <properties/>
+  <testcase name="fadesStayTimedAndSnapWithReducedMotion" classname="desktopkit.theme.MotionTierTest" time="0.003"/>
+  <testcase name="phonesGetSpringsWiderWindowsKeepTheTimedCurves" classname="desktopkit.theme.MotionTierTest" time="0.0"/>
+  <testcase name="spatialSpecFollowsTheTier" classname="desktopkit.theme.MotionTierTest" time="0.0"/>
+  <testcase name="screenTransitionsByTier" classname="desktopkit.theme.MotionTierTest" time="0.007"/>
+  <testcase name="reducedMotionSettlesAtOnce" classname="desktopkit.theme.MotionTierTest" time="0.013"/>
+  <testcase name="gestureSpringArrivesInTimeWithAThreshold" classname="desktopkit.theme.MotionTierTest" time="0.002"/>
+  <testcase name="barsSettleHalfWay" classname="desktopkit.theme.MotionTierTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

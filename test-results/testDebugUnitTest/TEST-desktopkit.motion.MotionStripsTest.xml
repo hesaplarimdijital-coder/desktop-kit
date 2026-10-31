@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.motion.MotionStripsTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-10-31T15:29:54.459Z" hostname="runnervmnwato" time="3.061">
+  <properties/>
+  <testcase name="sheetClose" classname="desktopkit.motion.MotionStripsTest" time="0.235"/>
+  <testcase name="detailTurnAround" classname="desktopkit.motion.MotionStripsTest" time="0.382"/>
+  <testcase name="playerTapWithBarsHidden" classname="desktopkit.motion.MotionStripsTest" time="0.281"/>
+  <testcase name="detailBackCancelled" classname="desktopkit.motion.MotionStripsTest" time="0.192"/>
+  <testcase name="detailBack" classname="desktopkit.motion.MotionStripsTest" time="0.241"/>
+  <testcase name="detailOpen" classname="desktopkit.motion.MotionStripsTest" time="0.354"/>
+  <testcase name="playerExpand" classname="desktopkit.motion.MotionStripsTest" time="0.205"/>
+  <testcase name="listAppear" classname="desktopkit.motion.MotionStripsTest" time="0.106"/>
+  <testcase name="playerCollapse" classname="desktopkit.motion.MotionStripsTest" time="0.216"/>
+  <testcase name="playerCollapseWithBarsHidden" classname="desktopkit.motion.MotionStripsTest" time="0.231"/>
+  <testcase name="tabSwitch" classname="desktopkit.motion.MotionStripsTest" time="0.234"/>
+  <testcase name="sheetOpen" classname="desktopkit.motion.MotionStripsTest" time="0.193"/>
+  <testcase name="playerBack" classname="desktopkit.motion.MotionStripsTest" time="0.185"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.shell.DetailGestureAgainTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-31T15:30:03.965Z" hostname="runnervmnwato" time="0.275">
+  <properties/>
+  <testcase name="aSecondGestureAfterACancelledOneStillFliesTheCard" classname="desktopkit.shell.DetailGestureAgainTest" time="0.162"/>
+  <testcase name="widerUpTheBackGestureShrinksTheDetailOverTheShadeAsBefore" classname="desktopkit.shell.DetailGestureAgainTest" time="0.056"/>
+  <testcase name="aDetailReEmittedUnderItsKeyShowsItsLatestObject" classname="desktopkit.shell.DetailGestureAgainTest" time="0.054"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

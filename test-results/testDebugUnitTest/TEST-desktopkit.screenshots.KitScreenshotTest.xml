@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.screenshots.KitScreenshotTest" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-10-31T15:29:59.048Z" hostname="runnervmnwato" time="1.608">
+  <properties/>
+  <testcase name="dexWorkstationDark" classname="desktopkit.screenshots.KitScreenshotTest" time="0.185"/>
+  <testcase name="dexWorkstationLight" classname="desktopkit.screenshots.KitScreenshotTest" time="0.151"/>
+  <testcase name="phonePlayerExpanded" classname="desktopkit.screenshots.KitScreenshotTest" time="0.098"/>
+  <testcase name="phoneGlassLight" classname="desktopkit.screenshots.KitScreenshotTest" time="0.15"/>
+  <testcase name="phoneMoreSheetLight" classname="desktopkit.screenshots.KitScreenshotTest" time="0.134"/>
+  <testcase name="dialogsDark" classname="desktopkit.screenshots.KitScreenshotTest" time="0.068"/>
+  <testcase name="tabletWorkstationLight" classname="desktopkit.screenshots.KitScreenshotTest" time="0.13"/>
+  <testcase name="phoneGlassDark" classname="desktopkit.screenshots.KitScreenshotTest" time="0.166"/>
+  <testcase name="phoneGlassOled" classname="desktopkit.screenshots.KitScreenshotTest" time="0.187"/>
+  <testcase name="phoneMoreSheet" classname="desktopkit.screenshots.KitScreenshotTest" time="0.158"/>
+  <testcase name="dialogsLight" classname="desktopkit.screenshots.KitScreenshotTest" time="0.058"/>
+  <testcase name="tabletWorkstationDark" classname="desktopkit.screenshots.KitScreenshotTest" time="0.119"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
