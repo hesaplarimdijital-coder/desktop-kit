@@ -202,7 +202,7 @@ fun <T : Any> DetailTransition(
             }
         }
     }
-    // the lookahead pass of shared elements is paid only while something moves: a list scrolled at rest inside a
+    // on the phone the lookahead pass of shared elements is paid only while something moves: a list scrolled at rest inside a
     // SharedTransitionLayout was measured twice on every frame. At rest the content sits in a plain Box and moves
     // into the layout (state and all) when a transition or a Back gesture starts, and back out once it is over.
     val latestContent by rememberUpdatedState(content)
@@ -214,7 +214,11 @@ fun <T : Any> DetailTransition(
                 transition.isRunning || gestureClose || dropped || undoing?.isActive == true
         }
     }
-    if (sharedElements && animated && moving) SharedTransitionLayout(container) { body(this) } else Box(container) { body(null) }
+    // (on the phone: its transition changes target one frame after the detail does, which gives the list's elements
+    // the frame they need inside the layout; wider up the target changes in the same composition, and the layout
+    // stays there all the time, as before)
+    val sharedLayout = sharedElements && (if (phone) animated && moving else true)
+    if (sharedLayout) SharedTransitionLayout(container) { body(this) } else Box(container) { body(null) }
 
     if (phone) {
         /**
