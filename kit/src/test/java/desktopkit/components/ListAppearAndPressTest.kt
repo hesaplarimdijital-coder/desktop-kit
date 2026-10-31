@@ -91,7 +91,7 @@ class ListAppearAndPressTest {
         rows = 10
         list(MotionTier.Gesture)
         frame()
-        assertTrue("row 7 starts low: ${top("row7")}", top("row7") > 7 * 40.dp + 6.dp)
+        assertTrue("row 7 starts low: ${top("row7")}", top("row7") > (7 * 40 + 6).dp)
         assertEquals(8 * 40f, top("row8").value, 0.5f)
         assertEquals(9 * 40f, top("row9").value, 0.5f)
     }
