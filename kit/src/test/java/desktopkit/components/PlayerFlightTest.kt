@@ -68,8 +68,9 @@ class PlayerFlightTest {
         compose.waitForIdle()
     }
 
+    /** The placed covers with [tag] (a node that is laid out but not placed is neither drawn, hit nor read out). */
     private fun covers(tag: String): List<Rect> =
-        compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().map { it.boundsInWindow }
+        compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().filter { it.layoutInfo.isPlaced }.map { it.boundsInWindow }
 
     /** The pixel at the middle of [rect] is the track's artwork colour. */
     private fun Bitmap.showsArtworkAt(rect: Rect): Boolean {
