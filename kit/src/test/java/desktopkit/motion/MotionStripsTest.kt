@@ -15,9 +15,6 @@ import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
-import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.SeekableTransitionState
-import androidx.compose.animation.core.rememberTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -300,21 +297,21 @@ class MotionStripsTest {
 
     @Test
     fun detailBackProposal() {
-        val state = SeekableTransitionState<Album?>(albums[2])
+        val progress = Animatable(0f)
         var scope: CoroutineScope? = null
         phoneContent {
             scope = rememberCoroutineScope()
-            SeekableDetail(state)
+            ProtoBack(progress)
         }
         compose.mainClock.autoAdvance = false
         val frames = mutableListOf("önce" to shot())
         for (p in listOf(0.25f, 0.5f, 0.8f)) {
-            compose.runOnIdle { scope?.launch { state.seekTo(p, null) } }
+            compose.runOnIdle { scope?.launch { progress.snapTo(p) } }
             compose.mainClock.advanceTimeByFrame()
             compose.waitForIdle()
             frames += "parmak $p" to shot()
         }
-        compose.runOnIdle { scope?.launch { state.animateTo(null, tween(220, easing = DeskMotion.EmphasizedAccelerate)) } }
+        compose.runOnIdle { scope?.launch { progress.animateTo(2f, tween(220, easing = DeskMotion.EmphasizedAccelerate)) } }
         var now = 0L
         for (t in listOf(16L, 64L, 144L, 304L)) {
             compose.mainClock.advanceTimeBy(t - now)
@@ -327,45 +324,40 @@ class MotionStripsTest {
     }
 
     /**
-     * Proposal: the Back gesture seeks the closing transition, so the list is really behind the
-     * shrinking detail; letting go plays the rest from where the finger left it.
+     * Proposal: the list is really behind the shrinking detail (from 94 % and dimmed to full as the
+     * finger moves); letting go slides the shrunken detail out to the edge from where the finger
+     * left it, over 220 ms. [progress]: 0..1 the finger, 1..2 the way out.
      */
     @Composable
-    private fun SeekableDetail(state: SeekableTransitionState<Album?>) {
-        val transition = rememberTransition(state, label = "seekableDetail")
+    private fun ProtoBack(progress: Animatable<Float, AnimationVector1D>) {
         val colors = DeskTheme.colors
-        transition.AnimatedContent(
-            transitionSpec = {
-                val closing = targetState == null
-                // the list comes up behind while the finger moves; the detail only leaves in the last
-                // part, so letting go slides it out from where the finger left it
-                val spec = (fadeIn(tween(300, easing = DeskMotion.StandardDecelerate)) + scaleIn(tween(300, easing = DeskMotion.Emphasized), initialScale = 0.94f))
-                    .togetherWith(
-                        slideOutHorizontally(tween(300, easing = CubicBezierEasing(0.9f, 0f, 1f, 0f))) { it / 2 } +
-                            fadeOut(tween(90, delayMillis = 210, easing = DeskMotion.StandardAccelerate)),
-                    )
-                // the shrinking detail stays above the list that shows behind it
-                spec.apply { targetContentZIndex = if (closing) -1f else 1f }
-            },
-            contentKey = { it?.id },
-        ) { target ->
-            if (target == null) {
-                AlbumList(kit = false)
-            } else {
+        Box(Modifier.fillMaxSize()) {
+            Box(
+                Modifier.fillMaxSize().graphicsLayer {
+                    val p = progress.value.coerceIn(0f, 1f)
+                    val scale = 0.94f + 0.06f * p
+                    scaleX = scale
+                    scaleY = scale
+                    alpha = 0.6f + 0.4f * p
+                },
+            ) { AlbumList(kit = false) }
+            if (progress.value < 2f) {
                 Box(
                     Modifier
                         .fillMaxSize()
                         .graphicsLayer {
-                            val p = state.fraction.coerceIn(0f, 1f)
-                            val scale = 1f - 0.1f * p
+                            val shrink = progress.value.coerceIn(0f, 1f)
+                            val leave = (progress.value - 1f).coerceIn(0f, 1f)
+                            val scale = 1f - 0.1f * shrink
                             scaleX = scale
                             scaleY = scale
-                            translationX = 24.dp.toPx() * p
-                            shape = RoundedCornerShape((28 * p).dp)
+                            translationX = 24.dp.toPx() * shrink + size.width * 0.4f * leave
+                            alpha = 1f - leave
+                            shape = RoundedCornerShape((28f * shrink).dp)
                             clip = true
                         }
                         .background(colors.background),
-                ) { AlbumDetail(target, kit = false) }
+                ) { AlbumDetail(albums[2], kit = false) }
             }
         }
     }
@@ -512,8 +504,15 @@ class MotionStripsTest {
                         transformOrigin = TransformOrigin(0f, 0f)
                         scaleX = scale
                         scaleY = scale
-                        translationX = lerpDp(68.dp, 24.dp, p).toPx()
-                        translationY = lerpDp(14.dp, 72.dp + 232.dp + 20.dp, p).toPx()
+                        // beside the cover until it has passed under it, then to its place under it
+                        val coverX = lerpDp(coverStart, coverEnd, p).toPx()
+                        val coverY = lerpDp(10.dp, 72.dp, p).toPx()
+                        val coverSize = (44f + 188f * p).dp.toPx()
+                        val y = lerpDp(14.dp, 72.dp + 232.dp + 20.dp, (p * 1.5f).coerceAtMost(1f)).toPx()
+                        val x = lerpDp(68.dp, 24.dp, p).toPx()
+                        val clear = ((y - (coverY + coverSize)) / 40.dp.toPx()).coerceIn(0f, 1f)
+                        translationX = x + ((coverX + coverSize + 8.dp.toPx()) - x).coerceAtLeast(0f) * (1f - clear)
+                        translationY = y
                     },
                 ) {
                     Text(track.first, style = DeskTheme.type.bodyStrong, color = colors.text, maxLines = 1)
