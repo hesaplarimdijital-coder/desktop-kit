@@ -173,7 +173,6 @@ class DetailSharedElementTest {
                 widths += (bounds.right - bounds.left).value
             }
         }
-        println("opening widths: $widths")
         assertTrue("the header passes through widths between the card's and its own: $widths", widths.any { it > 170f && it < 400f })
         compose.mainClock.autoAdvance = true
         compose.waitForIdle()
@@ -225,24 +224,25 @@ class DetailSharedElementTest {
             compose.waitForIdle()
             before += compose.onNodeWithTag("header", useUnmergedTree = true).getBoundsInRoot().let { (it.right - it.left).value }
         }
-        var last = before.last()
-        assertTrue("the header is still on its way at $last dp", last < 400f)
+        assertTrue("the header is still on its way at ${before.last()} dp", before.last() < 400f)
         compose.runOnIdle { detail = null }
-        var largestStep = 0f
         val after = mutableListOf<Float>()
         repeat(40) {
             compose.mainClock.advanceTimeByFrame()
             compose.waitForIdle()
             if (compose.onAllNodesWithTag("header", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()) {
-                val width = compose.onNodeWithTag("header", useUnmergedTree = true).getBoundsInRoot().let { (it.right - it.left).value }
-                after += width
-                largestStep = maxOf(largestStep, width - last)
-                last = width
+                after += compose.onNodeWithTag("header", useUnmergedTree = true).getBoundsInRoot().let { (it.right - it.left).value }
             }
         }
         compose.mainClock.autoAdvance = true
-        println("turn-around widths: before $before, after $after")
-        assertTrue("the header jumped $largestStep dp wider in one frame on the way back (before $before, after $after)", largestStep < 40f)
+        // in the frame the transition is over the detail stands at its own size, faded out, for the composition that
+        // removes it: not drawn, not a jump
+        val gone = compose.onAllNodesWithTag("header", useUnmergedTree = true).fetchSemanticsNodes().isEmpty()
+        val drawn = if (gone && after.size > 1) after.dropLast(1) else after
+        val largestStep = drawn.zipWithNext { a, b -> b - a }.plus(drawn.first() - before.last()).max()
+        assertTrue("the header came back: $after", gone && drawn.last() < 170f)
+        // the opening grows the header by 40 dp a frame at most; a jump to its full width is 250
+        assertTrue("the header jumped $largestStep dp wider in one frame on the way back (before $before, after $after)", largestStep < 60f)
     }
 
     private fun red(pixel: Int): Boolean {

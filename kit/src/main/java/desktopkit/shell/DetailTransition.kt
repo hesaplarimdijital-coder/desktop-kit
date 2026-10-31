@@ -66,6 +66,7 @@ import desktopkit.theme.LocalMotionTier
 import desktopkit.theme.MotionTier
 import androidx.compose.runtime.withFrameNanos
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -125,6 +126,8 @@ fun <T : Any> DetailTransition(
     // a closing driven by the Back gesture: the detail shrinks with the fraction, the list rises behind it
     var gestureClose by remember { mutableStateOf(false) }
     var swipeEdge by remember { mutableIntStateOf(BackEventCompat.EDGE_LEFT) }
+    // the run back after a cancelled gesture; a change of the detail takes over from it
+    var undo by remember { mutableStateOf<Job?>(null) }
 
     val container = modifier.fillMaxSize().background(page)
     val content: @Composable (SharedTransitionScope?) -> Unit = { shared ->
@@ -173,6 +176,8 @@ fun <T : Any> DetailTransition(
 
     // the app's detail drives the transition; a Back gesture that was let go finishes from where the finger left it
     LaunchedEffect(detail?.let(detailKey)) {
+        undo?.cancel()
+        undo = null
         val target = detail
         when {
             !animated -> seekable.snapTo(target)
@@ -209,7 +214,7 @@ fun <T : Any> DetailTransition(
                 latestOnBack()
                 // an app that keeps its detail: the gesture is undone
                 if (animated) {
-                    scope.launch {
+                    undo = scope.launch {
                         withFrameNanos { }
                         if (latestDetail != null && gestureClose) {
                             seekable.runBack(DeskMotion.gesture(FRACTION))
@@ -219,7 +224,7 @@ fun <T : Any> DetailTransition(
                 }
             } catch (e: CancellationException) {
                 if (animated) {
-                    scope.launch {
+                    undo = scope.launch {
                         seekable.runBack(DeskMotion.gesture(FRACTION))
                         gestureClose = false
                     }
