@@ -15,6 +15,12 @@ import androidx.compose.foundation.gestures.AnchoredDraggableDefaults
 import androidx.compose.foundation.gestures.AnchoredDraggableState
 import androidx.compose.foundation.gestures.DraggableAnchors
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.FlingBehavior
+import androidx.compose.foundation.gestures.ScrollScope
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.foundation.gestures.anchoredDraggable
 import androidx.compose.foundation.gestures.animateTo
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -204,6 +210,8 @@ fun rememberExpandablePlayerState(initialValue: PlayerValue = PlayerValue.Collap
  *
  * - Drag the mini player up (or tap it) to open the full player; drag the full player down to
  *   close it. Letting go settles on a spring that takes over the fling's speed; half way decides.
+ *   Scrollable content inside [full] scrolls first; once it is at its top, a downward drag pulls
+ *   the player down with the finger, and pushing back up raises it before the content scrolls.
  * - One surface grows from the strip to the whole screen: its glass turns into the page as it
  *   rises, its corners round on the way and straighten at both ends, the scrim darkens with it and
  *   the bottom bar is pushed away under it. The [mini] controls fade out in the first quarter of
@@ -326,6 +334,9 @@ private fun PlayerSheet(
     // the strip's controls are placed while the way is in its first part, and until they have drawn once: a
     // sheet that starts up (restored expanded) records them for the way down from the first frame
     val miniPlaced by remember(state, flight) { derivedStateOf { state.progress < MINI_GONE || !flight.miniDrawn } }
+    val fling = playerFlingBehavior(state)
+    val pull = remember(state) { PlayerPull(state) }
+    SideEffect { pull.fling = fling }
     // drawn no more from the frame the mini player is back (it leaves the overlay a frame later)
     Box(Modifier.fillMaxSize().graphicsLayer { alpha = if (state.progress > SHEET_OUT || state.targetValue == PlayerValue.Expanded) 1f else 0f }) {
         Box(
@@ -354,7 +365,9 @@ private fun PlayerSheet(
                 // the strip's glass, turning into the page as the sheet rises
                 .glass(DeskGlass.chrome(colors, GlassThickness.Regular), enabled = glassOn)
                 .onGloballyPositioned { flight.sheet = it }
-                .anchoredDraggable(state.draggable, Orientation.Vertical, flingBehavior = playerFlingBehavior(state))
+                // scrollable content in the full player scrolls first; at its top a downward drag pulls the sheet
+                .nestedScroll(pull)
+                .anchoredDraggable(state.draggable, Orientation.Vertical, flingBehavior = fling)
                 .semantics { paneTitle = label },
         ) {
             Box(Modifier.matchParentSize().graphicsLayer { alpha = state.progress }.background(colors.background))
@@ -405,6 +418,65 @@ private fun PlayerSheet(
         } catch (e: CancellationException) {
             scope.launch { backProgress.animateTo(0f, DeskMotion.spatial(state.tier, tween(DeskMotion.MEDIUM_MS, easing = DeskMotion.Emphasized), 0.001f)) }
             throw e
+        }
+    }
+}
+
+/**
+ * The full player's scrollable content and the sheet, as nested scrolling: what the content cannot
+ * scroll (it is at its top) pulls the sheet down with the finger, pushing up raises a pulled sheet
+ * before the content scrolls again, and letting go settles the sheet as a drag on it would (half way
+ * decides, a fling sooner). A fling of the content that reaches its top leaves the sheet where it is.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+private class PlayerPull(private val state: ExpandablePlayerState) : NestedScrollConnection {
+    var fling: FlingBehavior? = null
+
+    /** The sheet is off its anchors: a finger pulled it through the content. */
+    private val pulled: Boolean
+        get() {
+            val offset = state.draggable.offset
+            if (offset.isNaN()) return false
+            val anchors = state.draggable.anchors
+            return offset != anchors.positionOf(PlayerValue.Expanded) && offset != anchors.positionOf(PlayerValue.Collapsed)
+        }
+
+    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+        if (source != NestedScrollSource.UserInput || available.y >= 0f || !pulled) return Offset.Zero
+        return Offset(0f, state.draggable.dispatchRawDelta(available.y))
+    }
+
+    override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+        if (source != NestedScrollSource.UserInput || available.y <= 0f) return Offset.Zero
+        if (state.draggable.offset.isNaN()) return Offset.Zero
+        return Offset(0f, state.draggable.dispatchRawDelta(available.y))
+    }
+
+    override suspend fun onPreFling(available: Velocity): Velocity {
+        if (!pulled) return Velocity.Zero
+        settle(available.y)
+        return available
+    }
+
+    override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+        if (!pulled) return Velocity.Zero
+        settle(available.y)
+        return available
+    }
+
+    private suspend fun settle(velocity: Float) {
+        val behavior = fling ?: return
+        val draggable = state.draggable
+        draggable.anchoredDrag {
+            val scroll = object : ScrollScope {
+                override fun scrollBy(pixels: Float): Float {
+                    val from = draggable.requireOffset()
+                    val to = (from + pixels).coerceIn(draggable.anchors.minPosition(), draggable.anchors.maxPosition())
+                    dragTo(to)
+                    return to - from
+                }
+            }
+            with(behavior) { scroll.performFling(velocity) }
         }
     }
 }
