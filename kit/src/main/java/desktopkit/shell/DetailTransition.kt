@@ -9,7 +9,10 @@ import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.Easing
+import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.SeekableTransitionState
+import androidx.compose.animation.core.TargetBasedAnimation
+import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.rememberTransition
@@ -177,6 +180,12 @@ fun <T : Any> DetailTransition(
                 seekable.animateTo(null, tween(COMMIT_MS, easing = DeskMotion.EmphasizedAccelerate))
                 gestureClose = false
             }
+            // a change of mind on the way (Back right after the tap, the tap again right after Back): the way is run
+            // back from where it is
+            seekable.targetState != seekable.currentState && seekable.currentState?.let(detailKey) == target?.let(detailKey) -> {
+                gestureClose = false
+                seekable.runBack(DeskMotion.spatial(tier, tween(COMMIT_MS, easing = DeskMotion.Standard), FRACTION))
+            }
             else -> {
                 gestureClose = false
                 seekable.animateTo(target)
@@ -190,7 +199,8 @@ fun <T : Any> DetailTransition(
             try {
                 events.collectLatest { event ->
                     swipeEdge = event.swipeEdge
-                    if (animated) {
+                    // (a gesture while the opening is still on its way leaves it be: letting go runs the opening back)
+                    if (animated && seekable.currentState != null) {
                         gestureClose = true
                         // the finger seeks the closing as far as GESTURE_END; the rest is the way out
                         seekable.seekTo(event.progress * GESTURE_END, null)
@@ -202,7 +212,7 @@ fun <T : Any> DetailTransition(
                     scope.launch {
                         withFrameNanos { }
                         if (latestDetail != null && gestureClose) {
-                            seekable.animateTo(seekable.currentState, DeskMotion.gesture(FRACTION))
+                            seekable.runBack(DeskMotion.gesture(FRACTION))
                             gestureClose = false
                         }
                     }
@@ -210,7 +220,7 @@ fun <T : Any> DetailTransition(
             } catch (e: CancellationException) {
                 if (animated) {
                     scope.launch {
-                        seekable.animateTo(seekable.currentState, DeskMotion.gesture(FRACTION))
+                        seekable.runBack(DeskMotion.gesture(FRACTION))
                         gestureClose = false
                     }
                 }
@@ -222,6 +232,26 @@ fun <T : Any> DetailTransition(
 
 /** How far the finger seeks the closing; the rest ([1 - GESTURE_END]) is the detail's way out once let go. */
 private const val GESTURE_END = 0.85f
+
+/**
+ * A transition turned around on its way: its fraction runs back to 0 on [spec], then it stands at its
+ * current state again. Retargeted at its own current state instead, a seekable transition drops the
+ * shared elements' match for a frame: the detail's header jumped to its full size and left from there.
+ * Run back, the shared elements fly back along their path and the content's entering is undone.
+ */
+private suspend fun <S> SeekableTransitionState<S>.runBack(spec: FiniteAnimationSpec<Float>) {
+    val held = targetState
+    if (held != currentState && fraction > 0f) {
+        val way = TargetBasedAnimation(spec, Float.VectorConverter, fraction, 0f)
+        val start = withFrameNanos { it }
+        while (true) {
+            val played = withFrameNanos { it } - start
+            seekTo(way.getValueFromNanos(played).coerceIn(0f, 1f), held)
+            if (way.isFinishedFromNanos(played)) break
+        }
+    }
+    snapTo(currentState)
+}
 
 /** The way out after the finger lets go, from wherever it was. */
 private const val COMMIT_MS = 220
