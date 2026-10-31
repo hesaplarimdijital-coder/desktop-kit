@@ -184,6 +184,50 @@ class DetailSharedElementTest {
         assertTrue("the card is back at its size: ${back.right - back.left}", (back.right - back.left) <= 161.dp && (back.right - back.left) >= 159.dp)
     }
 
+    /** Back half way through the opening: the header turns around where it is, it never jumps to its end first. */
+    @Test
+    fun closingWhileOpeningTurnsAroundWhereItIs() {
+        var detail by mutableStateOf<String?>(null)
+        compose.setContent {
+            DesktopKitTheme {
+                androidx.compose.runtime.CompositionLocalProvider(LocalMotionTier provides MotionTier.Gesture) {
+                    DetailTransition(
+                        detail = detail,
+                        onBack = { detail = null },
+                        list = {
+                            Column {
+                                Box(Modifier.detailSharedCard("card").size(160.dp).background(Color.Red).testTag("card"))
+                            }
+                        },
+                    ) {
+                        Column {
+                            Box(Modifier.detailSharedCard("card").fillMaxWidth().height(300.dp).background(Color.Blue).testTag("header"))
+                        }
+                    }
+                }
+            }
+        }
+        compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+        compose.runOnIdle { detail = "album" }
+        compose.mainClock.advanceTimeBy(96)
+        compose.waitForIdle()
+        var last = compose.onNodeWithTag("header", useUnmergedTree = true).getBoundsInRoot().let { (it.right - it.left).value }
+        compose.runOnIdle { detail = null }
+        var largestStep = 0f
+        repeat(40) {
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+            if (compose.onAllNodesWithTag("header", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()) {
+                val width = compose.onNodeWithTag("header", useUnmergedTree = true).getBoundsInRoot().let { (it.right - it.left).value }
+                largestStep = maxOf(largestStep, width - last)
+                last = width
+            }
+        }
+        compose.mainClock.autoAdvance = true
+        assertTrue("the header jumped $largestStep dp wider in one frame on the way back", largestStep < 40f)
+    }
+
     private fun red(pixel: Int): Boolean {
         val r = pixel shr 16 and 0xff
         val g = pixel shr 8 and 0xff
