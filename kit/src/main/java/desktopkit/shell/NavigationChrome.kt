@@ -80,6 +80,8 @@ import desktopkit.theme.DeskGlass
 import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
 import desktopkit.theme.GlassThickness
+import desktopkit.theme.LocalMotionTier
+import desktopkit.theme.MotionTier
 import desktopkit.theme.glass
 import desktopkit.input.showShortcutHints
 
@@ -200,7 +202,7 @@ private fun NavIndicator(
     content: @Composable () -> Unit,
 ) {
     val colors = DeskTheme.colors
-    val fraction by animateFloatAsState(if (selected) 1f else 0f, DeskMotion.spatial(), label = "navIndicator")
+    val fraction by animateFloatAsState(if (selected) 1f else 0f, DeskMotion.fade(LocalMotionTier.current, DeskMotion.spatial()), label = "navIndicator")
     val feedback by animateInteractionColor(
         if (state.pressed) colors.pressed else if (state.hovered && !selected) colors.hover else Color.Transparent,
         selected, tween(NAV_COLOR_MS),
@@ -321,7 +323,7 @@ fun Sidebar(
     // the panel slides open and shut on the emphasized curve; labels fade in once there is room for them
     val width by animateDpAsState(
         if (collapsed) dimens.sidebarCollapsedWidth else dimens.sidebarWidth,
-        tween(DeskMotion.LONG_MS, easing = DeskMotion.Emphasized),
+        DeskMotion.fade(LocalMotionTier.current, tween(DeskMotion.LONG_MS, easing = DeskMotion.Emphasized)),
         label = "sidebarWidth",
     )
     val span = (dimens.sidebarWidth - dimens.sidebarCollapsedWidth).value
@@ -465,6 +467,7 @@ fun PageTopBar(
 ) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
+    val tier = LocalMotionTier.current
     val latestOnBack by rememberUpdatedState(onBack)
     val (shown, overflow) = remember(actions) { splitTopBarActions(actions) }
     // content scrolled beneath: the bar takes the chrome colour (or turns to glass over content lying
@@ -477,9 +480,9 @@ fun PageTopBar(
             glass -> colors.background.copy(alpha = 0f)
             else -> colors.chrome
         },
-        tween(DeskMotion.MEDIUM_MS), label = "topBar",
+        DeskMotion.fade(tier, tween(DeskMotion.MEDIUM_MS)), label = "topBar",
     )
-    val ruleAlpha by animateFloatAsState(if (scrolled) 1f else 0f, tween(DeskMotion.MEDIUM_MS), label = "topBarRule")
+    val ruleAlpha by animateFloatAsState(if (scrolled) 1f else 0f, DeskMotion.fade(tier, tween(DeskMotion.MEDIUM_MS)), label = "topBarRule")
     val rule = colors.border
     Column(
         modifier
@@ -502,7 +505,8 @@ fun PageTopBar(
                 targetState = TopBarHeading(title, if (onBack != null) backIcon else null),
                 // the old title is gone before the new one fades in: two titles never overlap
                 transitionSpec = {
-                    fadeIn(tween(TOP_BAR_FADE_MS, delayMillis = TOP_BAR_FADE_OUT_MS)) togetherWith fadeOut(tween(TOP_BAR_FADE_OUT_MS))
+                    if (tier == MotionTier.Reduced) fadeIn(tween(0)) togetherWith fadeOut(tween(0))
+                    else fadeIn(tween(TOP_BAR_FADE_MS, delayMillis = TOP_BAR_FADE_OUT_MS)) togetherWith fadeOut(tween(TOP_BAR_FADE_OUT_MS))
                 },
                 contentAlignment = Alignment.CenterStart,
                 label = "topBarHeading",
@@ -544,7 +548,8 @@ private const val TOP_BAR_FADE_OUT_MS = 90
 private const val NAV_COLOR_MS = 150
 
 @Composable
-private fun animateNavColor(target: Color) = animateColorAsState(target, tween(NAV_COLOR_MS), label = "navColor")
+private fun animateNavColor(target: Color) =
+    animateColorAsState(target, DeskMotion.fade(LocalMotionTier.current, tween(NAV_COLOR_MS)), label = "navColor")
 
 /**
  * Large and extra-large: brand, application menus and an optional search/command field.

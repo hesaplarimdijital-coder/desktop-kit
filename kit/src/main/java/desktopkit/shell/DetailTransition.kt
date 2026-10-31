@@ -164,7 +164,8 @@ fun <T : Any> DetailTransition(
                     backProgress.snapTo(0f)
                 }
             } catch (e: CancellationException) {
-                scope.launch { backProgress.animateTo(0f, DeskMotion.spatial()) }
+                // back to full size on the gesture spring: no bounce, so the scale never crosses 1
+                scope.launch { backProgress.animateTo(0f, DeskMotion.spatial(tier, tween(DeskMotion.MEDIUM_MS, easing = DeskMotion.Emphasized), 0.001f)) }
                 throw e
             }
         }

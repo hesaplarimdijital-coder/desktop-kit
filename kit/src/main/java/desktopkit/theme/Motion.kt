@@ -57,6 +57,9 @@ object DeskMotion {
     /** Accent and theme colour changes (an accent taken from artwork cross-fades in this time). */
     const val COLOR_CHANGE_MS = 150
 
+    /** The visibility threshold for a spring over pixels: half a pixel (see [gesture]). */
+    const val PIXEL = 0.5f
+
     /** Colour of hover, press and selection backgrounds. */
     fun <T> color(): FiniteAnimationSpec<T> = tween(150, easing = Standard)
 
@@ -102,7 +105,12 @@ object DeskMotion {
         MotionTier.Reduced -> snap()
     }
 
-    /** A fade or colour change: [spec] in both tiers, a jump with reduced motion. */
+    /**
+     * A fade, colour change or small spring that is the same on a phone and a tablet (a press
+     * shrinking, a pill growing, a menu appearing): [spec] in both tiers, a jump with reduced motion.
+     * Compose does not read the system's animation scale itself, so every animation goes through
+     * this or [spatial] to honour "Remove animations".
+     */
     fun <T> fade(tier: MotionTier, spec: FiniteAnimationSpec<T>): FiniteAnimationSpec<T> =
         if (tier == MotionTier.Reduced) snap() else spec
 }

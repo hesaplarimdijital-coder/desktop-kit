@@ -4,6 +4,7 @@ import android.view.HapticFeedbackConstants
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -95,6 +96,11 @@ class ExpandablePlayerState(initialValue: PlayerValue, @Suppress("unused") densi
     internal var collapsedTop by mutableFloatStateOf(0f)
         private set
 
+    /** The motion tier of the surrounding shell; set by [ExpandablePlayer], so [expand] jumps with reduced motion. */
+    internal var tier: MotionTier = MotionTier.Gesture
+
+    private fun settle(): FiniteAnimationSpec<Float> = DeskMotion.spatial(tier, DeskMotion.gesture(DeskMotion.PIXEL), DeskMotion.PIXEL)
+
     /** The settled value, or the one being animated to. */
     val currentValue: PlayerValue get() = draggable.currentValue
 
@@ -112,10 +118,10 @@ class ExpandablePlayerState(initialValue: PlayerValue, @Suppress("unused") densi
         }
 
     /** Opens the full-screen player on a spring. */
-    suspend fun expand() = draggable.animateTo(PlayerValue.Expanded, DeskMotion.gesture(0.5f))
+    suspend fun expand() = draggable.animateTo(PlayerValue.Expanded, settle())
 
     /** Back to the mini player. */
-    suspend fun collapse() = draggable.animateTo(PlayerValue.Collapsed, DeskMotion.gesture(0.5f))
+    suspend fun collapse() = draggable.animateTo(PlayerValue.Collapsed, settle())
 
     /** Jumps to [value] without animation. */
     suspend fun snapTo(value: PlayerValue) = draggable.snapTo(value)
@@ -188,6 +194,8 @@ fun ExpandablePlayer(
     val host = LocalShellOverlayHost.current
     val scope = rememberCoroutineScope()
     val colors = DeskTheme.colors
+    val tier = LocalMotionTier.current
+    SideEffect { state.tier = tier }
     val expandLabel = stringResource(R.string.dk_player_expand)
     var miniCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     fun measureAnchor() {
@@ -319,19 +327,23 @@ private fun PlayerSheet(
         backProgress.snapTo(0f)
         try {
             events.collect { event -> backProgress.snapTo(event.progress) }
-            scope.launch { backProgress.animateTo(0f, tween(DeskMotion.LONG_MS, easing = DeskMotion.Emphasized)) }
+            scope.launch { backProgress.animateTo(0f, DeskMotion.fade(state.tier, tween(DeskMotion.LONG_MS, easing = DeskMotion.Emphasized))) }
             collapse()
         } catch (e: CancellationException) {
-            scope.launch { backProgress.animateTo(0f, DeskMotion.gesture(0.001f)) }
+            scope.launch { backProgress.animateTo(0f, DeskMotion.spatial(state.tier, tween(DeskMotion.MEDIUM_MS, easing = DeskMotion.Emphasized), 0.001f)) }
             throw e
         }
     }
 }
 
-/** Letting go of the player: half way decides, a fling decides sooner; settles on the gesture spring. */
+/** Letting go of the player: half way decides, a fling decides sooner; settles on the gesture spring (at once with reduced motion). */
 @Composable
 private fun playerFlingBehavior(state: ExpandablePlayerState) =
-    AnchoredDraggableDefaults.flingBehavior(state.draggable, positionalThreshold = { distance -> distance * 0.5f }, animationSpec = DeskMotion.gesture(0.5f))
+    AnchoredDraggableDefaults.flingBehavior(
+        state.draggable,
+        positionalThreshold = { distance -> distance * 0.5f },
+        animationSpec = DeskMotion.spatial(LocalMotionTier.current, DeskMotion.gesture(DeskMotion.PIXEL), DeskMotion.PIXEL),
+    )
 
 /** What a sideways swipe on the mini player does. */
 enum class MiniSwipeAction { None, Previous, Next }

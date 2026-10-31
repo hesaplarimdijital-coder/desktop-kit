@@ -2,6 +2,7 @@ package desktopkit.components
 
 import androidx.compose.animation.Animatable
 import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -37,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
 import desktopkit.theme.InputMode
+import desktopkit.theme.LocalMotionTier
 
 /** Visual state of an interactive element: hover, press and keyboard focus. */
 data class InteractionState(val hovered: Boolean, val pressed: Boolean, val focused: Boolean)
@@ -149,12 +151,13 @@ fun animatedStateBackground(state: InteractionState, selected: Boolean = false, 
 internal fun animateInteractionColor(
     target: Color,
     selected: Boolean = false,
-    spec: AnimationSpec<Color> = DeskMotion.color(),
+    spec: FiniteAnimationSpec<Color> = DeskMotion.color(),
 ): State<Color> {
     val fade = remember { InteractionFade(target, selected) }
     fade.retarget(target, selected, instant = DeskTheme.inputMode == InputMode.Pointer)
     val current = rememberUpdatedState(target)
-    LaunchedEffect(fade, target) { fade.run(target, spec) }
+    val tier = LocalMotionTier.current
+    LaunchedEffect(fade, target) { fade.run(target, DeskMotion.fade(tier, spec)) }
     return if (fade.easing) fade.color.asState() else current
 }
 
@@ -192,7 +195,8 @@ private class InteractionFade(initial: Color, private var selected: Boolean) {
 @Composable
 fun Modifier.pressScale(pressed: Boolean, scale: Float = 0.96f): Modifier {
     val touch = DeskTheme.inputMode == InputMode.Touch
-    val value by animateFloatAsState(if (pressed && touch) scale else 1f, DeskMotion.fastSpatial(), label = "pressScale")
+    val tier = LocalMotionTier.current
+    val value by animateFloatAsState(if (pressed && touch) scale else 1f, DeskMotion.fade(tier, DeskMotion.fastSpatial()), label = "pressScale")
     return this.graphicsLayer {
         scaleX = value
         scaleY = value

@@ -4,6 +4,8 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -72,6 +74,8 @@ import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
 import desktopkit.theme.GlassMode
 import desktopkit.theme.GlassThickness
+import desktopkit.theme.LocalMotionTier
+import desktopkit.theme.MotionTier
 import desktopkit.theme.glass
 
 /** One line of a menu bar drop-down or a context menu. */
@@ -153,14 +157,17 @@ fun MenuPopup(
                 root.removeOnUnhandledKeyEventListener(escape)
             }
         }
+        val reduced = LocalMotionTier.current == MotionTier.Reduced
         AnimatedVisibility(
             visibleState = transition,
-            enter = fadeIn(tween(DeskMotion.SHORT_MS + 50, easing = DeskMotion.StandardDecelerate)) +
-                scaleIn(tween(DeskMotion.SHORT_MS + 50, easing = DeskMotion.EmphasizedDecelerate), initialScale = 0.92f,
-                    transformOrigin = TransformOrigin(0f, 0f)),
-            exit = fadeOut(tween(DeskMotion.SHORT_MS, easing = DeskMotion.StandardAccelerate)) +
-                scaleOut(tween(DeskMotion.SHORT_MS, easing = DeskMotion.EmphasizedAccelerate), targetScale = 0.96f,
-                    transformOrigin = TransformOrigin(0f, 0f)),
+            enter = if (reduced) EnterTransition.None else
+                fadeIn(tween(DeskMotion.SHORT_MS + 50, easing = DeskMotion.StandardDecelerate)) +
+                    scaleIn(tween(DeskMotion.SHORT_MS + 50, easing = DeskMotion.EmphasizedDecelerate), initialScale = 0.92f,
+                        transformOrigin = TransformOrigin(0f, 0f)),
+            exit = if (reduced) ExitTransition.None else
+                fadeOut(tween(DeskMotion.SHORT_MS, easing = DeskMotion.StandardAccelerate)) +
+                    scaleOut(tween(DeskMotion.SHORT_MS, easing = DeskMotion.EmphasizedAccelerate), targetScale = 0.96f,
+                        transformOrigin = TransformOrigin(0f, 0f)),
             label = "menuPopup",
         ) {
             Column(

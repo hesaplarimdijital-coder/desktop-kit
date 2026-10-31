@@ -77,6 +77,7 @@ import desktopkit.R
 import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
 import desktopkit.theme.InputMode
+import desktopkit.theme.LocalMotionTier
 import kotlin.math.roundToInt
 
 // ---------------------------------------------------------------- card and key–value row
@@ -438,7 +439,7 @@ fun DeskTab(
     val state = interaction.collectState()
     val shape = RoundedCornerShape(dimens.radiusControl)
     val background by animatedStateBackground(state)
-    val underline by animateFloatAsState(if (selected) 1f else 0f, DeskMotion.spatial(), label = "tabUnderline")
+    val underline by animateFloatAsState(if (selected) 1f else 0f, DeskMotion.fade(LocalMotionTier.current, DeskMotion.spatial()), label = "tabUnderline")
     val textColor by animateInteractionColor(if (selected) colors.text else colors.textSecondary, selected)
     val accent = colors.accent
     // the focus within the tab counts: Tab moves it on into the close button, which must stay
