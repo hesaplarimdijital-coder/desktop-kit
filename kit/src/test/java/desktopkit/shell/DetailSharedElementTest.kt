@@ -210,9 +210,20 @@ class DetailSharedElementTest {
         compose.waitForIdle()
         compose.mainClock.autoAdvance = false
         compose.runOnIdle { detail = "album" }
-        compose.mainClock.advanceTimeBy(96)
-        compose.waitForIdle()
+        // frame by frame (a run of frames without an idle in between leaves the recomposer asleep):
+        // the header appears, then it is a few frames into its growth
+        var waited = 0
+        while (compose.onAllNodesWithTag("header", useUnmergedTree = true).fetchSemanticsNodes().isEmpty()) {
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+            assertTrue("the header never appeared", ++waited < 10)
+        }
+        repeat(4) {
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+        }
         var last = compose.onNodeWithTag("header", useUnmergedTree = true).getBoundsInRoot().let { (it.right - it.left).value }
+        assertTrue("the header is still on its way at $last dp", last < 400f)
         compose.runOnIdle { detail = null }
         var largestStep = 0f
         repeat(40) {
