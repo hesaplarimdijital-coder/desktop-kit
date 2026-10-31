@@ -6,6 +6,8 @@ import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -134,6 +136,52 @@ class DetailSharedElementTest {
         }
         assertTrue("no frame of the flight was checked", checked > 0)
         compose.mainClock.autoAdvance = true
+    }
+
+    /** A card grows into the detail's header on a phone, through sizes in between, and lands back in the list. */
+    @Test
+    fun theCardGrowsIntoTheHeaderAndBack() {
+        var detail by mutableStateOf<String?>(null)
+        compose.setContent {
+            DesktopKitTheme {
+                androidx.compose.runtime.CompositionLocalProvider(LocalMotionTier provides MotionTier.Gesture) {
+                    DetailTransition(
+                        detail = detail,
+                        onBack = { detail = null },
+                        list = {
+                            Column {
+                                Box(Modifier.detailSharedCard("card").size(160.dp).background(Color.Red).testTag("card"))
+                            }
+                        },
+                    ) {
+                        Column {
+                            Box(Modifier.detailSharedCard("card").fillMaxWidth().height(300.dp).background(Color.Blue).testTag("header"))
+                        }
+                    }
+                }
+            }
+        }
+        compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+        compose.runOnIdle { detail = "album" }
+        val widths = mutableListOf<Float>()
+        repeat(40) {
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+            if (compose.onAllNodesWithTag("header", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()) {
+                val bounds = compose.onNodeWithTag("header", useUnmergedTree = true).getBoundsInRoot()
+                widths += (bounds.right - bounds.left).value
+            }
+        }
+        assertTrue("the header passes through widths between the card's and its own: $widths", widths.any { it > 170f && it < 400f })
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        val open = compose.onNodeWithTag("header", useUnmergedTree = true).getBoundsInRoot()
+        assertTrue("the header lands at full width: ${open.right - open.left}", (open.right - open.left) >= 400.dp)
+        compose.runOnIdle { detail = null }
+        compose.waitForIdle()
+        val back = compose.onNodeWithTag("card", useUnmergedTree = true).getBoundsInRoot()
+        assertTrue("the card is back at its size: ${back.right - back.left}", (back.right - back.left) <= 161.dp && (back.right - back.left) >= 159.dp)
     }
 
     private fun red(pixel: Int): Boolean {

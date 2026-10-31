@@ -5,23 +5,29 @@ import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.BoundsTransform
+import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.VisibilityThreshold
+import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -38,9 +44,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
@@ -54,25 +67,28 @@ import kotlinx.coroutines.launch
  * A list screen and the detail screen opened from it, with Android's own screen transition between
  * them and the predictive Back gesture:
  *
- * - opening ([detail] becomes non-null): the detail slides in a short way from the end edge while
- *   fading in, the list slides the other way and fades out (shared axis, emphasized curve);
+ * - opening ([detail] becomes non-null): on a phone the detail comes in from the end edge over the
+ *   list, which sinks to 95 % and fades under it (depth, on the [desktopkit.theme.DeskMotion.open]
+ *   spring); with a [detailSharedCard] the card carries the way and the detail only fades in after
+ *   it. From tablet width up the 0.2.0 shared axis: the detail slides in a short way from the end
+ *   edge while fading in, the list slides the other way and fades out (emphasized curve);
  * - closing ([detail] becomes null): the same, reversed;
  * - Back gesture (Android 14 and later with `android:enableOnBackInvokedCallback="true"`): while the
  *   finger moves, the detail shrinks toward 90 %, rounds its corners and leans toward the edge the
  *   swipe came from; letting go closes it with [onBack], swiping back cancels and it springs back.
  *   On older Android versions the Back button or gesture simply closes it.
  *
- * On a phone the slides run on the gesture spring ([desktopkit.theme.MotionTier.Gesture]); from tablet
- * width up on the timed curves above; with reduced motion the detail simply appears. Works in every width class. The Back gesture is taken over while a detail is shown, also from a
+ * With reduced motion the detail simply appears. Works in every width class. The Back gesture is taken over while a detail is shown, also from a
  * [CompactTopBar] inside it (both normally call the same close function), unless [handleBack] is false.
  * [detailKey] tells details apart (the default compares the values); [animate] false switches
  * without motion, e.g. for screenshot tests.
  *
  * Shared elements: mark the same thing in the list and in the detail with [detailSharedElement]
- * (a cover: it flies from the row to its place in the detail and back) or [detailSharedBounds]
- * (a title: it moves and scales instead of reflowing), with the same key on both sides. They need a
- * lookahead layout pass over the list and the detail; [sharedElements] false leaves it out for
- * screens that mark nothing.
+ * (a cover: it flies from the row to its place in the detail and back), [detailSharedBounds]
+ * (a title: it moves and scales instead of reflowing) or [detailSharedCard] (a whole card that
+ * grows into the detail's header), with the same key on both sides. They need a lookahead layout
+ * pass over the list and the detail; [sharedElements] false leaves it out for screens that mark
+ * nothing.
  */
 @Composable
 fun <T : Any> DetailTransition(
@@ -93,6 +109,7 @@ fun <T : Any> DetailTransition(
     val backProgress = remember { Animatable(0f) }
     var swipeEdge by remember { mutableIntStateOf(BackEventCompat.EDGE_LEFT) }
     val latestOnBack by rememberUpdatedState(onBack)
+    val cards = remember { DetailSharedState() }
     val behind = colors.pressed
     val page = colors.background
 
@@ -107,13 +124,18 @@ fun <T : Any> DetailTransition(
         AnimatedContent(
             targetState = detail,
             modifier = Modifier.fillMaxSize(),
-            transitionSpec = { detailTransform(initialState, targetState, animate, tier) },
+            transitionSpec = {
+                // a card registered by the list carries the opening and, remembered here, the closing too
+                if (initialState == null && targetState != null) cards.openedWithCard = cards.registered > 0
+                detailTransform(initialState, targetState, animate, tier, card = cards.openedWithCard)
+            },
             contentKey = { it?.let(detailKey) },
             label = "detailTransition",
         ) { target ->
             // one object per side: a new one on every recomposition would recompose everything under it
-            val scopes = remember(shared, this, animate, tier) {
-                if (shared != null && animate && tier != MotionTier.Reduced) DetailSharedScopes(shared, this, tier) else null
+            val side = if (target == null) DetailSide.List else DetailSide.Detail
+            val scopes = remember(shared, this, animate, tier, side) {
+                if (shared != null && animate && tier != MotionTier.Reduced) DetailSharedScopes(shared, this, tier, side, cards) else null
             }
             CompositionLocalProvider(LocalDetailSharedScopes provides scopes) {
                 if (target == null) {
@@ -172,19 +194,29 @@ fun <T : Any> DetailTransition(
     }
 }
 
-private fun <T> detailTransform(initial: T?, target: T?, animate: Boolean, tier: MotionTier): ContentTransform {
+private fun <T> detailTransform(initial: T?, target: T?, animate: Boolean, tier: MotionTier, card: Boolean): ContentTransform {
     if (!animate || tier == MotionTier.Reduced) return fadeIn(tween(0)) togetherWith fadeOut(tween(0))
     val opening = initial == null && target != null
     val closing = initial != null && target == null
     if (tier == MotionTier.Gesture && (opening || closing)) {
-        // phone: the slide is the interruptible gesture spring, the fades stay short and timed
-        val direction = if (opening) 1 else -1
-        return (slideInHorizontally(DeskMotion.gesture(IntOffset.VisibilityThreshold)) { direction * it / 10 } +
-            fadeIn(tween(DeskMotion.MEDIUM_MS, delayMillis = 50, easing = DeskMotion.StandardDecelerate)))
-            .togetherWith(
-                slideOutHorizontally(DeskMotion.gesture(IntOffset.VisibilityThreshold)) { -direction * it / 10 } +
-                    fadeOut(tween(DeskMotion.SHORT_MS, easing = DeskMotion.StandardAccelerate)),
-            )
+        // phone: depth. The detail comes in 12 % from the end edge on the opening spring and fades in
+        // at once (no dead frames after the tap); the list sinks to 95 % and fades under it. With a
+        // card the card carries the way and the detail only fades in after it. Back the same way
+        // round, the list rising under the leaving detail.
+        val slide = DeskMotion.open(IntOffset.VisibilityThreshold)
+        val fadeIn = fadeIn(tween(DeskMotion.MEDIUM_MS, easing = DeskMotion.StandardDecelerate))
+        val fadeOut = fadeOut(tween(DeskMotion.SHORT_MS + 20, easing = DeskMotion.StandardAccelerate))
+        return if (opening) {
+            val enter = if (card) fadeIn(tween(DeskMotion.MEDIUM_MS + 20, delayMillis = 60, easing = DeskMotion.StandardDecelerate))
+            else slideInHorizontally(slide) { it * 12 / 100 } + fadeIn
+            val exit = scaleOut(tween(DeskMotion.LONG_MS, easing = DeskMotion.Emphasized), targetScale = 0.95f) +
+                fadeOut(tween(DeskMotion.SHORT_MS + 60, easing = DeskMotion.StandardAccelerate))
+            enter togetherWith exit
+        } else {
+            val enter = scaleIn(tween(DeskMotion.LONG_MS, easing = DeskMotion.Emphasized), initialScale = 0.95f) + fadeIn
+            val exit = if (card) fadeOut else slideOutHorizontally(slide) { it * 12 / 100 } + fadeOut
+            (enter togetherWith exit).apply { targetContentZIndex = -1f }
+        }
     }
     return when {
         opening ->
@@ -210,13 +242,26 @@ internal class DetailSharedScopes(
     val transition: SharedTransitionScope,
     val visibility: AnimatedVisibilityScope,
     val tier: MotionTier,
+    val side: DetailSide,
+    val cards: DetailSharedState,
 )
+
+internal enum class DetailSide { List, Detail }
+
+/** What the two sides of a [DetailTransition] tell each other: whether the list has a [detailSharedCard]. */
+internal class DetailSharedState {
+    /** Cards composed in the list right now. */
+    var registered = 0
+
+    /** Whether the open detail was opened with a card: its closing is the card's way back. */
+    var openedWithCard = false
+}
 
 internal val LocalDetailSharedScopes = staticCompositionLocalOf<DetailSharedScopes?> { null }
 
-/** Bounds of a shared element move on the gesture spring on a phone, on the emphasized curve wider up. */
+/** Bounds of a shared element move on the opening spring on a phone, on the emphasized curve wider up. */
 private fun boundsTransform(tier: MotionTier) = BoundsTransform { _, _ ->
-    if (tier == MotionTier.Gesture) DeskMotion.gesture(Rect.VisibilityThreshold)
+    if (tier == MotionTier.Gesture) DeskMotion.open(Rect.VisibilityThreshold)
     else tween(DeskMotion.LONG_MS + 50, easing = DeskMotion.Emphasized)
 }
 
@@ -244,6 +289,8 @@ fun Modifier.detailSharedElement(key: Any, shape: Shape? = LocalSharedElementSha
             sharedContentState = rememberSharedContentState(key),
             animatedVisibilityScope = scopes.visibility,
             boundsTransform = boundsTransform(scopes.tier),
+            // above a card flying with it
+            zIndexInOverlay = 1f,
         )
     }.then(clip)
 }
@@ -262,6 +309,72 @@ fun Modifier.detailSharedBounds(key: Any): Modifier {
             animatedVisibilityScope = scopes.visibility,
             boundsTransform = boundsTransform(scopes.tier),
             resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds(ContentScale.Fit, Alignment.CenterStart),
+            zIndexInOverlay = 1f,
         )
+    }
+}
+
+/**
+ * Inside a [DetailTransition] on a phone, the card of a list item (a [desktopkit.components.CoverCell]'s
+ * `modifier`) and the header of its detail (the block holding the big cover and the title) marked
+ * with the same [key] open into each other: the card grows into the header, its corners
+ * straightening from [shape] and its surface turning into the page, while the header's content
+ * fades in over the card's; on the way back the header shrinks into the card's place. A
+ * [detailSharedElement] cover and a [detailSharedBounds] title inside both still fly on their own,
+ * above the card. Put it first in the modifiers of both. The card needs no background of its own
+ * (it gets the surface colour while it flies), the header draws the page colour while it flies.
+ * From tablet width up, outside a [DetailTransition] or with reduced motion nothing changes.
+ */
+@Composable
+fun Modifier.detailSharedCard(key: Any, shape: CornerBasedShape = RoundedCornerShape(DeskTheme.dimens.radiusCard)): Modifier {
+    val scopes = LocalDetailSharedScopes.current ?: return this
+    if (scopes.tier != MotionTier.Gesture) return this
+    val colors = DeskTheme.colors
+    val list = scopes.side == DetailSide.List
+    if (list) {
+        DisposableEffect(scopes.cards) {
+            scopes.cards.registered++
+            onDispose { scopes.cards.registered-- }
+        }
+    }
+    val density = LocalDensity.current
+    // the corners: the card's at rest in the list, none at rest in the detail, moving with the transition
+    val rested = with(density) { shape.topStart.toPx(Size(100f, 100f), this) }
+    val corner by scopes.visibility.transition.animateDp(
+        transitionSpec = { tween(DeskMotion.LONG_MS, easing = DeskMotion.Emphasized) },
+        label = "cardCorners",
+    ) { state ->
+        val atRest = state == EnterExitState.Visible
+        with(density) { if (atRest == list) rested.toDp() else 0.dp }
+    }
+    val cornerPx: () -> Float = { with(density) { corner.toPx() } }
+    val surface = if (list) colors.surface else colors.background
+    val clip = remember(scopes) { CornerClip(cornerPx) }
+    return with(scopes.transition) {
+        this@detailSharedCard
+            .sharedBounds(
+                sharedContentState = rememberSharedContentState(key),
+                animatedVisibilityScope = scopes.visibility,
+                enter = fadeIn(tween(DeskMotion.MEDIUM_MS + 10, delayMillis = DeskMotion.SHORT_MS - 10, easing = DeskMotion.StandardDecelerate)),
+                exit = fadeOut(tween(DeskMotion.SHORT_MS - 10, easing = DeskMotion.StandardAccelerate)),
+                boundsTransform = boundsTransform(scopes.tier),
+                resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds(ContentScale.FillWidth, Alignment.TopStart),
+                clipInOverlayDuringTransition = clip,
+            )
+            // a surface only while it flies: the card is as bare as before at rest
+            .drawBehind {
+                if (isTransitionActive) drawRoundRect(surface, cornerRadius = CornerRadius(cornerPx()))
+            }
+    }
+}
+
+/** The overlay clip of a flying card: a rounded rectangle whose radius [cornerPx] gives per draw. */
+private class CornerClip(private val cornerPx: () -> Float) : SharedTransitionScope.OverlayClip {
+    private val path = Path()
+
+    override fun getClipPath(sharedContentState: SharedTransitionScope.SharedContentState, bounds: Rect, layoutDirection: LayoutDirection, density: Density): Path? {
+        path.reset()
+        path.addRoundRect(RoundRect(bounds, CornerRadius(cornerPx())))
+        return path
     }
 }

@@ -44,6 +44,7 @@ import desktopkit.shell.TopBarAction
 import desktopkit.shell.WidthClass
 import desktopkit.shell.currentWidthClass
 import desktopkit.shell.detailSharedBounds
+import desktopkit.shell.detailSharedCard
 import desktopkit.shell.detailSharedElement
 import desktopkit.shell.rememberShellContentPadding
 import desktopkit.shell.plus
@@ -61,7 +62,8 @@ fun songsIn(payload: DeskDragPayload): Int = when (payload.kind) {
 /**
  * The cover grid (K5): click opens an album, Ctrl/Shift+click and Shift+arrows select, right click
  * or "⋯" opens its menu. Covers can be dragged with a mouse onto "Playlists" in the sidebar (K6).
- * Opening an album flies its cover and title into the album's page (M3).
+ * Opening an album flies its cover and title into the album's page (M3); on a phone the whole card
+ * grows into the page's header on the way.
  */
 @Composable
 fun AlbumsScreen(opened: String?, onOpen: (String?) -> Unit, onPlay: (Int) -> Unit) {
@@ -106,6 +108,7 @@ fun AlbumsScreen(opened: String?, onOpen: (String?) -> Unit, onPlay: (Int) -> Un
                 ) { album ->
                     CoverCell(
                         album.title,
+                        modifier = Modifier.detailSharedCard("card-${album.id}"),
                         subtitle = "${album.artist} · ${album.year}",
                         onPlay = { onPlay(albums.indexOf(album) % tracks.size) },
                         playLabel = "Play ${album.title}",
@@ -150,7 +153,11 @@ private fun AlbumPage(album: Album, onBack: () -> Unit, onPlay: (Int) -> Unit) {
                 }
             }
             if (compact) {
-                Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                // the header the card opens into
+                Column(
+                    Modifier.detailSharedCard("card-${album.id}").fillMaxWidth().padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
                     cover(232.dp)
                     Spacer(Modifier.height(16.dp))
                     about()
