@@ -20,10 +20,12 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
+import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import desktopkit.SampleFullPlayer
 import desktopkit.SampleMiniPlayer
+import desktopkit.SampleTrackList
 import desktopkit.TestShell
 import desktopkit.mediaSpec
 import desktopkit.sampleMoreActions
@@ -115,6 +117,29 @@ class PlayerAndSheetTest {
         compose.mainClock.autoAdvance = true
         assertTrue("the mini player never came back", miniFrames > 0)
         assertTrue("the sheet stayed $sheetFrames frames after the mini player was back", sheetFrames <= 1)
+    }
+
+    /**
+     * The bars were hidden by a scroll, so the strip sits at the bottom edge: the player opens from
+     * there and lands back on it, and the bars stay where they were (they used to snap back on the
+     * tap, which jumped the strip up 64 dp, and the sheet still opened from the old place).
+     */
+    @Test
+    fun opensFromAndReturnsToTheStripWithTheBarsHidden() {
+        phone { SampleTrackList() }
+        compose.onNodeWithTag("tracks").performTouchInput { swipeUp(startY = centerY + 300f, endY = top + 200f, durationMillis = 800) }
+        compose.waitForIdle()
+        val hidden = compose.onNodeWithTag("mini").getBoundsInRoot()
+        compose.onNodeWithTag("mini").performClick()
+        compose.waitForIdle()
+        assertTrue(player.isExpanded)
+        val anchor = with(compose.density) { player.collapsedTop.toDp() }
+        assertEquals("the sheet opened from the strip: ${hidden.top} vs $anchor", hidden.top.value, anchor.value, 1f)
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        compose.waitForIdle()
+        assertFalse(player.isExpanded)
+        val back = compose.onNodeWithTag("mini").getBoundsInRoot()
+        assertEquals("the strip is where it was: ${hidden.top} → ${back.top}", hidden.top.value, back.top.value, 1f)
     }
 
     @Test

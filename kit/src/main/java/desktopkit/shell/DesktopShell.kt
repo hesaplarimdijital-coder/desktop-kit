@@ -340,7 +340,6 @@ private fun ShellContent(
         if (!showBottomNav || navKind != NavKind.BottomBar) metrics.navPx = 0
         metrics.systemBottomPx = systemBottom
         overlayHost.systemBottomPx = systemBottom
-        overlayHost.onExpandStart = { scroll.showBars() }
     }
     // every screen starts with the bars shown and a flat top bar
     LaunchedEffect(currentRoute, navKind, showBottomNav) { scroll.reset() }

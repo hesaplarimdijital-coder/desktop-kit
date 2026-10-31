@@ -41,6 +41,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -220,9 +222,19 @@ fun ExpandablePlayer(
             .semantics {
                 customActions = listOf(CustomAccessibilityAction(expandLabel) { scope.launch { state.expand() }; true })
             }
+            // the sheet opens from where the strip is drawn, also when a scroll has moved the bars
+            // (the bars are left where they are: the expanding sheet covers them, and the strip is
+            // back in the same place when it closes). Measured on every press, since a moved bar
+            // moves the strip without laying it out again.
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        if (event.type == PointerEventType.Press) measureAnchor()
+                    }
+                }
+            }
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClickLabel = expandLabel) {
-                host?.onExpandStart?.invoke()
-                measureAnchor()
                 scope.launch { state.expand() }
             },
     ) {

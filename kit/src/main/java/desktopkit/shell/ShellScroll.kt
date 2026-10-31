@@ -84,11 +84,6 @@ internal class ShellScrollState {
         }
     }
 
-    /** Brings the bottom chrome back at once (an expanding player starts from it). */
-    fun showBars() {
-        offsetPx = 0f
-    }
-
     /** A new screen starts with the chrome shown and the top bar flat. */
     fun reset() {
         offsetPx = 0f
