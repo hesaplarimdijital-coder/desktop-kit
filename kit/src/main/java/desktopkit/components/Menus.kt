@@ -183,10 +183,11 @@ fun MenuPopup(
                 },
                 label = "menuScale",
             ) { state ->
-                when (state) {
-                    EnterExitState.PreEnter -> 0.92f
-                    EnterExitState.Visible -> 1f
-                    EnterExitState.PostExit -> 0.96f
+                when {
+                    reduced -> 1f
+                    state == EnterExitState.PreEnter -> 0.92f
+                    state == EnterExitState.PostExit -> 0.96f
+                    else -> 1f
                 }
             }
             Column(

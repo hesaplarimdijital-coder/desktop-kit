@@ -14,8 +14,10 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNode
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
@@ -80,6 +82,8 @@ class SheetGestureTest {
         compose.waitForIdle()
         assertEquals("not dismissed while still on its way out", 0, dismissed)
         var last = compose.onNodeWithTag("row1").getBoundsInRoot().top
+        val surface = SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Paylaş")
+        val windowBottom = compose.onRoot().getBoundsInRoot().bottom
         var frames = 0
         var moved = 0
         var still = 0
@@ -90,11 +94,12 @@ class SheetGestureTest {
             if (dismissed == 0) {
                 val top = compose.onNodeWithTag("row1").getBoundsInRoot().top
                 assertTrue("frame $frames: the sheet came back up ($last → $top)", top >= last)
-                // the animation's first frame is its starting point; after that no pause of two frames
+                // the animation's first frame is its starting point; after that no pause of two frames while the
+                // sheet is in view (out of view the spring's last fraction of a pixel may not move the placement)
                 if (top > last) {
                     moved++
                     still = 0
-                } else {
+                } else if (compose.onNode(surface).getBoundsInRoot().top < windowBottom) {
                     still++
                     assertTrue("frame $frames: the sheet stood still at $top", still <= 1)
                 }

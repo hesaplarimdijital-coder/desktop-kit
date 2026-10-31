@@ -428,11 +428,18 @@ private fun ToastCard(toast: DeskToast) {
                         if (abs(swipe.value) > width * 0.3f || abs(velocity) > 1200f) {
                             // on a phone the card carries on the way it was going, at the finger's speed, and is
                             // dismissed once it is out (it used to stop and fade where the finger left it)
+                            var gone = false
                             if (tier == MotionTier.Gesture) {
                                 val out = if (swipe.value < 0f || (swipe.value == 0f && velocity < 0f)) -width.toFloat() else width.toFloat()
-                                swipe.animateTo(out, DeskMotion.gesture(0.5f), initialVelocity = velocity)
+                                swipe.animateTo(out, DeskMotion.gesture(0.5f), initialVelocity = velocity) {
+                                    // faded out entirely at its own width: dismissed there, whatever the spring still does
+                                    if (!gone && abs(value) >= width - 0.5f) {
+                                        gone = true
+                                        toast.dismiss()
+                                    }
+                                }
                             }
-                            toast.dismiss()
+                            if (!gone) toast.dismiss()
                         } else {
                             swipe.animateTo(0f, DeskMotion.gesture(0.5f), initialVelocity = velocity)
                         }
