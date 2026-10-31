@@ -1,8 +1,13 @@
 package desktopkit.shell
 
+import androidx.activity.BackEventCompat
+import androidx.compose.animation.core.Easing
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -307,6 +312,11 @@ private fun ShellContent(
         remember { { shellEnter(currentTransitions, currentKind, currentTier) } }
     val exit: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition =
         remember { { shellExit(currentTransitions, currentKind, currentTier) } }
+    // the predictive Back gesture between tabs (gesture navigation): the phone's own, wider up Navigation's as before
+    val predictiveEnter: AnimatedContentTransitionScope<NavBackStackEntry>.(Int) -> EnterTransition =
+        remember { { _ -> shellPredictiveEnter(currentTransitions, currentKind, currentTier) ?: NavigationPredictiveEnter } }
+    val predictiveExit: AnimatedContentTransitionScope<NavBackStackEntry>.(Int) -> ExitTransition =
+        remember { { edge -> shellPredictiveExit(currentTransitions, currentKind, currentTier, edge) ?: NavigationPredictiveExit } }
     val topBarHost = remember { CompactTopBarHost() }
     val scroll = remember { ShellScrollState() }
     val metrics = remember { ShellChromeMetrics() }
@@ -452,6 +462,8 @@ private fun ShellContent(
                             exitTransition = exit,
                             popEnterTransition = enter,
                             popExitTransition = exit,
+                            predictivePopEnterTransition = predictiveEnter,
+                            predictivePopExitTransition = predictiveExit,
                         ) {
                             spec.items.forEach { item ->
                                 composable(item.route) {
@@ -553,6 +565,40 @@ internal fun shellEnter(transitions: ShellTransitions, kind: NavKind, tier: Moti
         val scale = if (kind == NavKind.BottomBar) 0.96f else 0.98f
         fadeIn(tween(FADE_IN_MS, delayMillis = FADE_OUT_MS, easing = DeskMotion.EmphasizedDecelerate)) +
             scaleIn(tween(FADE_IN_MS, delayMillis = FADE_OUT_MS, easing = DeskMotion.EmphasizedDecelerate), initialScale = scale)
+    }
+}
+
+/** Navigation's own predictive pop (its defaults), which wider windows keep. */
+private val NavigationPredictiveEnter: EnterTransition = fadeIn(spring(dampingRatio = 1f, stiffness = 1600f))
+private val NavigationPredictiveExit: ExitTransition = scaleOut(targetScale = 0.7f)
+
+/** How long the predictive Back gesture between tabs is seeked over on the phone (the finger's part and the way out). */
+private const val PREDICTIVE_MS = 300
+
+/**
+ * The phone's predictive Back gesture between tabs, as the detail's: the screen being left shrinks
+ * toward 90 % and leans away from the edge the swipe came from, with the finger, staying whole until
+ * the last tenth of the way; the screen it goes back to rises from 94 % and brightens behind it.
+ * Navigation seeks this with the finger, plays the rest once let go and runs it back on a cancel.
+ * Null (Navigation's own) wider up, as before; with reduced motion nothing moves.
+ */
+internal fun shellPredictiveEnter(transitions: ShellTransitions, kind: NavKind, tier: MotionTier): EnterTransition? = when {
+    transitions == ShellTransitions.None || tier == MotionTier.Reduced -> EnterTransition.None
+    tier != MotionTier.Gesture || kind != NavKind.BottomBar -> null
+    else -> scaleIn(tween(PREDICTIVE_MS, easing = DeskMotion.Standard), initialScale = 0.94f) +
+        fadeIn(tween(PREDICTIVE_MS, easing = DeskMotion.Standard))
+}
+
+internal fun shellPredictiveExit(transitions: ShellTransitions, kind: NavKind, tier: MotionTier, swipeEdge: Int): ExitTransition? = when {
+    transitions == ShellTransitions.None || tier == MotionTier.Reduced -> ExitTransition.None
+    tier != MotionTier.Gesture || kind != NavKind.BottomBar -> null
+    else -> {
+        val direction = if (swipeEdge == BackEventCompat.EDGE_RIGHT) -1 else 1
+        val linear = Easing { it }
+        val wayOut = Easing { fraction -> ((fraction - 0.9f) / 0.1f).coerceIn(0f, 1f) }
+        scaleOut(tween(PREDICTIVE_MS, easing = linear), targetScale = 0.9f) +
+            slideOutHorizontally(tween(PREDICTIVE_MS, easing = linear)) { direction * it / 20 } +
+            fadeOut(tween(PREDICTIVE_MS, easing = wayOut))
     }
 }
 
