@@ -3,6 +3,8 @@ package desktopkit.components
 import android.content.res.Resources
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.VisibilityThreshold
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -381,7 +383,7 @@ private fun PaletteFrame(
         }
         val enter = when {
             tier == MotionTier.Reduced -> fadeIn(tween(0))
-            compact -> fadeIn(tween(DeskMotion.MEDIUM_MS)) + slideInVertically(DeskMotion.gesture()) { it / 8 }
+            compact -> fadeIn(tween(DeskMotion.MEDIUM_MS)) + slideInVertically(DeskMotion.gesture(IntOffset.VisibilityThreshold)) { it / 8 }
             else -> fadeIn(tween(DeskMotion.MEDIUM_MS)) +
                 scaleIn(tween(DeskMotion.MEDIUM_MS, easing = DeskMotion.EmphasizedDecelerate), initialScale = 0.97f)
         }

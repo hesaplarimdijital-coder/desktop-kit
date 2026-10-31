@@ -258,9 +258,9 @@ fun GlassBottomSheet(
     LaunchedEffect(visible) {
         if (visible) {
             drag.snapTo(0f)
-            progress.animateTo(1f, DeskMotion.spatial(tier, tween(DeskMotion.LONG_MS, easing = DeskMotion.EmphasizedDecelerate)))
+            progress.animateTo(1f, DeskMotion.spatial(tier, tween(DeskMotion.LONG_MS, easing = DeskMotion.EmphasizedDecelerate), 0.001f))
         } else {
-            progress.animateTo(0f, DeskMotion.spatial(tier, tween(DeskMotion.MEDIUM_MS, easing = DeskMotion.EmphasizedAccelerate)))
+            progress.animateTo(0f, DeskMotion.spatial(tier, tween(DeskMotion.MEDIUM_MS, easing = DeskMotion.EmphasizedAccelerate), 0.001f))
         }
     }
     val showing = visible || progress.value > 0f || progress.isRunning
@@ -340,7 +340,7 @@ private fun SheetSurface(
     val latestDismiss by rememberUpdatedState(onDismiss)
     // pulled down on the handle, or anywhere on the sheet while its list is at the top
     val pull = remember(drag) { SheetPull(drag) }
-    val settleSpec = DeskMotion.spatial(tier, tween<Float>(DeskMotion.MEDIUM_MS, easing = DeskMotion.Emphasized))
+    val settleSpec = DeskMotion.spatial(tier, tween<Float>(DeskMotion.MEDIUM_MS, easing = DeskMotion.Emphasized), 0.5f)
     SideEffect {
         pull.scope = scope
         pull.flingPx = with(density) { 800.dp.toPx() }

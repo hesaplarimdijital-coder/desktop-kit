@@ -7,8 +7,7 @@ import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -40,6 +39,8 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
@@ -177,10 +178,10 @@ private fun <T> detailTransform(initial: T?, target: T?, animate: Boolean, tier:
     if (tier == MotionTier.Gesture && (opening || closing)) {
         // phone: the slide is the interruptible gesture spring, the fades stay short and timed
         val direction = if (opening) 1 else -1
-        return (slideInHorizontally(DeskMotion.gesture()) { direction * it / 10 } +
+        return (slideInHorizontally(DeskMotion.gesture(IntOffset.VisibilityThreshold)) { direction * it / 10 } +
             fadeIn(tween(DeskMotion.MEDIUM_MS, delayMillis = 50, easing = DeskMotion.StandardDecelerate)))
             .togetherWith(
-                slideOutHorizontally(DeskMotion.gesture()) { -direction * it / 10 } +
+                slideOutHorizontally(DeskMotion.gesture(IntOffset.VisibilityThreshold)) { -direction * it / 10 } +
                     fadeOut(tween(DeskMotion.SHORT_MS, easing = DeskMotion.StandardAccelerate)),
             )
     }
@@ -214,7 +215,7 @@ internal val LocalDetailSharedScopes = staticCompositionLocalOf<DetailSharedScop
 
 /** Bounds of a shared element move on the gesture spring on a phone, on the emphasized curve wider up. */
 private fun boundsTransform(tier: MotionTier) = BoundsTransform { _, _ ->
-    if (tier == MotionTier.Gesture) spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+    if (tier == MotionTier.Gesture) DeskMotion.gesture(Rect.VisibilityThreshold)
     else tween(DeskMotion.LONG_MS + 50, easing = DeskMotion.Emphasized)
 }
 

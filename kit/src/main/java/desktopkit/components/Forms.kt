@@ -633,7 +633,7 @@ fun DeskSwitch(
     val trackHeight = if (touch) 32.dp else 20.dp
     val inset = if (touch) 4.dp else 3.dp
     val position by animateFloatAsState(if (checked) 1f else 0f,
-        DeskMotion.spatial(tier, tween(DeskMotion.MEDIUM_MS, easing = DeskMotion.Emphasized)), label = "switchThumb")
+        DeskMotion.spatial(tier, tween(DeskMotion.MEDIUM_MS, easing = DeskMotion.Emphasized), 0.001f), label = "switchThumb")
     val pressedGrowth by animateFloatAsState(if (state.pressed && touch) 1f else 0f, DeskMotion.fastSpatial(), label = "switchPress")
     val track by animateInteractionColor(if (checked) colors.accent else colors.borderStrong, selected = checked)
     val thumb by animateInteractionColor(

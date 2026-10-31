@@ -110,10 +110,10 @@ class ExpandablePlayerState(initialValue: PlayerValue, @Suppress("unused") densi
         }
 
     /** Opens the full-screen player on a spring. */
-    suspend fun expand() = draggable.animateTo(PlayerValue.Expanded, DeskMotion.gesture())
+    suspend fun expand() = draggable.animateTo(PlayerValue.Expanded, DeskMotion.gesture(0.5f))
 
     /** Back to the mini player. */
-    suspend fun collapse() = draggable.animateTo(PlayerValue.Collapsed, DeskMotion.gesture())
+    suspend fun collapse() = draggable.animateTo(PlayerValue.Collapsed, DeskMotion.gesture(0.5f))
 
     /** Jumps to [value] without animation. */
     suspend fun snapTo(value: PlayerValue) = draggable.snapTo(value)
@@ -310,7 +310,7 @@ private fun PlayerSheet(
             scope.launch { backProgress.animateTo(0f, tween(DeskMotion.LONG_MS, easing = DeskMotion.Emphasized)) }
             collapse()
         } catch (e: CancellationException) {
-            scope.launch { backProgress.animateTo(0f, DeskMotion.gesture()) }
+            scope.launch { backProgress.animateTo(0f, DeskMotion.gesture(0.001f)) }
             throw e
         }
     }
@@ -319,7 +319,7 @@ private fun PlayerSheet(
 /** Letting go of the player: half way decides, a fling decides sooner; settles on the gesture spring. */
 @Composable
 private fun playerFlingBehavior(state: ExpandablePlayerState) =
-    AnchoredDraggableDefaults.flingBehavior(state.draggable, positionalThreshold = { distance -> distance * 0.5f }, animationSpec = DeskMotion.gesture())
+    AnchoredDraggableDefaults.flingBehavior(state.draggable, positionalThreshold = { distance -> distance * 0.5f }, animationSpec = DeskMotion.gesture(0.5f))
 
 /** What a sideways swipe on the mini player does. */
 enum class MiniSwipeAction { None, Previous, Next }
@@ -400,7 +400,7 @@ private fun MiniSwipeArea(onPrevious: (() -> Unit)?, onNext: (() -> Unit)?, cont
                             scope.launch { finishSwipe(offset, action, velocity, width, tier, rtl, latestPrevious, latestNext) }
                         },
                         onDragCancel = {
-                            scope.launch { offset.animateTo(0f, DeskMotion.spatial(tier, tween(DeskMotion.MEDIUM_MS))) }
+                            scope.launch { offset.animateTo(0f, DeskMotion.spatial(tier, tween(DeskMotion.MEDIUM_MS), 0.5f)) }
                         },
                     ) { change, amount ->
                         change.consume()
@@ -434,7 +434,7 @@ private suspend fun finishSwipe(
     onPrevious: (() -> Unit)?,
     onNext: (() -> Unit)?,
 ) {
-    val spring = DeskMotion.spatial(tier, tween<Float>(DeskMotion.MEDIUM_MS, easing = DeskMotion.Emphasized))
+    val spring = DeskMotion.spatial(tier, tween<Float>(DeskMotion.MEDIUM_MS, easing = DeskMotion.Emphasized), 0.5f)
     if (action == MiniSwipeAction.None) {
         offset.animateTo(0f, spring, initialVelocity = velocity)
         return

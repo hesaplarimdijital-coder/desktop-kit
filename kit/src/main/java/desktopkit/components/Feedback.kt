@@ -1,6 +1,8 @@
 package desktopkit.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.VisibilityThreshold
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -380,7 +382,8 @@ fun ToastHost(state: ToastState, modifier: Modifier = Modifier) {
         visible = current != null,
         modifier = modifier,
         enter = if (tier == MotionTier.Reduced) fadeIn(tween(0)) else
-            fadeIn(tween(DeskMotion.MEDIUM_MS)) + slideInVertically(DeskMotion.spatial(tier, tween(DeskMotion.LONG_MS, easing = DeskMotion.EmphasizedDecelerate))) { it / 2 },
+            fadeIn(tween(DeskMotion.MEDIUM_MS)) +
+                slideInVertically(DeskMotion.spatial(tier, tween(DeskMotion.LONG_MS, easing = DeskMotion.EmphasizedDecelerate), IntOffset.VisibilityThreshold)) { it / 2 },
         exit = if (tier == MotionTier.Reduced) fadeOut(tween(0)) else
             fadeOut(tween(DeskMotion.MEDIUM_MS, easing = DeskMotion.EmphasizedAccelerate)) + slideOutVertically(tween(DeskMotion.MEDIUM_MS)) { it / 4 },
     ) {
@@ -424,7 +427,7 @@ private fun ToastCard(toast: DeskToast) {
                         if (abs(swipe.value) > width * 0.3f || abs(velocity) > 1200f) {
                             toast.dismiss()
                         } else {
-                            swipe.animateTo(0f, DeskMotion.gesture())
+                            swipe.animateTo(0f, DeskMotion.gesture(0.5f))
                         }
                     },
                 ),

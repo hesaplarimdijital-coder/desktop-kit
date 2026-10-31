@@ -550,7 +550,7 @@ internal fun shellEnter(transitions: ShellTransitions, kind: NavKind, tier: Moti
     kind == NavKind.Sidebar -> fadeIn(tween(CROSSFADE_MS, easing = DeskMotion.Standard))
     kind == NavKind.BottomBar && tier == MotionTier.Gesture ->
         fadeIn(tween(FADE_IN_MS, delayMillis = FADE_OUT_MS, easing = DeskMotion.EmphasizedDecelerate)) +
-            scaleIn(DeskMotion.gesture(), initialScale = 0.96f)
+            scaleIn(DeskMotion.gesture(0.001f), initialScale = 0.96f)
     else -> {
         val scale = if (kind == NavKind.BottomBar) 0.96f else 0.98f
         fadeIn(tween(FADE_IN_MS, delayMillis = FADE_OUT_MS, easing = DeskMotion.EmphasizedDecelerate)) +

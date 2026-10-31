@@ -73,8 +73,16 @@ object DeskMotion {
      * The phone's spring for everything a finger moves or flings: bars, sheets, the player, screen
      * scale. No bounce, medium-low stiffness, so a new touch can catch it anywhere and a fling hands
      * over its speed.
+     *
+     * [visibilityThreshold] is where the spring counts as arrived: half a pixel for pixel values,
+     * [androidx.compose.animation.core.VisibilityThreshold] for offsets and rects, a thousandth for
+     * fractions. Without one Compose uses 0.01 in the value's own unit, and a spring that looks
+     * settled after 300 ms keeps running for another 300 ms to shave the last hundredth of a pixel:
+     * both screens of a transition stay composed, a hidden bar keeps redrawing, a fraction of a
+     * sheet's height is left to jump at the end.
      */
-    fun <T> gesture(): SpringSpec<T> = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+    fun <T> gesture(visibilityThreshold: T? = null): SpringSpec<T> =
+        spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow, visibilityThreshold = visibilityThreshold)
 
     /** The tier for a window: springs on a phone, the timed curves from tablet width up, nothing with [reduced] motion. */
     fun tier(widthClass: WidthClass, reduced: Boolean = false): MotionTier = when {
@@ -84,11 +92,12 @@ object DeskMotion {
     }
 
     /**
-     * A spatial animation (position, size, scale) for [tier]: the [gesture] spring on a phone,
-     * [timed] (the 0.2.0 curve) on wider windows, a jump to the end with reduced motion.
+     * A spatial animation (position, size, scale) for [tier]: the [gesture] spring on a phone (with
+     * [visibilityThreshold], see there), [timed] (the 0.2.0 curve) on wider windows, a jump to the
+     * end with reduced motion.
      */
-    fun <T> spatial(tier: MotionTier, timed: FiniteAnimationSpec<T>): FiniteAnimationSpec<T> = when (tier) {
-        MotionTier.Gesture -> gesture()
+    fun <T> spatial(tier: MotionTier, timed: FiniteAnimationSpec<T>, visibilityThreshold: T? = null): FiniteAnimationSpec<T> = when (tier) {
+        MotionTier.Gesture -> gesture(visibilityThreshold)
         MotionTier.Timed -> timed
         MotionTier.Reduced -> snap()
     }
