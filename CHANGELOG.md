@@ -1,5 +1,135 @@
 # Değişiklikler
 
+## 2.3.0 (2026-10-31)
+
+Galaxy S24'teki hareketlerin kare kare incelenmesi: takılan ve sıçrayan ne varsa düzeltildi, geçişler telefonun
+kendi karakterinde yeniden çizildi. 2.2.0 için yazılmış kod değişmeden derlenir. Yeni API
+(`Modifier.detailSharedCard`, `Modifier.playerSharedElement`, `rememberListAppear` ve `Modifier.listAppear`,
+`DeskMotion.open`, `DeskMotion.gesture(visibilityThreshold)`, `DeskMotion.spatial(tier, timed, visibilityThreshold)`)
+ve telefonda görünür davranış değişiklikleri yüzünden sürüm, kuralımız gereği ikinci sayıyı artırır. Tablet ve
+DeX'in süreleri ve görünümü değişmedi (ekran görüntüleri aynı). Uygulamanın fark edebileceği değişiklikler
+[MIGRATION.md](MIGRATION.md#220dan-230a) içinde. Her geçişin kare şeridi CI'ın `ci/screenshots-pr-6` dalında,
+`motion/` altında.
+
+### Telefon: düzeltmeler
+
+- **Yayların kuyruğu:** Compose bir yayı hedefe kendi biriminde 0,01 yaklaşınca durdurur; 300 ms'de yerleşmiş
+  görünen yay son pikselin yüzde birini traşlamak için 300 ms daha çalışıyordu: kapanan ayrıntı (ve
+  `CompactTopBar`'ı) yarım saniye fazla duruyor, gizlenen alt çubuk sistem bandını yeniden çiziyor ve dolgu almayan
+  ekranları her karede yeniden ölçüyor, oynatıcının kapanışı sürüyor (2.1.0'daki SHEET_OUT bunun belirtisini
+  tedavi ediyordu), alt sayfa yüksekliğinin yüzde birini sonda sıçratıyordu. `DeskMotion.gesture(visibilityThreshold)`
+  ve `spatial(tier, timed, visibilityThreshold)`: piksel değerlerinde yarım piksel (`DeskMotion.PIXEL`), konum ve
+  dikdörtgenlerde `VisibilityThreshold`, kesirlerde binde bir. Yayların sabitleri bu düzeltmede değişmedi.
+- **Oynatıcı şeridin olduğu yerden açılır:** çubuklar kaydırmayla gizliyken mini oynatıcıya dokununca çubuklar bir
+  anda geri geliyor (şerit 64 dp zıplıyordu), çapa katman kaymadan önce ölçüldüğü için sayfa eski yerden açılıyor,
+  kapanınca oraya iniyor ve şerit çubuğun üstünde beliriyordu: bir dokunuşa iki sıçrama. Çubuklar oldukları yerde
+  kalır (açılan sayfa onları örter, şerit kapanınca aynı yerdedir), çapa her basışta ölçülür (`showBars()` gitti).
+- **Fırlatılan alt sayfa:** yüksekliğin üçte birini geçince ya da fırlatınca `onDismiss` hemen çağrılıyor ve kapanış
+  parmağın bıraktığı yerden duruşla başlıyordu: fırlatmanın hemen ardında görünür bir duraklama. Sayfa parmağın
+  hızıyla yoluna devam eder, çıktıktan sonra kapatılmak ister.
+- **"Animasyonları kaldır":** azaltılmış hareket katmanı kabuğu, alt sayfayı, bildirimleri, paleti ve ilerleme
+  çubuğunu kapsıyordu, gerisini değil: menüler (KDoc'u söz vermişti), ipuçları, üst çubuğun camı, çizgisi ve
+  başlığı, gezinme hapı, basma küçülmesi, denetimlerin renk geçişleri, chip'in onay işareti, sekmenin çizgisi,
+  kapağın halkası, kaydırıcının tutamağı, anahtarın basması, oynatıcının yayları ve iki öngörülü geri iptali hareket
+  ediyordu. Hepsi `DeskMotion.fade` ya da `spatial`'dan katmanla geçer; oynatıcının durumu katmanı bileşeninden öğrenir.
+- **Üst çubuk:** camdan düz renge dönüş de bir solmadır. Yalnızca cama gidiş soluyordu; dönüşte bulanıklık düz
+  rengin geldiği karede kapanıyor, görünmez bir solmanın altında kalıyordu. Cam, sayfa rengi üstüne solup kapanıncaya
+  kadar durur.
+- **Fade-through:** sekme geçişinde yüzde 96'dan büyüme, yeni ekranın solmasıyla birlikte başlar. Büyüme 90 ms erken
+  başladığı için ekran görünür olduğunda yalnızca son yüzde iki kalıyordu; solmalar ve sıra (eski gider, yeni gelir)
+  aynı.
+- **Dolgu almayan ekranlar:** örnek uygulamanın albüm ızgarası, albüm sayfası, Dosyalar, Çalma listeleri, Çöp ve
+  Ayarlar `rememberShellContentPadding` istemediği için kabuk onları çubukların kaymasıyla yeniden ölçüyordu:
+  çubuklar kayarken (ve yayın kuyruğunda) bütün ekran, kapak ızgarası dahil, her karede. Uçlarını kendileri doldurur
+  (`rememberShellContentPadding() + PaddingValues(…)`, `shellContentPadding()`); kitin "Diğer" ekranı da. Kabuğun
+  yedek ölçümü 0.2.0 ekranları için kalır.
+
+### Telefon: hareketler
+
+- **Yaylar:** `DeskMotion.gesture()` kritik sönümlü 400'den 0,92 sönümlü 600'e: görünür sekme yok, yine her yerinden
+  yakalanır, fırlatma hızını alır, 300 ms'de yerleşir. Yeni `DeskMotion.open()`: Android'in standart uzamsal yayı
+  (0,9 sönüm, 700) dokunuşun açtığı ve kapattığı şeyler için — ayrıntı ve içine uçanlar.
+- **Ayrıntı derinlikte açılır:** ayrıntı bitiş kenarından yüzde 12 içeri kayıp hemen solarak gelir (dokunuştan
+  sonraki 50 ms'lik boşluk gitti), liste altında yüzde 95'e küçülerek solar; dönüş tersi. Yeni
+  `Modifier.detailSharedCard(key, shape)` listedeki kartı ve ayrıntının başlığını işaretler: kart başlığa büyür,
+  köşeleri düzleşir, yüzeyi sayfaya döner, başlığın içeriği kartınkinin üstünde belirir; geri dönüşte başlık kartın
+  yerine küçülür. Kapak ve başlık kartın üstünde kendi başlarına uçmayı sürdürür; kartla ayrıntı kaymaz, kartın
+  ardından solar. Tablet genişliğinden yukarı 0.2.0'ın paylaşılan ekseni kalır.
+- **Öngörülü geri:** ayrıntının geçişi `SeekableTransitionState` üzerinde. Parmak kapanışı yüzde 85'e kadar oynatır:
+  liste küçülen ayrıntının gerçekten arkasındadır ve yüzde 94'ten parmakla yükselir; ayrıntı bütün, köşeleri yuvarlak,
+  kaydırmanın geldiği kenara yaslı kalır. Bırakınca kalan yol parmağın bıraktığı yerden 220 ms'de biter: ayrıntı o
+  kenara kayıp solar, liste yükselmesini tamamlar. Vazgeçince her şey geldiği yoldan yaylanarak döner. Listenin
+  yerine duran gölge, yeni bir hareketin içine düşebilen gecikmeli sıfırlama ve küçülmüş sayfadan tam boyuta sıçrayan
+  kapak gittiler; `onBack`'ten sonra ayrıntısını tutan uygulamada hareket geri alınır. Geri düğmesi yalnızca çıkış
+  yolunu oynatır. Yolun ortasında fikir değişikliği (dokunuştan hemen sonra Geri, Geri'den hemen sonra yine dokunuş,
+  vazgeçilen hareket) geçişi yeniden hedeflemez, kesri geri oynatır: kart yolundan geri uçar (yeniden hedeflenen
+  seekable geçiş paylaşılan öğelerin eşleşmesini bir kare bırakıyor, başlık tam genişliğe sıçrayıp oradan gidiyordu).
+- **Oynatıcı tek parça:** sayfa şeridin kendisi olarak başlar — aynı cam, üstünde şeridin denetimleri. Yükselirken
+  camın üstüne sayfa rengi gelir, köşeler yolda yuvarlanıp iki uçta düzleşir, perde onunla koyulaşır, alt çubuk
+  altına itilir; şeridin denetimleri ilk çeyrekte solar, tam oynatıcınınkiler son bölümde gelir. Yeni
+  `Modifier.playerSharedElement(key, shape)`: `mini` ve `full` içeriğinde aynı anahtarla işaretlenen öğeler (kapak,
+  başlık) şeritteki yerinden tam oynatıcıdaki yerine uçar ve geri; şeridin denetimleri solunca yerleştirilmez
+  (çizilmez, dokunulmaz, TalkBack okumaz). Dokunuşun yayı 0,9 sönüm, 500 (yarım piksel eşikle). Geri hareketinin
+  küçülmesi sayfayla birlikte iner ve sayfa şeride inince ya da parmak yakalayınca bırakır; önce küçülme önce açılıp
+  sonra iniyordu.
+- **Alt sayfa:** gidiş de dönüş de tek sert yay (0,92 sönüm, 800); sayfa katmanda kaydırılmak yerine yerleştirilir
+  (`offset {}`), camı o an arkasında ne varsa onu bulanıklaştırır (Haze konumu yerleşimde okur, katmanın
+  kaydırmasını görmez).
+- **Menü açıldığı noktadan büyür:** parmağın üstüne çevrilmek zorunda kaldıysa alt köşesinden, pencere kenarından
+  içeri itildiyse parmağın altından; konum sağlayıcısı bunu açılır pencere yerleştiğinde hesaplar.
+- **Bildirim:** yana kaydırılan bildirim parmağın hızıyla yoluna devam eder ve çıktığı anda kapatılır (parmağın
+  bıraktığı yerde durup soluyordu); geri yaylanma da parmağın hızını alır.
+- **Satırlar sırayla gelir:** yeni `rememberListAppear(keys)` ve `Modifier.listAppear(appear, index)`. Liste
+  göründüğünde yerinde olan ilk sekiz satır 15 ms arayla, her biri 180 ms'de solup 12 dp yükselerek gelir; sonradan
+  gelen satırlar (kaydırılan, eklenen) olduğu gibi yerindedir. Anahtarlar listenin ne zaman yeni sayılacağını söyler:
+  iskeletten sonra gelen satırlar, yeni ayrıntının satırları sırayla gelir, ayrıntıdan dönen liste yeniden gelmez.
+- **Basma:** telefonda basma istenenin dörtte üçü derinliğinde (varsayılan 0,96 → 0,97: parmak denetimi örter,
+  küçülme görülmekten çok hissedilir), bırakınca 0,75 sönümlü 1200 yayla biraz üstüne sekip yerleşir.
+
+### Tablet ve DeX
+
+Süreler ve görünüm değişmedi; ekran görüntüleri aynı. Ayrıntı 0.2.0'ın paylaşılan ekseninde açılır, menü sol üst
+köşesinden büyür, bildirim bir anda gider, basma eskisi gibi. Yalnızca iki şey ortak: yayların eşik düzeltmesi (süreli
+eğrilerde etkisi yok) ve alt sayfanın katman yerine yerleşimle kayması, bu da sayfa kayarken camın arkasındakini
+doğru yerden bulanıklaştırması demek; süre aynı.
+
+### Örnek uygulama
+
+- Telefonda her liste cam çubukların altına uzanır ve uçlarını kendi doldurur.
+- Albümler kartla açılır (`detailSharedCard`), mini ve tam oynatıcının kapağı ve başlığı uçar
+  (`playerSharedElement`), Parçalar, Albümler (yer tutucular gidince), albüm sayfası, Çalma listeleri, Çöp ve
+  Dosyalar'ın satırları sırayla gelir.
+
+### Testler
+
+- Yeni testler: yayların eşikli süresi ve katman seçimi, azaltılmış harekette her şeyin bir anda olması, üst çubuğun
+  iki yöne de solması, çubuklar gizliyken oynatıcının şeritten açılıp oraya inmesi, fırlatılan sayfanın kendi hızıyla
+  çıkması (kare kare), kartın başlığa büyüyüp geri gelmesi ve yolun ortasında dönmesi (kare kare genişlik), geri
+  hareketinde listenin gerçekten arkada olması, kapağın şeritten tam oynatıcıya uçuşu (piksel piksel) ve şeridin
+  denetimlerinin solunca yerleştirilmemesi, bildirimin kaydırılınca yoluna devam etmesi ve genişte bir anda gitmesi,
+  menünün büyüme köşesi, satırların sırayla gelişi ve telefonun basması.
+- `MotionStripsTest`: her geçişin kare şeridi (sekme geçişi, ayrıntının açılışı, yolda dönüşü, geri hareketi ve
+  vazgeçilen hareket, oynatıcının açılışı, kapanışı ve geri hareketi, çubuklar gizliyken açılış ve kapanış, alt
+  sayfanın açılışı ve kapanışı, satırların gelişi) `kit/build/outputs/screenshots/motion` altına yazılır, CI çekme
+  isteğinin `ci/screenshots-pr-<numara>` dalına koyar.
+- Robolectric'te art arda kareler arasında boşta kalınmayınca recomposer uyur; kare kare ilerleyen testler her
+  kareden sonra `waitForIdle` çağırır.
+
+### Bu sürümde olmayan
+
+- **Vurgu rengi değişimi:** `animatePalette` paleti kompozisyonda 150 ms boyunca her karede yeniden kurar; o
+  sürede `DeskTheme.colors` okuyan her şey yeniden kompoze olur. Rengi çizim aşamasında okuyan bir yol daha büyük bir
+  yeniden yapılanma.
+- **Lookahead maliyeti:** `SharedTransitionLayout` liste ve ayrıntıyı geçiş sürerken her yerleşimde iki kez ölçer
+  (lookahead); uzun listelerde paylaşılan öğelerin bedeli bu, olduğu gibi kaldı.
+- **Dört cam yüzey:** üst çubuk, alt çubuk, mini oynatıcının şeridi ve kaplama katmanındaki sayfalar her biri
+  kendi bulanıklığını çizer; altlarında bir şey hareket ederken kare başına birkaç bulanıklık geçişi. Tek paylaşılan
+  bulanıklık ayrı bir tasarım.
+- **Tam oynatıcıda iç içe kaydırma:** `ExpandablePlayer`'ın KDoc'u tam oynatıcının kaydırılabilir içeriğinin önce
+  kayıp en üstte sayfayı çekeceğini söylüyordu; böyle bir bağlantı yok, cümle silindi. Bağlantının kendisi açık iş.
+- Hareketle gezinmede sekmeler arası öngörülü geri bu turda ele alınmadı (S24 üç düğmeli gezinmede); chip'lerin
+  genişlik değişimi animasyonsuz.
+
 ## 2.2.0 (2026-10-30)
 
 Walkman Sync 2.1.0'a geçerken bulunanlar. 2.1.0 için yazılmış kod değişmeden derlenir; yeni:
