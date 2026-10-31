@@ -420,8 +420,9 @@ internal val LocalPlayerSide = staticCompositionLocalOf { PlayerSide.Mini }
  * [key] (the cover, the title) are one: as the player opens the element flies from its place in the
  * strip to its place in the full player, scaling on the way, the strip's look giving way to the full
  * player's over the first part; on the way down it flies back. Put it first in the element's modifiers.
- * [shape] is the element's own rounded shape, kept in flight. Outside an [ExpandablePlayer]'s sheet
- * nothing flies, and with reduced motion the player jumps as a whole.
+ * [shape] is the element's own rounded shape, kept in flight. In flight the element marked first in
+ * [mini] lies on top (a title crossing the cover's path passes under it). Outside an
+ * [ExpandablePlayer]'s sheet nothing flies, and with reduced motion the player jumps as a whole.
  */
 @Composable
 fun Modifier.playerSharedElement(key: Any, shape: CornerBasedShape? = null): Modifier {
@@ -513,7 +514,8 @@ internal class PlayerFlight {
     fun draw(scope: DrawScope, progress: Float) {
         if (progress <= 0f || progress >= 1f) return
         val sheet = sheet?.takeIf { it.isAttached } ?: return
-        for (entry in entries.values) {
+        // the first element marked lies on top: a title crossing the cover's path passes under it
+        for (entry in entries.values.reversed()) {
             if (!entry.ready) continue
             val from = sheet.localBoundingBoxOf(entry.mini!!, clipBounds = false)
             val to = sheet.localBoundingBoxOf(entry.full!!, clipBounds = false)
