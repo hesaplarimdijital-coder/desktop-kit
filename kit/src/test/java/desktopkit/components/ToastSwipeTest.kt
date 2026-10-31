@@ -58,11 +58,11 @@ class ToastSwipeTest {
     fun onAPhoneASwipedToastCarriesOnBeforeItIsDismissed() {
         toast(MotionTier.Gesture)
         compose.mainClock.autoAdvance = false
-        // a quick swipe over a third of the card: committed by its speed, two thirds of the way still to go
+        // a swipe over half the card (past the third that commits it, the touch slop taken), half the way still to go
         val rest = card().getBoundsInRoot()
         val cardWidth = rest.right - rest.left
         val width = with(compose.density) { cardWidth.toPx() }
-        compose.onNodeWithText("Çöpe taşındı").performTouchInput { swipe(center, center + Offset(-width * 0.35f, 0f), durationMillis = 40) }
+        compose.onNodeWithText("Çöpe taşındı").performTouchInput { swipe(center, center + Offset(-width * 0.5f, 0f), durationMillis = 60) }
         compose.waitForIdle()
         assertNotNull("not dismissed while still on its way out", toasts.current)
         var last = card().getBoundsInRoot().left
@@ -92,7 +92,7 @@ class ToastSwipeTest {
         toast(MotionTier.Timed)
         compose.mainClock.autoAdvance = false
         val width = card().getBoundsInRoot().let { with(compose.density) { (it.right - it.left).toPx() } }
-        compose.onNodeWithText("Çöpe taşındı").performTouchInput { swipe(center, center + Offset(-width * 0.35f, 0f), durationMillis = 40) }
+        compose.onNodeWithText("Çöpe taşındı").performTouchInput { swipe(center, center + Offset(-width * 0.5f, 0f), durationMillis = 60) }
         compose.waitForIdle()
         // the dismiss lands with the next dispatch: one frame, no way out in between
         compose.mainClock.advanceTimeByFrame()
