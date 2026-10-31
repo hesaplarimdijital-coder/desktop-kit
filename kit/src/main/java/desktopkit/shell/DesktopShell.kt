@@ -1,8 +1,13 @@
 package desktopkit.shell
 
+import androidx.activity.BackEventCompat
+import androidx.compose.animation.core.Easing
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -88,11 +93,12 @@ val LocalNavKind = compositionLocalOf { NavKind.Sidebar }
  * How the shell animates switching screens.
  *
  * - [Default]: Android's fade-through between top-level screens on phones and tablets (bottom bar,
- *   rail): the old screen fades out in 90 ms, the new one fades in over 210 ms while growing from
- *   96 % (phone, on the gesture spring) or 98 % (tablet, on the emphasized curve) to full size. In the sidebar layout (large
- *   windows, DeX) a plain 150 ms cross-fade without movement, as on a desktop. Going back looks the
- *   same and, on Android 14 and later with `android:enableOnBackInvokedCallback="true"`, follows the
- *   predictive Back gesture: the transition plays along with the finger and can be cancelled.
+ *   rail): the old screen fades out in 90 ms, then the new one fades in over 210 ms while growing
+ *   from 96 % (phone) or 98 % (tablet) to full size on the emphasized curve; the two never overlap.
+ *   In the sidebar layout (large windows, DeX) a plain 150 ms cross-fade without movement, as on a
+ *   desktop. Going back looks the same and, on Android 14 and later with
+ *   `android:enableOnBackInvokedCallback="true"`, follows the predictive Back gesture: the
+ *   transition plays along with the finger and can be cancelled.
  * - [None]: no animation, e.g. for screenshot tests.
  *
  * Durations follow the system's animation scale (Developer options, "Remove animations").
@@ -306,6 +312,11 @@ private fun ShellContent(
         remember { { shellEnter(currentTransitions, currentKind, currentTier) } }
     val exit: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition =
         remember { { shellExit(currentTransitions, currentKind, currentTier) } }
+    // the predictive Back gesture between tabs (gesture navigation): the phone's own, wider up Navigation's as before
+    val predictiveEnter: AnimatedContentTransitionScope<NavBackStackEntry>.(Int) -> EnterTransition =
+        remember { { _ -> shellPredictiveEnter(currentTransitions, currentKind, currentTier) ?: NavigationPredictiveEnter } }
+    val predictiveExit: AnimatedContentTransitionScope<NavBackStackEntry>.(Int) -> ExitTransition =
+        remember { { edge -> shellPredictiveExit(currentTransitions, currentKind, currentTier, edge) ?: NavigationPredictiveExit } }
     val topBarHost = remember { CompactTopBarHost() }
     val scroll = remember { ShellScrollState() }
     val metrics = remember { ShellChromeMetrics() }
@@ -340,7 +351,6 @@ private fun ShellContent(
         if (!showBottomNav || navKind != NavKind.BottomBar) metrics.navPx = 0
         metrics.systemBottomPx = systemBottom
         overlayHost.systemBottomPx = systemBottom
-        overlayHost.onExpandStart = { scroll.showBars() }
     }
     // every screen starts with the bars shown and a flat top bar
     LaunchedEffect(currentRoute, navKind, showBottomNav) { scroll.reset() }
@@ -360,12 +370,17 @@ private fun ShellContent(
         }
     }
 
+    // on a phone one glass lies behind the player strip, the bottom bar and the system band
+    val bottomGlass = remember { ShellBottomGlass { Modifier.glass(DeskGlass.chrome(DeskTheme.colors, GlassThickness.Regular)) } }
+    val sharedGlass = if (navKind == NavKind.BottomBar) bottomGlass else null
+
     CompositionLocalProvider(
         LocalWidthClass provides widthClass,
         LocalCompactTopBarHost provides topBarHost,
         LocalGlassSource provides glassSource,
         LocalShellOverlayHost provides overlayHost,
         LocalShellContentPadding provides padding,
+        LocalShellBottomGlass provides sharedGlass,
     ) {
         ShellLayout(
             navKind = navKind,
@@ -452,6 +467,8 @@ private fun ShellContent(
                             exitTransition = exit,
                             popEnterTransition = enter,
                             popExitTransition = exit,
+                            predictivePopEnterTransition = predictiveEnter,
+                            predictivePopExitTransition = predictiveExit,
                         ) {
                             spec.items.forEach { item ->
                                 composable(item.route) {
@@ -492,6 +509,8 @@ private fun ShellContent(
             floatingMargin = floatingMargin,
             systemBottom = systemBottom,
             systemBand = { SystemBand(navKind, scroll) },
+            floatingMaxWidth = 760.dp,
+            bottomGlass = sharedGlass,
         )
 
         if (spec.moreStyle == MoreStyle.Sheet) {
@@ -516,7 +535,8 @@ private fun SystemBand(navKind: NavKind, scroll: ShellScrollState) {
         Box(
             Modifier
                 .fillMaxSize()
-                .glass(DeskGlass.chrome(colors, GlassThickness.Regular))
+                // the shell's one bottom glass lies behind the band; only without it the band has its own
+                .glass(DeskGlass.chrome(colors, GlassThickness.Regular), enabled = LocalShellBottomGlass.current == null)
                 .drawBehind {
                     val hidden = if (scroll.maxOffsetPx > 0f) (scroll.offsetPx / scroll.maxOffsetPx).coerceIn(0f, 1f) else 0f
                     if (hidden > 0f) drawRect(rule.copy(alpha = rule.alpha * hidden), size = Size(size.width, 1.dp.toPx()))
@@ -543,18 +563,50 @@ private const val CROSSFADE_MS = 150
 
 /**
  * Fade-through (Material motion) between top-level screens; desktop cross-fade in the sidebar layout.
- * On a phone the scale-in is the gesture spring; the fades stay timed.
+ * The growth starts with the fade-in, on the phone too: on the gesture spring it used to start 90 ms
+ * earlier, while the screen was still invisible, and was mostly over by the time it could be seen.
  */
 internal fun shellEnter(transitions: ShellTransitions, kind: NavKind, tier: MotionTier = MotionTier.Timed): EnterTransition = when {
     transitions == ShellTransitions.None || tier == MotionTier.Reduced -> EnterTransition.None
     kind == NavKind.Sidebar -> fadeIn(tween(CROSSFADE_MS, easing = DeskMotion.Standard))
-    kind == NavKind.BottomBar && tier == MotionTier.Gesture ->
-        fadeIn(tween(FADE_IN_MS, delayMillis = FADE_OUT_MS, easing = DeskMotion.EmphasizedDecelerate)) +
-            scaleIn(DeskMotion.gesture(), initialScale = 0.96f)
     else -> {
         val scale = if (kind == NavKind.BottomBar) 0.96f else 0.98f
         fadeIn(tween(FADE_IN_MS, delayMillis = FADE_OUT_MS, easing = DeskMotion.EmphasizedDecelerate)) +
             scaleIn(tween(FADE_IN_MS, delayMillis = FADE_OUT_MS, easing = DeskMotion.EmphasizedDecelerate), initialScale = scale)
+    }
+}
+
+/** Navigation's own predictive pop (its defaults), which wider windows keep. */
+private val NavigationPredictiveEnter: EnterTransition = fadeIn(spring(dampingRatio = 1f, stiffness = 1600f))
+private val NavigationPredictiveExit: ExitTransition = scaleOut(targetScale = 0.7f)
+
+/** How long the predictive Back gesture between tabs is seeked over on the phone (the finger's part and the way out). */
+private const val PREDICTIVE_MS = 300
+
+/**
+ * The phone's predictive Back gesture between tabs, as the detail's: the screen being left shrinks
+ * toward 90 % and leans away from the edge the swipe came from, with the finger, staying whole until
+ * the last tenth of the way; the screen it goes back to rises from 94 % and brightens behind it.
+ * Navigation seeks this with the finger, plays the rest once let go and runs it back on a cancel.
+ * Null (Navigation's own) wider up, as before; with reduced motion nothing moves.
+ */
+internal fun shellPredictiveEnter(transitions: ShellTransitions, kind: NavKind, tier: MotionTier): EnterTransition? = when {
+    transitions == ShellTransitions.None || tier == MotionTier.Reduced -> EnterTransition.None
+    tier != MotionTier.Gesture || kind != NavKind.BottomBar -> null
+    else -> scaleIn(tween(PREDICTIVE_MS, easing = DeskMotion.Standard), initialScale = 0.94f) +
+        fadeIn(tween(PREDICTIVE_MS, easing = DeskMotion.Standard))
+}
+
+internal fun shellPredictiveExit(transitions: ShellTransitions, kind: NavKind, tier: MotionTier, swipeEdge: Int): ExitTransition? = when {
+    transitions == ShellTransitions.None || tier == MotionTier.Reduced -> ExitTransition.None
+    tier != MotionTier.Gesture || kind != NavKind.BottomBar -> null
+    else -> {
+        val direction = if (swipeEdge == BackEventCompat.EDGE_RIGHT) -1 else 1
+        val linear = Easing { it }
+        val wayOut = Easing { fraction -> ((fraction - 0.9f) / 0.1f).coerceIn(0f, 1f) }
+        scaleOut(tween(PREDICTIVE_MS, easing = linear), targetScale = 0.9f) +
+            slideOutHorizontally(tween(PREDICTIVE_MS, easing = linear)) { direction * it / 20 } +
+            fadeOut(tween(PREDICTIVE_MS, easing = wayOut))
     }
 }
 

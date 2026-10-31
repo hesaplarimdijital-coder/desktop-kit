@@ -80,17 +80,23 @@ class TopBarFadeTest {
         assertTrue("the bar darkened on the way: $seen", seen.all { it >= floor })
     }
 
+    /** Both ways are fades: frames in between, not one jump (the way back used to switch in one frame). */
+    private fun assertFades(seen: List<Int>) {
+        assertTrue("the bar did not change: $seen", seen.first() != seen.last())
+        assertTrue("the bar jumped instead of fading: $seen", seen.distinct().size >= 3)
+    }
+
     @Test
     fun lightBarTurnsToGlassAndBackWithoutGrey() {
         bar(ThemeMode.Light)
-        assertNoDarkFrame(frames { scrolled = true })
-        assertNoDarkFrame(frames { scrolled = false })
+        assertNoDarkFrame(frames { scrolled = true }.also(::assertFades))
+        assertNoDarkFrame(frames { scrolled = false }.also(::assertFades))
     }
 
     @Test
     fun darkBarTurnsToGlassAndBackWithoutGrey() {
         bar(ThemeMode.Dark)
-        assertNoDarkFrame(frames { scrolled = true })
-        assertNoDarkFrame(frames { scrolled = false })
+        assertNoDarkFrame(frames { scrolled = true }.also(::assertFades))
+        assertNoDarkFrame(frames { scrolled = false }.also(::assertFades))
     }
 }

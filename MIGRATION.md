@@ -1,10 +1,10 @@
-# 2.2.0'a geçiş
+# 2.3.0'a geçiş
 
-Bu rehber kiti kullanan uygulamaları en güncel sürüme, 2.2.0'a taşımak için. 0.1.3'ten gelenler baştan
+Bu rehber kiti kullanan uygulamaları en güncel sürüme, 2.3.0'a taşımak için. 0.1.3'ten gelenler baştan
 başlar; adımlardan sonra [görünümde fark edecekleri](#013ten-gelince-görünümde-fark-edecekleriniz) ayrıca
-yazılı. 1.0.0'dan geçenler 1. adımdan sonra doğrudan [1.0'dan 2.0'a](#10dan-20a) bölümüne atlayabilir. 2.0.0
-ya da 2.1.0 kullananlar yalnızca [2.0.0'dan 2.1.0'a](#200dan-210a) ve [2.1.0'dan 2.2.0'a](#210dan-220a)
-bölümlerine bakar.
+yazılı. 1.0.0'dan geçenler 1. adımdan sonra doğrudan [1.0'dan 2.0'a](#10dan-20a) bölümüne atlayabilir. 2.0.0,
+2.1.0 ya da 2.2.0 kullananlar yalnızca [2.0.0'dan 2.1.0'a](#200dan-210a), [2.1.0'dan 2.2.0'a](#210dan-220a) ve
+[2.2.0'dan 2.3.0'a](#220dan-230a) bölümlerine bakar.
 
 Sıra şöyle: önce derleme ortamı (kitin kendisi aynı adımları `7845eb5` gönderisinde attı, örnek olarak
 oraya bakılabilir), sonra uygulamanın kendi yazdığı bileşenler kitinkilerle değiştirilir, en son yeni
@@ -12,7 +12,7 @@ oraya bakılabilir), sonra uygulamanın kendi yazdığı bileşenler kitinkilerl
 
 ## 1. Derleme ortamı
 
-| | 0.1.3 uygulamaları | 2.2.0 |
+| | 0.1.3 uygulamaları | 2.3.0 |
 | --- | --- | --- |
 | Android Gradle eklentisi (AGP) | 8.7.3 | 9.4.1 (en az 9.1.1) |
 | Gradle | 8.11.1 | 9.8.2 |
@@ -31,7 +31,7 @@ cihazlar uygulamayı kuramaz. Uygulamalar Play'de olmadığı için başka bir e
 Adımlar:
 
 1. `gradle/wrapper/gradle-wrapper.properties`: `distributionUrl=https\://services.gradle.org/distributions/gradle-9.8.2-bin.zip`
-2. `gradle/libs.versions.toml`: yukarıdaki sürümler ve `desktopKit = "2.2.0"`. En kolayı kitin kendi
+2. `gradle/libs.versions.toml`: yukarıdaki sürümler ve `desktopKit = "2.3.0"`. En kolayı kitin kendi
    `gradle/libs.versions.toml` dosyasındaki sürümleri almak.
 3. AGP 9 Kotlin'i kendisi derler (yerleşik Kotlin). Modüllerden `alias(libs.plugins.kotlin.android)`
    satırını sil, `kotlin.compose` kalsın. Kökteki `build.gradle.kts` dosyasında eklentiyi uygulamadan
@@ -264,3 +264,43 @@ Kod değişmeden derlenir; sürümü `2.2.0` yapmak yeter.
   CommandPaletteState()`) ve `dispatchKeyEvent`'teki kısayol yönlendirmesine `!palet.isOpen` koşulunu ekle
   (3. adımdaki örnek).
 - **Yeni:** `showShortcutHints()`, `DeskCard(verticalArrangement)`, `DenseTable`/`DeskGrid(clearSelectionOnBack)`.
+
+## 2.2.0'dan 2.3.0'a
+
+Kod değişmeden derlenir (2.2.0'a karşı derlenmiş kod da bağlanır); sürümü `2.3.0` yapmak yeter. Davranış
+değişikliklerinin hepsi telefonda (`WidthClass.Compact`); tablet ve DeX'te süreler ve görünüm aynı, iki tarafta ortak
+olan birkaç düzeltme (yayların eşiği, alt sayfanın yerleşimle kayması, azaltılmış harekette her şeyin bir anda olması)
+CHANGELOG'un "Tablet ve DeX" bölümünde. Ayrıntılar [CHANGELOG](CHANGELOG.md#230-2026-10-31) içinde.
+
+- **Telefonda farklı görünenler:** ayrıntı derinlikte açılır (yüzde 12 kayıp solar, liste altında küçülür) ve
+  öngörülü geri hareketinde liste gerçekten arkadadır; oynatıcı şeritten tek parça büyür; alt sayfa daha sert bir
+  yayla gelir; menü açıldığı noktadan büyür; yana kaydırılan bildirim yoluna devam eder; basma biraz daha hafif ve
+  bırakınca hafifçe seker; yaylar daha çabuk yerleşir. Hiçbiri kod istemez.
+- **Yayların eşiği:** kendi yayların `DeskMotion.gesture()` ya da `DeskMotion.spatial(tier, timed)` ile yazılıysa
+  birim eşiğini ver: piksel değerinde `DeskMotion.PIXEL`, `IntOffset`'te `IntOffset.VisibilityThreshold`,
+  dikdörtgende `Rect.VisibilityThreshold`, 0..1 kesirde `0.001f`. Vermezsen eski davranış kalır (yay yerleşmiş
+  göründükten sonra 300 ms kadar daha çalışır). Dokunuşun açtığı şeyler için `DeskMotion.open(threshold)`.
+- **Kart geçişi:** listedeki kartın ayrıntının başlığına büyümesi için ikisini de aynı anahtarla
+  `Modifier.detailSharedCard("kart-$id")` ile işaretle; kapak ve başlık `detailSharedElement`/`detailSharedBounds`
+  ile uçmayı sürdürür. Kartsız ayrıntı derinlik geçişiyle açılır, ek bir şey gerekmez. Başlığın `shape`'i kartın
+  köşesi (varsayılan `radiusCard`).
+- **Oynatıcıda uçan kapak ve başlık:** `mini` ve `full` içeriğinde aynı öğeyi aynı anahtarla
+  `Modifier.playerSharedElement("kapak", RoundedCornerShape(8.dp))` ile işaretle (öğenin değiştiricilerinde ilk
+  sırada, boyutundan önce). İşaretlenmeyen içerik eskisi gibi solar. Öğe çizildiği gibi kaydedilir (donanım tuvalinde
+  kendi grafik katmanına: Coil ya da Glide'ın donanım bitmap'i olan bir kapak da olur); açık başlayan oynatıcıda
+  (geri yüklenen durum) ilk inişte de uçar. Tam oynatıcının içeriği sayfa rengi gelmeden görünmez; şeridin denetimleri
+  yolun ilk çeyreğinde solar ve sonra yerleştirilmez (dokunulmaz, okunmaz).
+- **Satırların sırayla gelişi:** listenin olduğu yerde `val gelis = rememberListAppear(yuklendi)` al, her satıra
+  `Modifier.listAppear(gelis, index)` ver. Anahtar, satırların ne zaman geldiğini söyleyen şeydir (yüklenme bayrağı,
+  gösterilen albüm); anahtarsız yalnızca listenin ilk görünüşü sayılır. `DetailTransition` listesinde `rememberListAppear`'ı
+  `list` lambda'sının dışında al ki ayrıntıdan dönüşte satırlar yeniden gelmesin.
+- **Tam oynatıcıda kaydırılabilir içerik:** artık önce içerik kayar, en üstteyken aşağı çekmek oynatıcıyı indirir
+  (KDoc'un 2.0'dan beri söz verdiği). Bunun için kendi `NestedScrollConnection`'ını kurduysan kaldır; ikisi birden
+  aynı sürüklemeyi paylaşır.
+- **Vurgu rengi:** `LocalDeskColors` artık dinamik bir `compositionLocalOf` (türü aynı). Geçiş boyunca yalnızca rengi
+  okuyanlar yeniden kompoze olur; tema içindeki Material bileşenleri yeni renk şemasını bir anda alır.
+- **Telefonun alt camı:** `BottomNavBar` ve `ExpandablePlayer`'ın şeridi kabuğun içinde kendi camlarını çizmez,
+  kabuk hepsinin arkasına tek cam çizer. Kabuğun dışında eskisi gibi kendi camları vardır.
+- **Yeni:** `Modifier.detailSharedCard`, `Modifier.playerSharedElement`, `rememberListAppear`/`Modifier.listAppear`
+  (`ListAppear.ROWS`, `STAGGER_MS`, `DURATION_MS`), `DeskMotion.open`, `DeskMotion.PIXEL`,
+  `DeskMotion.gesture(visibilityThreshold)`, `DeskMotion.spatial(tier, timed, visibilityThreshold)`.

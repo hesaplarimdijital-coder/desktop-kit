@@ -1,6 +1,7 @@
 package desktopkit.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -37,6 +38,8 @@ import androidx.compose.ui.window.PopupPositionProvider
 import kotlinx.coroutines.delay
 import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
+import desktopkit.theme.LocalMotionTier
+import desktopkit.theme.MotionTier
 
 /**
  * Desktop tooltip: appears after the mouse rests on [content] for [delayMillis], shows the
@@ -87,8 +90,9 @@ fun TooltipArea(
                 val appear = remember { MutableTransitionState(false).apply { targetState = true } }
                 AnimatedVisibility(
                     visibleState = appear,
-                    enter = fadeIn(tween(DeskMotion.SHORT_MS, easing = DeskMotion.StandardDecelerate)) +
-                        scaleIn(tween(DeskMotion.SHORT_MS + 50, easing = DeskMotion.EmphasizedDecelerate), initialScale = 0.94f),
+                    enter = if (LocalMotionTier.current == MotionTier.Reduced) EnterTransition.None else
+                        fadeIn(tween(DeskMotion.SHORT_MS, easing = DeskMotion.StandardDecelerate)) +
+                            scaleIn(tween(DeskMotion.SHORT_MS + 50, easing = DeskMotion.EmphasizedDecelerate), initialScale = 0.94f),
                     label = "tooltip",
                 ) {
                     TooltipBubble(text, shortcut)

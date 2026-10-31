@@ -65,7 +65,7 @@ Uygulama modülünün `build.gradle.kts` dosyası:
 
 ```kotlin
 dependencies {
-    implementation("com.github.hesaplarimdijital-coder:desktop-kit:2.2.0")
+    implementation("com.github.hesaplarimdijital-coder:desktop-kit:2.3.0")
     implementation("androidx.activity:activity-compose:1.13.0")
 }
 ```
@@ -268,12 +268,19 @@ fun Sarkilar() {
 
 | Pencere | Yer değiştiren, sürüklenen | Solma, renk |
 | --- | --- | --- |
-| Telefon (`WidthClass.Compact`) | `DeskMotion.gesture()`: sekmesiz, `StiffnessMediumLow` yay; kesilebilir, fırlatma hızını alır | Kısa, süreli |
+| Telefon (`WidthClass.Compact`) | `DeskMotion.gesture()`: 0,92 sönümlü 600 yay, görünür sekmesi yok; kesilebilir, fırlatma hızını alır, 300 ms'de yerleşir. `DeskMotion.open()`: dokunuşun açtıkları için Android'in standart yayı (0,9; 700) | Kısa, süreli |
 | Tablet ve DeX | 0.2.0 süreleri: 90 ms solma, 210 ms %98→%100 büyüme, DeX'te 150 ms geçiş, 300 ms panel | Aynı |
 | "Animasyonları kaldır" | Anında | Anında |
 
-Kendi animasyonların için `DeskMotion.spatial(LocalMotionTier.current, tween(300))` (telefonda yay, genişte verilen
-süre, azaltılmış harekette atlama) ve `DeskMotion.fade(tier, tween(150))`. View kodunda
+Kendi animasyonların için `DeskMotion.spatial(LocalMotionTier.current, tween(300), eşik)` (telefonda yay, genişte
+verilen süre, azaltılmış harekette atlama) ve `DeskMotion.fade(tier, tween(150))`. Yaya birimine göre bir eşik ver
+(piksellerde `DeskMotion.PIXEL`, konumda `IntOffset.VisibilityThreshold`, kesirde `0.001f`): Compose eşiksiz yayı
+hedefin 0,01 yakınına gelince durdurur, bu da 300 ms'de yerleşmiş görünen yayı 300 ms daha çalıştırır.
+
+Telefonda bir listenin satırları sırayla gelir: `val gelis = rememberListAppear(yuklendi)` ve her satıra
+`Modifier.listAppear(gelis, index)`. Yerinde olan ilk sekiz satır 15 ms arayla solup 12 dp yükselerek gelir, sonra
+gelenler (kaydırılan, eklenen) olduğu gibi yerindedir; anahtar listenin ne zaman yeni sayılacağını söyler. Genişte
+ve azaltılmış harekette hiçbir şey oynamaz. View kodunda
 `ViewAnimators.bind(view).start(animator)`, Compose'da `rememberViewAnimators()`: ekran kapanınca ve yapılandırma
 değişince animatör durur ve son değerine atlar.
 
@@ -298,8 +305,15 @@ DesktopShell(…, bottomBar = { tur ->
 
 - Mini oynatıcı yukarı sürüklenince ya da dokununca büyür; tam oynatıcı aşağı sürüklenince küçülür. Yarı yolu
   geçmişse ya da hızlı fırlatıldıysa açılır, yoksa geri döner; yerleşme fırlatma hızını alan bir yaydır.
-- Perde, miniden tama geçiş ve alt çubuğun çekilmesi parmağı izler (`oynatici.progress`, çizimde okunur).
-- Öngörülü geri hareketi tam oynatıcıyı küçültür ve kapatır.
+- Tek parça: sayfa şeridin kendisi olarak başlar (aynı cam, üstünde şeridin denetimleri), yükselirken sayfa rengine
+  döner, köşeleri yolda yuvarlanır; şeridin denetimleri ilk çeyrekte solar, tam oynatıcınınkiler son bölümde gelir.
+  Perde ve alt çubuğun çekilmesi parmağı izler (`oynatici.progress`, çizimde okunur).
+- `mini` ve `full` içinde aynı anahtarla `Modifier.playerSharedElement("kapak", RoundedCornerShape(8.dp))` ile
+  işaretlenen öğeler (kapak, başlık) şeritteki yerinden tam oynatıcıdaki yerine uçar ve geri; değiştiricilerde ilk
+  sırada, boyuttan önce. Öğe çizildiği gibi kaydedilir (donanım bitmap'i olan bir kapak da); açık başlayan oynatıcıda
+  da ilk inişte uçar.
+- Tam oynatıcıdaki kaydırılabilir içerik (sözler, sıra) önce kayar; en üstteyken aşağı çekmek oynatıcıyı indirir.
+- Öngörülü geri hareketi tam oynatıcıyı küçültür ve kapatır; küçülme sayfayla birlikte şeride iner.
 - Mini oynatıcıyı sola kaydırmak `onNext`, sağa `onPrevious`; şerit parmağı izler, eşikte titreşir, eşiğe
   varmazsa yaylanarak geri gelir.
 
@@ -315,8 +329,10 @@ MoreButton(groups = {
 ```
 
 Telefonda cam alt sayfa, genişte menü. Klavyeyle gezilir; Esc, Geri ya da aşağı çekmek kapatır (liste en
-üstteyken listenin her yerinden). `MenuEntry.Item(checked = …)` sayfada satır sonunda bir anahtardır ve dokununca
-sayfayı kapatmadan değişir; menüde onay işaretidir. Kısayollar yalnızca fare ya da donanım klavyesi varken yazılır.
+üstteyken listenin her yerinden; telefonda fırlatılan sayfa parmağın hızıyla çıkar). Sayfa telefonda sert bir yayla
+gelir ve gider; menü telefonda açıldığı noktadan büyür (parmağın üstüne çevrildiyse alt köşesinden). `MenuEntry.Item(checked = …)`
+sayfada satır sonunda bir anahtardır ve dokununca sayfayı kapatmadan değişir; menüde onay işaretidir. Kısayollar
+yalnızca fare ya da donanım klavyesi varken yazılır.
 
 Telefonda üç sekme ve "⋯": `ShellSpec(bottomBar = listOf("muzik", "podcast", "radyo"), moreStyle = MoreStyle.Sheet)`.
 "⋯" sığmayan ekranları bölümleriyle ve `DesktopShell(moreActions = listOf(ActionGroup(…)))` eylemlerini listeler.
@@ -361,7 +377,8 @@ Başlığın yanındaki kapatma işareti klavye bağlıyken "Esc", dokunmatikte 
 
 ### Vurgu rengi
 
-Vurgu (ve camın tonu) değişince renkler 150 ms'de geçer. Çalan parçanın kapağından vurgu almak için
+Vurgu (ve camın tonu) değişince renkler 150 ms'de geçer; o karelerde yalnızca `DeskTheme.colors` okuyanlar yeniden
+kompoze olur (tema içindeki Material bileşenleri yeni rengi bir anda alır). Çalan parçanın kapağından vurgu almak için
 `DesktopKitRoot(prefs, accent = Accent.custom("Kapak", kapakRengi))`; saklanan vurgu değişmez. Duvar kâğıdının
 rengini ayarlarda sunmak için `rememberDeskPreferences(dynamicAccent = true)` (`Accent.dynamic(context)`); duvar
 kâğıdı değişince renk de değişir.
@@ -402,8 +419,16 @@ DetailTransition(
 }
 ```
 
-- Açılırken ayrıntı kısa bir yoldan kayıp belirir, liste öbür yana çekilir; kapanırken tersi.
-- Android 14+ öngörülü geri hareketinde ayrıntı parmakla küçülür ve köşeleri yuvarlanır; bırakınca kapanır.
+- Telefonda derinlik: ayrıntı bitiş kenarından yüzde 12 kayıp solarak gelir, liste altında yüzde 95'e küçülüp
+  solar; kapanırken tersi. Tablet genişliğinden yukarı paylaşılan eksen: ayrıntı kısa bir yoldan kayıp belirir,
+  liste öbür yana çekilir.
+- Telefonda kart: listedeki kart ve ayrıntının başlığı aynı anahtarla `Modifier.detailSharedCard("kart-$id")`
+  alırsa kart başlığa büyür (köşeleri düzleşir, yüzeyi sayfaya döner), ayrıntının gerisi ardından solar; geri dönüşte
+  başlık kartın yerine küçülür. Kapak ve başlık (`detailSharedElement`, `detailSharedBounds`) kartın üstünde uçar.
+- Android 14+ öngörülü geri hareketinde ayrıntı parmakla küçülür ve köşeleri yuvarlanır; telefonda liste arkasında
+  parmakla yükselir, bırakınca kalan yol parmağın bıraktığı yerden biter, vazgeçince her şey geri yaylanır, yolun
+  ortasındaki fikir değişikliği (dokunuştan hemen sonra Geri) geçişi olduğu yerden geri oynatır. Tablet genişliğinden
+  yukarı ayrıntı gölge üstünde küçülür ve bırakınca paylaşılan eksenle kapanır (2.2.0'daki gibi).
   Manifestte `<application android:enableOnBackInvokedCallback="true">` gerekir. Eski sürümlerde Geri yine kapatır.
 - Geri hareketini `DetailTransition` üstlenir (`CompactTopBar` içindeyken de); ayrıca `BackHandler` gerekmez.
 
@@ -464,15 +489,16 @@ Fare tıklamasını Compose kendisi yönetir: varsayılan olarak odaktaki öğen
 
 `DesktopShell(transitions = ShellTransitions.Default)` (varsayılan): telefonda (alt çubuklu düzen)
 ekranlar arasında fade-through: eski ekran 90 ms'de solar, yenisi 210 ms'de belirirken %96'dan tam
-boyuta yaylanarak büyür. Ray ve kenar çubuklu düzende (tablet, DeX) hareketsiz, 150 ms'lik kısa bir geçiş.
+boyuta büyür; büyüme solmayla birlikte başlar. Ray ve kenar çubuklu düzende (tablet, DeX) hareketsiz, 150 ms'lik kısa bir geçiş.
 Geri dönüş aynı biçimde. Süreler sistemin animasyon ölçeğine uyar ("Animasyonları kaldır" açıksa
 geçiş olmaz). Alt çubuk, ray ve kenar çubuğundaki seçim rengi 150 ms'de yumuşakça değişir.
 `ShellTransitions.None` geçişi kapatır (ekran görüntüsü testleri için).
 
 0.2.0 ile telefon ve tablette (alt çubuk, ray) Android'in fade-through geçişi kullanılır: eski ekran 90 ms'de
 solar, yenisi 210 ms'de %96 (telefon) ya da %98'den (tablet) büyüyerek belirir. Kenar çubuklu düzende (DeX)
-150 ms'lik sade geçiş kalır. Manifestte `android:enableOnBackInvokedCallback="true"` varsa öngörülü geri
-hareketi geçişi parmakla oynatır.
+150 ms'lik sade geçiş kalır. Manifestte `android:enableOnBackInvokedCallback="true"` varsa hareketle gezinmede
+sekmeler arası öngörülü geri parmakla oynar: telefonda sekme yüzde 90'a doğru küçülüp yaslanır, başlangıç sekmesi
+arkasında yükselir; genişte Navigation'ın kendi geçişi.
 
 ### Telefonda kaydırma ve boyutlar
 
@@ -633,9 +659,9 @@ uçarken de yuvarlak kalsın diye biçimini ver: `detailSharedElement("kapak-$id
 ## Sürüm yayınlamak
 
 1. `CHANGELOG.md` dosyasına ne değiştiğini yaz, `gradle.properties` içindeki `VERSION_NAME`'i güncelle.
-2. Önce PR'ı birleştir, sonra GitHub'da **Releases → Draft a new release** ile etiketi (`2.2.0`) `main` üzerinde
-   oluştur; ya da `git tag 2.2.0 && git push origin 2.2.0`. Etiket birleştirmeden önce açılırsa eski kodu gösterir.
-3. JitPack ilk istekte derler (`jitpack.yml`, Java 17). Uygulamada sürümü `2.2.0` yapman yeterli.
+2. Önce PR'ı birleştir, sonra GitHub'da **Releases → Draft a new release** ile etiketi (`2.3.0`) `main` üzerinde
+   oluştur; ya da `git tag 2.3.0 && git push origin 2.3.0`. Etiket birleştirmeden önce açılırsa eski kodu gösterir.
+3. JitPack ilk istekte derler (`jitpack.yml`, Java 17). Uygulamada sürümü `2.3.0` yapman yeterli.
 
 Sürüm numaraları [SemVer](https://semver.org/lang/tr/) kuralına uyar: uyumu bozan değişiklik
 ana sürümü, yeni özellik ikinci sayıyı, düzeltme üçüncüyü artırır.

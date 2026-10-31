@@ -57,6 +57,9 @@ object DeskMotion {
     /** Accent and theme colour changes (an accent taken from artwork cross-fades in this time). */
     const val COLOR_CHANGE_MS = 150
 
+    /** The visibility threshold for a spring over pixels: half a pixel (see [gesture]). */
+    const val PIXEL = 0.5f
+
     /** Colour of hover, press and selection backgrounds. */
     fun <T> color(): FiniteAnimationSpec<T> = tween(150, easing = Standard)
 
@@ -70,11 +73,31 @@ object DeskMotion {
     fun <T> effects(): FiniteAnimationSpec<T> = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 1600f)
 
     /**
-     * The phone's spring for everything a finger moves or flings: bars, sheets, the player, screen
-     * scale. No bounce, medium-low stiffness, so a new touch can catch it anywhere and a fling hands
-     * over its speed.
+     * The phone's spring for everything a finger lets go of: bars, sheets, the player, a swiped
+     * strip. All but critically damped (0.92) at 600, so a new touch can catch it anywhere, a fling
+     * hands over its speed, and it settles in about 300 ms without the long soft tail of the 0.2.0
+     * spring.
+     *
+     * [visibilityThreshold] is where the spring counts as arrived: half a pixel for pixel values,
+     * [androidx.compose.animation.core.VisibilityThreshold] for offsets and rects, a thousandth for
+     * fractions. Without one Compose uses 0.01 in the value's own unit, and a spring that looks
+     * settled after 300 ms keeps running for another 300 ms to shave the last hundredth of a pixel:
+     * both screens of a transition stay composed, a hidden bar keeps redrawing, a fraction of a
+     * sheet's height is left to jump at the end. (Without the argument this is the 2.2.0 call, so
+     * code built against 2.2.0 still links.)
      */
-    fun <T> gesture(): SpringSpec<T> = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+    @JvmOverloads
+    fun <T> gesture(visibilityThreshold: T? = null): SpringSpec<T> =
+        spring(dampingRatio = 0.92f, stiffness = 600f, visibilityThreshold = visibilityThreshold)
+
+    /**
+     * The phone's spring for what a tap opens or closes: a detail and the things flying into it, a
+     * sheet. Android's own standard spatial spring (0.9 at 700): quicker than [gesture], settled in
+     * about 250 ms, its overshoot too small to see. [visibilityThreshold] as for [gesture].
+     */
+    @JvmOverloads
+    fun <T> open(visibilityThreshold: T? = null): SpringSpec<T> =
+        spring(dampingRatio = 0.9f, stiffness = 700f, visibilityThreshold = visibilityThreshold)
 
     /** The tier for a window: springs on a phone, the timed curves from tablet width up, nothing with [reduced] motion. */
     fun tier(widthClass: WidthClass, reduced: Boolean = false): MotionTier = when {
@@ -84,23 +107,31 @@ object DeskMotion {
     }
 
     /**
-     * A spatial animation (position, size, scale) for [tier]: the [gesture] spring on a phone,
-     * [timed] (the 0.2.0 curve) on wider windows, a jump to the end with reduced motion.
+     * A spatial animation (position, size, scale) for [tier]: the [gesture] spring on a phone (with
+     * [visibilityThreshold], see there), [timed] (the 0.2.0 curve) on wider windows, a jump to the
+     * end with reduced motion. (Without the threshold this is the 2.2.0 call, so code built against
+     * 2.2.0 still links.)
      */
-    fun <T> spatial(tier: MotionTier, timed: FiniteAnimationSpec<T>): FiniteAnimationSpec<T> = when (tier) {
-        MotionTier.Gesture -> gesture()
+    @JvmOverloads
+    fun <T> spatial(tier: MotionTier, timed: FiniteAnimationSpec<T>, visibilityThreshold: T? = null): FiniteAnimationSpec<T> = when (tier) {
+        MotionTier.Gesture -> gesture(visibilityThreshold)
         MotionTier.Timed -> timed
         MotionTier.Reduced -> snap()
     }
 
-    /** A fade or colour change: [spec] in both tiers, a jump with reduced motion. */
+    /**
+     * A fade, colour change or small spring that is the same on a phone and a tablet (a press
+     * shrinking, a pill growing, a menu appearing): [spec] in both tiers, a jump with reduced motion.
+     * Compose does not read the system's animation scale itself, so every animation goes through
+     * this or [spatial] to honour "Remove animations".
+     */
     fun <T> fade(tier: MotionTier, spec: FiniteAnimationSpec<T>): FiniteAnimationSpec<T> =
         if (tier == MotionTier.Reduced) snap() else spec
 }
 
 /** How the kit moves in a window; see [DeskMotion.tier]. */
 enum class MotionTier {
-    /** Phone: interruptible, velocity-aware springs for spatial and finger-driven motion. */
+    /** Phone: interruptible, velocity-aware springs for spatial and finger-driven motion ([DeskMotion.gesture], [DeskMotion.open]). */
     Gesture,
 
     /** Tablet and DeX: the timed Material curves (90 ms fade-out, 210 ms scale-in, 150 ms cross-fade, 300 ms panels). */

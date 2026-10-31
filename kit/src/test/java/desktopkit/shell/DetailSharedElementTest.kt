@@ -6,6 +6,8 @@ import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -134,6 +136,169 @@ class DetailSharedElementTest {
         }
         assertTrue("no frame of the flight was checked", checked > 0)
         compose.mainClock.autoAdvance = true
+    }
+
+    /** A card grows into the detail's header on a phone, through sizes in between, and lands back in the list. */
+    @Test
+    fun theCardGrowsIntoTheHeaderAndBack() {
+        var detail by mutableStateOf<String?>(null)
+        compose.setContent {
+            DesktopKitTheme {
+                androidx.compose.runtime.CompositionLocalProvider(LocalMotionTier provides MotionTier.Gesture) {
+                    DetailTransition(
+                        detail = detail,
+                        onBack = { detail = null },
+                        list = {
+                            Column {
+                                Box(Modifier.detailSharedCard("card").size(160.dp).background(Color.Red).testTag("card"))
+                            }
+                        },
+                    ) {
+                        Column {
+                            Box(Modifier.detailSharedCard("card").fillMaxWidth().height(300.dp).background(Color.Blue).testTag("header"))
+                        }
+                    }
+                }
+            }
+        }
+        compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+        compose.runOnIdle { detail = "album" }
+        val widths = mutableListOf<Float>()
+        repeat(40) {
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+            if (compose.onAllNodesWithTag("header", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()) {
+                val bounds = compose.onNodeWithTag("header", useUnmergedTree = true).getBoundsInRoot()
+                widths += (bounds.right - bounds.left).value
+            }
+        }
+        assertTrue("the header passes through widths between the card's and its own: $widths", widths.any { it > 170f && it < 400f })
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        val open = compose.onNodeWithTag("header", useUnmergedTree = true).getBoundsInRoot()
+        assertTrue("the header lands at full width: ${open.right - open.left}", (open.right - open.left) >= 400.dp)
+        compose.runOnIdle { detail = null }
+        compose.waitForIdle()
+        val back = compose.onNodeWithTag("card", useUnmergedTree = true).getBoundsInRoot()
+        assertTrue("the card is back at its size: ${back.right - back.left}", (back.right - back.left) <= 161.dp && (back.right - back.left) >= 159.dp)
+    }
+
+    /** Back half way through the opening: the header turns around where it is, it never jumps to its end first. */
+    @Test
+    fun closingWhileOpeningTurnsAroundWhereItIs() {
+        var detail by mutableStateOf<String?>(null)
+        compose.setContent {
+            DesktopKitTheme {
+                androidx.compose.runtime.CompositionLocalProvider(LocalMotionTier provides MotionTier.Gesture) {
+                    DetailTransition(
+                        detail = detail,
+                        onBack = { detail = null },
+                        list = {
+                            Column {
+                                Box(Modifier.detailSharedCard("card").size(160.dp).background(Color.Red).testTag("card"))
+                            }
+                        },
+                    ) {
+                        Column {
+                            Box(Modifier.detailSharedCard("card").fillMaxWidth().height(300.dp).background(Color.Blue).testTag("header"))
+                        }
+                    }
+                }
+            }
+        }
+        compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+        compose.runOnIdle { detail = "album" }
+        // frame by frame (a run of frames without an idle in between leaves the recomposer asleep):
+        // the header appears, then it is a few frames into its growth
+        var waited = 0
+        while (compose.onAllNodesWithTag("header", useUnmergedTree = true).fetchSemanticsNodes().isEmpty()) {
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+            assertTrue("the header never appeared", ++waited < 10)
+        }
+        val before = mutableListOf<Float>()
+        repeat(4) {
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+            before += compose.onNodeWithTag("header", useUnmergedTree = true).getBoundsInRoot().let { (it.right - it.left).value }
+        }
+        assertTrue("the header is still on its way at ${before.last()} dp", before.last() < 400f)
+        compose.runOnIdle { detail = null }
+        val window = compose.activity.window.decorView
+        val bitmap = Bitmap.createBitmap(window.width, window.height, Bitmap.Config.ARGB_8888)
+        fun cardIsRed(): Boolean {
+            compose.runOnIdle { window.draw(Canvas(bitmap)) }
+            val card = compose.onNodeWithTag("card", useUnmergedTree = true).fetchSemanticsNode().boundsInWindow
+            return red(bitmap.getPixel(card.center.x.roundToInt(), card.center.y.roundToInt()))
+        }
+        val after = mutableListOf<Float>()
+        repeat(40) {
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+            val header = compose.onAllNodesWithTag("header", useUnmergedTree = true).fetchSemanticsNodes().firstOrNull()
+            if (header != null) after += (header.boundsInWindow.width / compose.density.density)
+            // once the header is back at the card's size (or standing at its own, faded out, before it leaves), the
+            // card draws itself where it is: it was left dark, waiting for an overlay that no longer drew it
+            if (header == null || after.last() < 170f || after.last() >= 400f) {
+                assertTrue("frame $it: the card is red (header ${after.lastOrNull()})", cardIsRed())
+            }
+        }
+        compose.mainClock.autoAdvance = true
+        // after the way back the detail stands at its own size, faded out, for the compositions that let its shared
+        // elements go and remove it: not drawn, not a jump
+        val gone = compose.onAllNodesWithTag("header", useUnmergedTree = true).fetchSemanticsNodes().isEmpty()
+        val tail = after.takeLastWhile { it >= 400f }
+        val drawn = after.dropLast(tail.size)
+        assertTrue("the header came back: $after", gone && drawn.isNotEmpty() && drawn.last() < 170f && tail.size <= 4)
+        val largestStep = drawn.zipWithNext { a, b -> b - a }.plus(drawn.first() - before.last()).max()
+        // the opening grows the header by 40 dp a frame at most; a jump to its full width is 250
+        assertTrue("the header jumped $largestStep dp wider in one frame on the way back (before $before, after $after)", largestStep < 60f)
+        compose.waitForIdle()
+        assertTrue("the card is red once everything has settled", cardIsRed())
+    }
+
+    /** The whole way: open, close, and the card draws itself again where it is once the detail is gone. */
+    @Test
+    fun theCardIsDrawnAgainOnceTheDetailIsGone() {
+        var detail by mutableStateOf<String?>(null)
+        compose.runOnUiThread { compose.activity.actionBar?.hide() }
+        compose.setContent {
+            DesktopKitTheme {
+                androidx.compose.runtime.CompositionLocalProvider(LocalMotionTier provides MotionTier.Gesture) {
+                    DetailTransition(
+                        detail = detail,
+                        onBack = { detail = null },
+                        list = {
+                            Column {
+                                Box(Modifier.detailSharedCard("card").size(160.dp).background(Color.Red).testTag("card"))
+                            }
+                        },
+                    ) {
+                        Column {
+                            Box(Modifier.detailSharedCard("card").fillMaxWidth().height(300.dp).background(Color.Blue).testTag("header"))
+                        }
+                    }
+                }
+            }
+        }
+        compose.waitForIdle()
+        val window = compose.activity.window.decorView
+        val bitmap = Bitmap.createBitmap(window.width, window.height, Bitmap.Config.ARGB_8888)
+        fun cardIsRed(): Boolean {
+            compose.runOnIdle { window.draw(Canvas(bitmap)) }
+            val card = compose.onNodeWithTag("card", useUnmergedTree = true).fetchSemanticsNode().boundsInWindow
+            return red(bitmap.getPixel(card.center.x.roundToInt(), card.center.y.roundToInt()))
+        }
+        assertTrue("the card is red before", cardIsRed())
+        compose.runOnIdle { detail = "album" }
+        compose.waitForIdle()
+        compose.onNodeWithTag("header", useUnmergedTree = true).assertExists()
+        compose.runOnIdle { detail = null }
+        compose.waitForIdle()
+        compose.onNodeWithTag("header", useUnmergedTree = true).assertDoesNotExist()
+        assertTrue("the card is red again once the detail is gone", cardIsRed())
     }
 
     private fun red(pixel: Int): Boolean {

@@ -1,12 +1,15 @@
 package desktopkit.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.VisibilityThreshold
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -380,7 +383,8 @@ fun ToastHost(state: ToastState, modifier: Modifier = Modifier) {
         visible = current != null,
         modifier = modifier,
         enter = if (tier == MotionTier.Reduced) fadeIn(tween(0)) else
-            fadeIn(tween(DeskMotion.MEDIUM_MS)) + slideInVertically(DeskMotion.spatial(tier, tween(DeskMotion.LONG_MS, easing = DeskMotion.EmphasizedDecelerate))) { it / 2 },
+            fadeIn(tween(DeskMotion.MEDIUM_MS)) +
+                slideInVertically(DeskMotion.spatial(tier, tween(DeskMotion.LONG_MS, easing = DeskMotion.EmphasizedDecelerate), IntOffset.VisibilityThreshold)) { it / 2 },
         exit = if (tier == MotionTier.Reduced) fadeOut(tween(0)) else
             fadeOut(tween(DeskMotion.MEDIUM_MS, easing = DeskMotion.EmphasizedAccelerate)) + slideOutVertically(tween(DeskMotion.MEDIUM_MS)) { it / 4 },
     ) {
@@ -395,6 +399,7 @@ private fun ToastCard(toast: DeskToast) {
     val touch = DeskTheme.inputMode == InputMode.Touch
     val shape = RoundedCornerShape(dimens.radiusCard)
     val scope = rememberCoroutineScope()
+    val tier = LocalMotionTier.current
     val swipe = remember(toast) { Animatable(0f) }
     var width by remember { mutableStateOf(1) }
     val glassy = DeskGlass.source != null && DeskGlass.mode != GlassMode.Solid
@@ -422,9 +427,25 @@ private fun ToastCard(toast: DeskToast) {
                     state = rememberDraggableState { delta -> scope.launch { swipe.snapTo(swipe.value + delta) } },
                     onDragStopped = { velocity ->
                         if (abs(swipe.value) > width * 0.3f || abs(velocity) > 1200f) {
-                            toast.dismiss()
+                            // on a phone the card carries on the way it was going, at the finger's speed, and is
+                            // dismissed once it is out (it used to stop and fade where the finger left it)
+                            var gone = false
+                            if (tier == MotionTier.Gesture) {
+                                val out = if (swipe.value < 0f || (swipe.value == 0f && velocity < 0f)) -width.toFloat() else width.toFloat()
+                                swipe.animateTo(out, DeskMotion.gesture(0.5f), initialVelocity = velocity) {
+                                    // faded out entirely at its own width: dismissed there, whatever the spring still does
+                                    if (!gone && abs(value) >= width - 0.5f) {
+                                        gone = true
+                                        toast.dismiss()
+                                    }
+                                }
+                            }
+                            if (!gone) toast.dismiss()
+                        } else if (tier == MotionTier.Gesture) {
+                            swipe.animateTo(0f, DeskMotion.gesture(0.5f), initialVelocity = velocity)
                         } else {
-                            swipe.animateTo(0f, DeskMotion.gesture())
+                            // the 2.2.0 spring back wider up (a jump with reduced motion)
+                            swipe.animateTo(0f, DeskMotion.fade(tier, spring(dampingRatio = 1f, stiffness = 400f)))
                         }
                     },
                 ),

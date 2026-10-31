@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -41,6 +43,8 @@ import desktopkit.components.TableColumn
 import desktopkit.components.TableSort
 import desktopkit.components.WorkstationLayout
 import desktopkit.components.rememberInspectorState
+import desktopkit.components.rememberListAppear
+import desktopkit.components.listAppear
 import desktopkit.components.rememberTableColumnsState
 import desktopkit.screens.PageHeader
 import desktopkit.settings.DeskPreferences
@@ -49,6 +53,9 @@ import desktopkit.shell.DetailTransition
 import desktopkit.shell.TopBarAction
 import desktopkit.shell.WidthClass
 import desktopkit.shell.currentWidthClass
+import desktopkit.shell.plus
+import desktopkit.shell.rememberShellContentPadding
+import desktopkit.shell.shellContentPadding
 import desktopkit.theme.DeskTheme
 import desktopkit.theme.InputMode
 
@@ -119,7 +126,9 @@ private fun FilesList(prefs: DeskPreferences, library: LibraryState, inspectorTo
         // nothing flies between the table and the details
         sharedElements = false,
         list = {
-            Column(Modifier.fillMaxSize()) {
+            // under the phone's glass bars: the header clears the top bar, the grid and the table pad their ends
+            val shell = rememberShellContentPadding()
+            Column(Modifier.fillMaxSize().padding(top = shell.calculateTopPadding())) {
                 val subtitle = if (selected.isEmpty()) "${files.size} items" else "${selected.size} of ${files.size} selected"
                 PageHeader("Files", subtitle = subtitle) {
                     DeskButton(if (selectMode) "Done" else "Select", { selectMode = !selectMode })
@@ -148,6 +157,7 @@ private fun FilesList(prefs: DeskPreferences, library: LibraryState, inspectorTo
                         toggleOnClick = selectMode,
                         onOpen = { opened = it.name },
                         openOnClick = openOnTap,
+                        bottomPadding = shell.calculateBottomPadding(),
                     )
                 } else {
                     FilesTable(
@@ -160,6 +170,7 @@ private fun FilesList(prefs: DeskPreferences, library: LibraryState, inspectorTo
                         toggleOnClick = selectMode,
                         onOpen = { opened = it.name },
                         openOnClick = openOnTap,
+                        bottomPadding = shell.calculateBottomPadding(),
                     )
                 }
             }
@@ -180,16 +191,21 @@ private fun FilesGrid(
     toggleOnClick: Boolean,
     onOpen: (SampleFile) -> Unit,
     openOnClick: Boolean,
+    bottomPadding: Dp = 0.dp,
 ) {
     val shown = files
         .filter { filter.isBlank() || it.name.contains(filter.trim(), ignoreCase = true) }
         .filter { kinds.isEmpty() || it.kind in kinds }
         .sortedBy { it.name }
+    val dimens = DeskTheme.dimens
+    // the files arrive in turn when the grid is new, or when a filter leaves a new set
+    val appear = rememberListAppear(filter, kinds)
     DeskGrid(
         items = shown,
         key = { it.name },
         onItemClick = { file, _ -> if (openOnClick) onOpen(file) },
         minCellWidth = 112.dp,
+        contentPadding = PaddingValues(horizontal = dimens.pagePadding, vertical = dimens.gapL) + PaddingValues(bottom = bottomPadding),
         selectedKeys = selectedKeys,
         onSelectionChange = onSelectionChange,
         toggleOnClick = toggleOnClick,
@@ -200,7 +216,7 @@ private fun FilesGrid(
             DeskDragPayload(DragKinds.FILE, names, if (names.size == 1) names[0] else "${names.size} files")
         },
     ) { file ->
-        CoverCell(file.name, subtitle = "${file.kind} · ${file.size}") {
+        CoverCell(file.name, modifier = Modifier.listAppear(appear, shown.indexOf(file)), subtitle = "${file.kind} · ${file.size}") {
             Box(Modifier.fillMaxSize().background(DeskTheme.colors.surface), contentAlignment = Alignment.Center) {
                 Icon(kindIcon(file.kind), contentDescription = null, tint = DeskTheme.colors.textSecondary, modifier = Modifier.size(36.dp))
             }
@@ -237,7 +253,7 @@ private fun FileDetails(file: SampleFile, onClose: () -> Unit) {
             TopBarAction(DeskIcons.Delete, "Delete", { toast("Delete") }),
         ),
     )
-    Column(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().shellContentPadding()) {
         PageHeader(file.name, subtitle = "${file.kind} · ${file.size}") {
             if (currentWidthClass() != WidthClass.Compact) DeskButton("Back", onClose, icon = DeskIcons.ArrowLeft)
         }
@@ -266,6 +282,7 @@ fun FilesTable(
     onOpen: (SampleFile) -> Unit = {},
     openOnClick: Boolean = false,
     loading: Boolean = false,
+    bottomPadding: Dp = 0.dp,
 ) {
     var selected by remember { mutableStateOf<String?>(null) }
     var sort by remember { mutableStateOf(TableSort(0, true)) }
@@ -316,6 +333,7 @@ fun FilesTable(
         },
         loading = loading,
         columnsState = if (prefs == null) null else rememberTableColumnsState("files", prefs),
+        contentPadding = PaddingValues(bottom = 8.dp + bottomPadding),
         modifier = Modifier.background(DeskTheme.colors.background),
     )
 }

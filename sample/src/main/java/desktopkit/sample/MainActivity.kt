@@ -60,6 +60,7 @@ import desktopkit.shell.NavSection
 import desktopkit.shell.ShellNavigator
 import desktopkit.shell.ShellSpec
 import desktopkit.shell.WidthClass
+import desktopkit.shell.rememberShellContentPadding
 import desktopkit.theme.Accent
 import desktopkit.theme.DeskTheme
 import kotlinx.coroutines.launch
@@ -246,7 +247,7 @@ class MainActivity : ComponentActivity() {
                         "settings" -> {
                             // the shortcut table only where there is a keyboard (or a mouse) to use it
                             val keys = showShortcutHints()
-                            LazyColumn(Modifier.fillMaxSize()) {
+                            LazyColumn(Modifier.fillMaxSize(), contentPadding = rememberShellContentPadding()) {
                                 item { PageHeader(stringResource(desktopkit.R.string.dk_settings)) }
                                 item { AppearanceSection(prefs, accentLabel = accentLabel) }
                                 item { InputSection(prefs) }

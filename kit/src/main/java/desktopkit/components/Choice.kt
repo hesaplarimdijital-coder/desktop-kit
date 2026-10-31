@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
+import desktopkit.theme.LocalMotionTier
 import desktopkit.theme.rememberDeskHaptics
 
 /** Row of mutually exclusive options (theme, density, view mode). */
@@ -60,8 +61,8 @@ fun <T> SegmentedChoice(options: List<Pair<T, String>>, selected: T, onSelect: (
             val isSelected = value == selected
             val shape = RoundedCornerShape(dimens.radiusControl)
             val background by animatedStateBackground(state, isSelected)
-            val labelColor by animateColorAsState(if (isSelected) colors.onSelection else colors.textSecondary, DeskMotion.color(),
-                label = "segmentLabel")
+            val labelColor by animateColorAsState(if (isSelected) colors.onSelection else colors.textSecondary,
+                DeskMotion.fade(LocalMotionTier.current, DeskMotion.color()), label = "segmentLabel")
             Box(
                 modifier = Modifier
                     .heightIn(min = dimens.minTarget.coerceAtLeast(dimens.controlHeight))

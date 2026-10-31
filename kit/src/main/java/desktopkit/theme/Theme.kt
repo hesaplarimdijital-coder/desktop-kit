@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,7 +23,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.lerp
 
-val LocalDeskColors = staticCompositionLocalOf { DeskPalette.dark(Accent.Blue) }
+/**
+ * The colour tokens. Dynamic, not static: an accent or theme change cross-fades over 150 ms, and a
+ * static local recomposed everything under the theme on each of those frames (a static change
+ * turns skipping off for the whole subtree); a dynamic one recomposes only what reads the colours.
+ */
+val LocalDeskColors = compositionLocalOf { DeskPalette.dark(Accent.Blue) }
 val LocalDeskType = staticCompositionLocalOf { DeskType.Pointer }
 val LocalDeskDimens = staticCompositionLocalOf { DeskDimens.Pointer }
 val LocalInputMode = staticCompositionLocalOf { InputMode.Pointer }
@@ -52,8 +58,9 @@ object DeskTheme {
  *   pointer only: `{ mode, fonts -> DeskType.forMode(mode, fonts, pointerStep = 1f) }`.
  *
  * A new accent (one taken from the playing track's artwork, say) or theme cross-fades over
- * [colorChangeMillis] (150 ms); glass tints follow, since they are made from these colours. With
- * reduced motion, or 0, colours switch at once.
+ * [colorChangeMillis] (150 ms); glass tints follow, since they are made from these colours. Only
+ * what reads [DeskTheme.colors] recomposes on those frames; Material components inside take the new
+ * colour scheme at once. With reduced motion, or 0, colours switch at once.
  */
 @Composable
 fun DesktopKitTheme(
@@ -73,17 +80,21 @@ fun DesktopKitTheme(
     val palette = animatePalette(target, if (reduced) 0 else colorChangeMillis)
     val styles = remember(inputMode, fonts, type) { type(inputMode, fonts) }
     val sizes = dimens(DeskDimens.forMode(inputMode))
-    val scheme = remember(palette) { palette.toMaterialScheme() }
-    val selection = remember(palette) {
-        TextSelectionColors(handleColor = palette.accent, backgroundColor = palette.accent.copy(alpha = 0.35f))
+    // Material's colour scheme (and the text selection colours) take the new palette at once: Material
+    // provides its scheme through a static local, and a new scheme on each frame of the cross-fade
+    // recomposed everything under the theme. The kit's own components fade with DeskTheme.colors.
+    val scheme = remember(target) { target.toMaterialScheme() }
+    val selection = remember(target) {
+        TextSelectionColors(handleColor = target.accent, backgroundColor = target.accent.copy(alpha = 0.35f))
     }
+    val typography = remember(styles) { styles.toMaterialTypography() }
     CompositionLocalProvider(
         LocalDeskColors provides palette,
         LocalDeskType provides styles,
         LocalDeskDimens provides sizes,
         LocalInputMode provides inputMode,
     ) {
-        MaterialTheme(colorScheme = scheme, typography = styles.toMaterialTypography()) {
+        MaterialTheme(colorScheme = scheme, typography = typography) {
             CompositionLocalProvider(
                 LocalContentColor provides palette.text,
                 LocalTextSelectionColors provides selection,

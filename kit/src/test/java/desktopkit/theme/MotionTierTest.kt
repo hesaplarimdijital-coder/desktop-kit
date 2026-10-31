@@ -2,9 +2,10 @@ package desktopkit.theme
 
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.SnapSpec
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.SpringSpec
+import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.tween
 import desktopkit.shell.NavKind
 import desktopkit.shell.ShellScrollState
@@ -40,10 +41,30 @@ class MotionTierTest {
         val spring = DeskMotion.spatial(MotionTier.Gesture, timed)
         assertTrue(spring is SpringSpec<*>)
         spring as SpringSpec<Float>
-        assertEquals(Spring.StiffnessMediumLow, spring.stiffness)
-        assertEquals(Spring.DampingRatioNoBouncy, spring.dampingRatio)
+        assertEquals(600f, spring.stiffness)
+        assertEquals(0.92f, spring.dampingRatio)
+        val open = DeskMotion.open<Float>()
+        assertEquals(700f, open.stiffness)
+        assertEquals(0.9f, open.dampingRatio)
         assertSame(timed, DeskMotion.spatial(MotionTier.Timed, timed))
         assertTrue(DeskMotion.spatial(MotionTier.Reduced, timed) is SnapSpec<*>)
+    }
+
+    /**
+     * The gesture spring arrives in time with a threshold for its unit: without one Compose's 0.01
+     * keeps a bar that looks settled after 300 ms "running" for half a second more.
+     */
+    @Test
+    fun gestureSpringArrivesInTimeWithAThreshold() {
+        val travel = 170f // px: a hidden 64 dp bottom bar on the S24
+        fun millis(spec: SpringSpec<Float>): Long =
+            spec.vectorize(Float.VectorConverter).getDurationNanos(AnimationVector1D(0f), AnimationVector1D(travel), AnimationVector1D(0f)) / 1_000_000
+        val bare = millis(DeskMotion.gesture())
+        val pixels = millis(DeskMotion.gesture(0.5f))
+        assertTrue("without a threshold the spring runs $bare ms", bare > 400)
+        assertTrue("with half a pixel it is done in $pixels ms", pixels < 350)
+        assertTrue(DeskMotion.spatial(MotionTier.Gesture, tween(300), 0.5f) is SpringSpec<*>)
+        assertEquals(0.5f, (DeskMotion.spatial(MotionTier.Gesture, tween(300), 0.5f) as SpringSpec<Float>).visibilityThreshold)
     }
 
     @Test

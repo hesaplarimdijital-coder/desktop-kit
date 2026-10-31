@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -36,6 +37,8 @@ import desktopkit.components.MenuEntry
 import desktopkit.components.MoreButton
 import desktopkit.components.StatusBanner
 import desktopkit.components.dropZone
+import desktopkit.components.listAppear
+import desktopkit.components.rememberListAppear
 import desktopkit.screens.PageHeader
 import desktopkit.shell.CompactTopBar
 import desktopkit.shell.DetailTransition
@@ -43,8 +46,11 @@ import desktopkit.shell.TopBarAction
 import desktopkit.shell.WidthClass
 import desktopkit.shell.currentWidthClass
 import desktopkit.shell.detailSharedBounds
+import desktopkit.shell.detailSharedCard
 import desktopkit.shell.detailSharedElement
 import desktopkit.shell.rememberShellContentPadding
+import desktopkit.shell.plus
+import desktopkit.shell.shellContentPadding
 import desktopkit.theme.DeskTheme
 import desktopkit.theme.InputMode
 import kotlinx.coroutines.delay
@@ -58,7 +64,8 @@ fun songsIn(payload: DeskDragPayload): Int = when (payload.kind) {
 /**
  * The cover grid (K5): click opens an album, Ctrl/Shift+click and Shift+arrows select, right click
  * or "⋯" opens its menu. Covers can be dragged with a mouse onto "Playlists" in the sidebar (K6).
- * Opening an album flies its cover and title into the album's page (M3).
+ * Opening an album flies its cover and title into the album's page (M3); on a phone the whole card
+ * grows into the page's header on the way.
  */
 @Composable
 fun AlbumsScreen(opened: String?, onOpen: (String?) -> Unit, onPlay: (Int) -> Unit) {
@@ -69,18 +76,25 @@ fun AlbumsScreen(opened: String?, onOpen: (String?) -> Unit, onPlay: (Int) -> Un
         delay(900)
         loading = false
     }
+    // the covers arrive in turn once the placeholders go (not again on the way back from an album)
+    val appear = rememberListAppear(loading)
     DetailTransition(
         detail = albums.firstOrNull { it.id == opened },
         onBack = { onOpen(null) },
         detailKey = { it.id },
         list = {
-            Column(Modifier.fillMaxSize()) {
+            // laid out under the phone's glass bars: the header clears the top bar, the grid's last row the bottom ones
+            val shell = rememberShellContentPadding()
+            val dimens = DeskTheme.dimens
+            Column(Modifier.fillMaxSize().padding(top = shell.calculateTopPadding())) {
                 val subtitle = if (selected.isEmpty()) "${albums.size} albums" else "${selected.size} of ${albums.size} selected"
                 PageHeader("Albums", subtitle = subtitle)
                 DeskGrid(
                     items = if (loading) emptyList() else albums,
                     key = { it.id },
                     onItemClick = { album, _ -> onOpen(album.id) },
+                    contentPadding = PaddingValues(horizontal = dimens.pagePadding, vertical = dimens.gapL) +
+                        PaddingValues(bottom = shell.calculateBottomPadding()),
                     selectedKeys = selected,
                     onSelectionChange = { selected = it },
                     itemMenu = { album, _ ->
@@ -98,6 +112,7 @@ fun AlbumsScreen(opened: String?, onOpen: (String?) -> Unit, onPlay: (Int) -> Un
                 ) { album ->
                     CoverCell(
                         album.title,
+                        modifier = Modifier.listAppear(appear, albums.indexOf(album)).detailSharedCard("card-${album.id}"),
                         subtitle = "${album.artist} · ${album.year}",
                         onPlay = { onPlay(albums.indexOf(album) % tracks.size) },
                         playLabel = "Play ${album.title}",
@@ -117,12 +132,14 @@ fun AlbumsScreen(opened: String?, onOpen: (String?) -> Unit, onPlay: (Int) -> Un
 @Composable
 private fun AlbumPage(album: Album, onBack: () -> Unit, onPlay: (Int) -> Unit) {
     val compact = currentWidthClass() == WidthClass.Compact
+    // the songs arrive in turn under the header the card grows into
+    val appear = rememberListAppear(album.id)
     CompactTopBar(
         title = album.title,
         onBack = onBack,
         actions = listOf(TopBarAction(DeskIcons.Play, "Play", { onPlay(0) }, primary = true)),
     )
-    LazyColumn(Modifier.fillMaxSize()) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = rememberShellContentPadding()) {
         item {
             val cover = @Composable { size: androidx.compose.ui.unit.Dp ->
                 Box(Modifier.detailSharedElement("cover-${album.id}", shape = RoundedCornerShape(12.dp)).size(size).background(album.artwork))
@@ -142,7 +159,11 @@ private fun AlbumPage(album: Album, onBack: () -> Unit, onPlay: (Int) -> Unit) {
                 }
             }
             if (compact) {
-                Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                // the header the card opens into
+                Column(
+                    Modifier.detailSharedCard("card-${album.id}").fillMaxWidth().padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
                     cover(232.dp)
                     Spacer(Modifier.height(16.dp))
                     about()
@@ -158,6 +179,7 @@ private fun AlbumPage(album: Album, onBack: () -> Unit, onPlay: (Int) -> Unit) {
         itemsIndexed(album.songs) { i, song ->
             DeskListRow(
                 title = "${i + 1}. ${song.title}",
+                modifier = Modifier.listAppear(appear, i),
                 subtitle = song.artist,
                 trailing = song.length,
                 onClick = { onPlay(tracks.indexOfFirst { it.title == song.title }.coerceAtLeast(0)) },
@@ -175,11 +197,13 @@ private fun AlbumPage(album: Album, onBack: () -> Unit, onPlay: (Int) -> Unit) {
 @Composable
 fun TracksScreen(playing: Int, onPlay: (Int) -> Unit) {
     val padding = rememberShellContentPadding()
+    val appear = rememberListAppear()
     LazyColumn(Modifier.fillMaxSize(), contentPadding = padding) {
         item { PageHeader("Tracks", subtitle = "${tracks.size * 8} tracks") }
         itemsIndexed(List(tracks.size * 8) { tracks[it % tracks.size] }) { i, track ->
             DeskListRow(
                 title = track.title,
+                modifier = Modifier.listAppear(appear, i),
                 subtitle = track.artist,
                 selected = i % tracks.size == playing,
                 leadingContent = { Box(Modifier.size(40.dp).background(track.artwork, RoundedCornerShape(6.dp))) },
@@ -199,13 +223,14 @@ fun TracksScreen(playing: Int, onPlay: (Int) -> Unit) {
 @Composable
 fun PlaylistsScreen(library: LibraryState, onPlay: (Int) -> Unit) {
     var opened by rememberSaveable { mutableStateOf<String?>(null) }
+    val appear = rememberListAppear()
     DetailTransition(
         detail = library.playlists.firstOrNull { it.name == opened },
         onBack = { opened = null },
         detailKey = { it.name },
         sharedElements = false,
         list = {
-            Column(Modifier.fillMaxSize()) {
+            Column(Modifier.fillMaxSize().shellContentPadding()) {
                 PageHeader("Playlists", subtitle = "${library.playlists.size} playlists")
                 if (DeskTheme.inputMode == InputMode.Pointer) {
                     StatusBanner(
@@ -220,7 +245,7 @@ fun PlaylistsScreen(library: LibraryState, onPlay: (Int) -> Unit) {
                         subtitle = "${playlist.count} songs",
                         leading = DeskIcons.Queue,
                         onClick = { opened = playlist.name },
-                        modifier = Modifier.dropZone(
+                        modifier = Modifier.listAppear(appear, index).dropZone(
                             setOf(DragKinds.ALBUM, DragKinds.TRACK),
                             onDrop = { payload ->
                                 library.addToPlaylist(index, songsIn(payload))
@@ -239,6 +264,7 @@ fun PlaylistsScreen(library: LibraryState, onPlay: (Int) -> Unit) {
 /** A playlist's songs (the sample's tracks over and over, as many as the playlist holds). */
 @Composable
 private fun PlaylistPage(playlist: Playlist, onBack: () -> Unit, onPlay: (Int) -> Unit) {
+    val appear = rememberListAppear(playlist.name)
     CompactTopBar(
         title = playlist.name,
         onBack = onBack,
@@ -254,6 +280,7 @@ private fun PlaylistPage(playlist: Playlist, onBack: () -> Unit, onPlay: (Int) -
         itemsIndexed(List(playlist.count) { tracks[it % tracks.size] }) { i, track ->
             DeskListRow(
                 title = track.title,
+                modifier = Modifier.listAppear(appear, i),
                 subtitle = track.artist,
                 leadingContent = { Box(Modifier.size(40.dp).background(track.artwork, RoundedCornerShape(6.dp))) },
                 trailing = track.length,
@@ -266,7 +293,8 @@ private fun PlaylistPage(playlist: Playlist, onBack: () -> Unit, onPlay: (Int) -
 /** Files dropped on "Bin" in the sidebar (the hint shows with a mouse), with a way back. */
 @Composable
 fun BinScreen(library: LibraryState) {
-    Column(Modifier.fillMaxSize()) {
+    val appear = rememberListAppear()
+    Column(Modifier.fillMaxSize().shellContentPadding()) {
         PageHeader("Bin", subtitle = if (library.binned.isEmpty()) "Empty" else "${library.binned.size} files") {
             if (library.binned.isNotEmpty()) DeskButton("Restore all", { library.binned.clear() }, icon = DeskIcons.Undo)
         }
@@ -277,9 +305,10 @@ fun BinScreen(library: LibraryState) {
                 Modifier.padding(horizontal = DeskTheme.dimens.pagePadding),
             )
         }
-        library.binned.toList().forEach { name ->
+        library.binned.toList().forEachIndexed { index, name ->
             DeskListRow(
                 title = name,
+                modifier = Modifier.listAppear(appear, index),
                 leading = DeskIcons.Delete,
                 trailingContent = { DeskButton("Restore", { library.binned.remove(name) }) },
             )

@@ -168,9 +168,6 @@ internal class ShellOverlayHost {
     /** 0 collapsed … 1 expanded; the shell slides the bottom bar away with it. Read while drawing. */
     var expandProgress: () -> Float by mutableStateOf({ 0f })
 
-    /** Called when the player starts to expand: the shell brings the bars back first. */
-    var onExpandStart: () -> Unit = {}
-
     /**
      * Height of the system navigation bar the overlay reaches behind (px, read while measuring):
      * sheets and the expanded player keep their controls above it.

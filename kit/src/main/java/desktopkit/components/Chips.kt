@@ -2,6 +2,8 @@ package desktopkit.components
 
 import desktopkit.theme.rememberDeskHaptics
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
@@ -34,6 +36,9 @@ import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,6 +59,8 @@ import desktopkit.shell.currentWidthClass
 import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
 import desktopkit.theme.InputMode
+import desktopkit.theme.LocalMotionTier
+import desktopkit.theme.MotionTier
 
 /**
  * A filter chip: a pill with a label, an optional icon and an optional count ("12"). Selected, it
@@ -77,9 +84,10 @@ fun DeskChip(
     val haptics = rememberDeskHaptics()
     val shape = RoundedCornerShape(50)
     val iconSize = if (touch) 18.dp else 14.dp
+    val tier = LocalMotionTier.current
     val background by animatedStateBackground(state, selected, rest = colors.surface)
-    val border by animateColorAsState(if (selected) colors.selection else colors.borderStrong, DeskMotion.color(), label = "chipBorder")
-    val content by animateColorAsState(if (selected) colors.onSelection else colors.textSecondary, DeskMotion.color(), label = "chipText")
+    val border by animateColorAsState(if (selected) colors.selection else colors.borderStrong, DeskMotion.fade(tier, DeskMotion.color()), label = "chipBorder")
+    val content by animateColorAsState(if (selected) colors.onSelection else colors.textSecondary, DeskMotion.fade(tier, DeskMotion.color()), label = "chipText")
     Row(
         modifier = modifier
             .then(if (touch) Modifier.minimumInteractiveComponentSize() else Modifier)
@@ -105,19 +113,38 @@ fun DeskChip(
             .padding(start = if (touch) 12.dp else 10.dp, end = if (touch) 14.dp else 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AnimatedVisibility(
+        if (icon != null && tier == MotionTier.Gesture) {
+            // phone: the check mark takes the icon's place, cross-fading in the same slot, so the chip keeps
+            // its width (the icon went at once while the check grew: the label jumped left, then right)
+            val check by animateFloatAsState(if (selected) 1f else 0f, tween(DeskMotion.MEDIUM_MS, easing = DeskMotion.Standard), label = "chipCheck")
+            Box(contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(iconSize).graphicsLayer {
+                    alpha = 1f - check
+                    scaleX = 1f - 0.4f * check
+                    scaleY = 1f - 0.4f * check
+                })
+                Icon(DeskIcons.Check, contentDescription = null, tint = content, modifier = Modifier.size(iconSize).graphicsLayer {
+                    alpha = check
+                    scaleX = 0.6f + 0.4f * check
+                    scaleY = 0.6f + 0.4f * check
+                })
+            }
+            Spacer(Modifier.width(6.dp))
+        } else AnimatedVisibility(
             visible = selected,
-            enter = expandHorizontally(tween(DeskMotion.MEDIUM_MS, easing = DeskMotion.EmphasizedDecelerate)) +
-                fadeIn(tween(DeskMotion.MEDIUM_MS)),
-            exit = shrinkHorizontally(tween(DeskMotion.SHORT_MS + 50, easing = DeskMotion.EmphasizedAccelerate)) +
-                fadeOut(tween(DeskMotion.SHORT_MS)),
+            enter = if (tier == MotionTier.Reduced) EnterTransition.None else
+                expandHorizontally(tween(DeskMotion.MEDIUM_MS, easing = DeskMotion.EmphasizedDecelerate)) +
+                    fadeIn(tween(DeskMotion.MEDIUM_MS)),
+            exit = if (tier == MotionTier.Reduced) ExitTransition.None else
+                shrinkHorizontally(tween(DeskMotion.SHORT_MS + 50, easing = DeskMotion.EmphasizedAccelerate)) +
+                    fadeOut(tween(DeskMotion.SHORT_MS)),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(DeskIcons.Check, contentDescription = null, tint = content, modifier = Modifier.size(iconSize))
                 Spacer(Modifier.width(6.dp))
             }
         }
-        if (icon != null && !selected) {
+        if (icon != null && !selected && tier != MotionTier.Gesture) {
             Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(iconSize))
             Spacer(Modifier.width(6.dp))
         }

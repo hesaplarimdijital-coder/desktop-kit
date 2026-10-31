@@ -66,16 +66,19 @@ class BackAndRestoreTest {
             dispatcher.dispatchOnBackProgressed(back(0.5f))
         }
         compose.waitForIdle()
-        // half way: the detail has shrunk toward 90 % (95 % now) and leans toward the edge the swipe came from
+        // half way: the detail has shrunk toward 90 % (95 % now) and leans away from the edge the swipe came from
         val half = compose.onNodeWithTag("detail").getBoundsInRoot()
         val ratio = (half.right - half.left) / (full.right - full.left)
         assertTrue("width at half way: $ratio of full", abs(ratio - 0.95f) < 0.01f)
-        // the swipe was abandoned: back to full size, still open
+        // and the list is really there behind it
+        compose.onNodeWithText("Liste").assertExists()
+        // the swipe was abandoned: back to full size, still open, the list gone again
         compose.runOnUiThread { dispatcher.dispatchOnBackCancelled() }
         compose.waitForIdle()
         val restored = compose.onNodeWithTag("detail").getBoundsInRoot()
         assertEquals(full.right - full.left, restored.right - restored.left)
         assertEquals("album", detail)
+        compose.onNodeWithText("Liste").assertDoesNotExist()
         // a whole gesture closes it
         compose.runOnUiThread {
             dispatcher.dispatchOnBackStarted(back(0f))

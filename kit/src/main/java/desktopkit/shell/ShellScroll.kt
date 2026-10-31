@@ -75,18 +75,13 @@ internal class ShellScrollState {
         val target = settleTarget(start, maxOffsetPx) ?: return
         when (tier) {
             MotionTier.Reduced -> offsetPx = target
-            MotionTier.Gesture -> animate(start, target, initialVelocity = velocity, animationSpec = DeskMotion.gesture()) { value, _ ->
+            MotionTier.Gesture -> animate(start, target, initialVelocity = velocity, animationSpec = DeskMotion.gesture(0.5f)) { value, _ ->
                 offsetPx = value.coerceIn(0f, maxOffsetPx)
             }
             MotionTier.Timed -> animate(start, target, animationSpec = tween(DeskMotion.MEDIUM_MS + 50, easing = DeskMotion.Emphasized)) { value, _ ->
                 offsetPx = value
             }
         }
-    }
-
-    /** Brings the bottom chrome back at once (an expanding player starts from it). */
-    fun showBars() {
-        offsetPx = 0f
     }
 
     /** A new screen starts with the chrome shown and the top bar flat. */

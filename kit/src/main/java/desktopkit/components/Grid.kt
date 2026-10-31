@@ -81,6 +81,7 @@ import desktopkit.shell.LocalSharedElementShape
 import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
 import desktopkit.theme.InputMode
+import desktopkit.theme.LocalMotionTier
 import kotlin.math.roundToInt
 
 /**
@@ -366,8 +367,9 @@ fun GridCellScope.CoverCell(
     val pointer = DeskTheme.inputMode == InputMode.Pointer
     val radius = dimens.radiusCard
     val ring = selected || focused || (hovered && pointer)
-    val ringAlpha by animateFloatAsState(if (ring) 1f else 0f, tween(DeskMotion.SHORT_MS), label = "coverRing")
-    val overlay by animateFloatAsState(if (hovered && pointer) 1f else 0f, tween(DeskMotion.SHORT_MS), label = "coverOverlay")
+    val tier = LocalMotionTier.current
+    val ringAlpha by animateFloatAsState(if (ring) 1f else 0f, DeskMotion.fade(tier, tween(DeskMotion.SHORT_MS)), label = "coverRing")
+    val overlay by animateFloatAsState(if (hovered && pointer) 1f else 0f, DeskMotion.fade(tier, tween(DeskMotion.SHORT_MS)), label = "coverOverlay")
     val play = playLabel ?: stringResource(R.string.dk_play)
     val cellActions = LocalCellActions.current
     if (onPlay != null && cellActions != null) {

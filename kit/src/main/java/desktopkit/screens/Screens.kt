@@ -42,6 +42,8 @@ import desktopkit.components.stateBackground
 import desktopkit.shell.LocalNavKind
 import desktopkit.shell.NavItem
 import desktopkit.shell.NavKind
+import desktopkit.shell.plus
+import desktopkit.shell.rememberShellContentPadding
 import desktopkit.theme.DeskTheme
 
 /**
@@ -141,11 +143,11 @@ fun MessageScreen(
     }
 }
 
-/** The "More" screen: every item that the current navigation chrome does not show. */
+/** The "More" screen: every item that the current navigation chrome does not show; on a phone its list lies under the glass bars. */
 @Composable
 fun OverflowScreen(entries: List<NavItem>, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
     val dimens = DeskTheme.dimens
-    LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = dimens.gapS)) {
+    LazyColumn(modifier.fillMaxSize(), contentPadding = rememberShellContentPadding() + PaddingValues(vertical = dimens.gapS)) {
         items(entries, key = { it.route }) { item -> ItemRow(item) { onSelect(item.route) } }
     }
 }

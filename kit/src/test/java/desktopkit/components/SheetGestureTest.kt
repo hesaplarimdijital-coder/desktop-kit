@@ -16,6 +16,7 @@ import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
@@ -69,6 +70,44 @@ class SheetGestureTest {
         compose.onNodeWithTag("row1").performTouchInput { swipe(center, center + Offset(0f, 700f), durationMillis = 250) }
         compose.waitForIdle()
         assertEquals(1, dismissed)
+    }
+
+    /** A fling carries the sheet out at its own speed, frame by frame; the dismiss comes once it is gone. */
+    @Test
+    fun aFlingCarriesTheSheetOutBeforeItIsDismissed() {
+        sheet()
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithTag("row1").performTouchInput { swipe(center, center + Offset(0f, 150f), durationMillis = 60) }
+        compose.waitForIdle()
+        assertEquals("not dismissed while still on its way out", 0, dismissed)
+        var last = compose.onNodeWithTag("row1").getBoundsInRoot().top
+        val surface = SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Paylaş")
+        val windowBottom = compose.onRoot().getBoundsInRoot().bottom
+        var frames = 0
+        var moved = 0
+        var still = 0
+        while (dismissed == 0 && frames < 90) {
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+            frames++
+            if (dismissed == 0) {
+                val top = compose.onNodeWithTag("row1").getBoundsInRoot().top
+                assertTrue("frame $frames: the sheet came back up ($last → $top)", top >= last)
+                // the animation's first frame is its starting point; after that no pause of two frames while the
+                // sheet is in view (out of view the spring's last fraction of a pixel may not move the placement)
+                if (top > last) {
+                    moved++
+                    still = 0
+                } else if (compose.onNode(surface).getBoundsInRoot().top < windowBottom) {
+                    still++
+                    assertTrue("frame $frames: the sheet stood still at $top", still <= 1)
+                }
+                last = top
+            }
+        }
+        compose.mainClock.autoAdvance = true
+        assertEquals(1, dismissed)
+        assertTrue("the sheet moved on its own after the finger lifted ($moved frames)", moved >= 3)
     }
 
     @Test

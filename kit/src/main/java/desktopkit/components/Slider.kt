@@ -45,6 +45,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
+import desktopkit.theme.LocalMotionTier
 
 /**
  * Horizontal slider for 0..1 values (seek bar, volume, equaliser bands).
@@ -146,7 +147,8 @@ fun DeskSlider(
             },
         contentAlignment = Alignment.CenterStart,
     ) {
-        val trackHeight by animateDpAsState(if (emphasised) 5.dp else 3.dp, DeskMotion.fastSpatial(), label = "trackHeight")
+        val tier = LocalMotionTier.current
+        val trackHeight by animateDpAsState(if (emphasised) 5.dp else 3.dp, DeskMotion.fade(tier, DeskMotion.fastSpatial()), label = "trackHeight")
         // the thumb grows in on hover, focus or touch and swells a little while dragged
         val thumbScale by animateFloatAsState(
             when {
@@ -154,7 +156,7 @@ fun DeskSlider(
                 dragging -> 1.25f
                 else -> 1f
             },
-            DeskMotion.fastSpatial(),
+            DeskMotion.fade(tier, DeskMotion.fastSpatial()),
             label = "thumbScale",
         )
         val thumb = 12.dp
