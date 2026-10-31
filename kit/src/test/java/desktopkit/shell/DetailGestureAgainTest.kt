@@ -92,11 +92,14 @@ class DetailGestureAgainTest {
         compose.waitForIdle()
         assertTrue("the header is open at full width: ${headerWidth()}", headerWidth()!! >= 400f)
         val dispatcher = compose.activity.onBackPressedDispatcher
-        // a gesture half way, given up: everything springs back
+        // a gesture half way, given up: everything springs back. (Two events, as a finger sends: the shared
+        // elements match on the first one's composition, and the seek that moves them is the next one's.)
         compose.runOnUiThread {
             dispatcher.dispatchOnBackStarted(back(0f))
-            dispatcher.dispatchOnBackProgressed(back(0.5f))
+            dispatcher.dispatchOnBackProgressed(back(0.3f))
         }
+        compose.waitForIdle()
+        compose.runOnUiThread { dispatcher.dispatchOnBackProgressed(back(0.5f)) }
         compose.waitForIdle()
         assertTrue("half way the header is on its way back to the card: ${headerWidth()}", headerWidth()!! < 380f)
         compose.runOnUiThread { dispatcher.dispatchOnBackCancelled() }
@@ -110,9 +113,11 @@ class DetailGestureAgainTest {
         compose.mainClock.autoAdvance = false
         compose.runOnUiThread {
             dispatcher.dispatchOnBackStarted(back(0f))
-            dispatcher.dispatchOnBackProgressed(back(0.5f))
+            dispatcher.dispatchOnBackProgressed(back(0.3f))
         }
-        frame()
+        repeat(2) { frame() }
+        compose.runOnUiThread { dispatcher.dispatchOnBackProgressed(back(0.5f)) }
+        repeat(2) { frame() }
         assertTrue("half way again the header is on its way: ${headerWidth()}", headerWidth()!! < 380f)
         compose.runOnUiThread { dispatcher.onBackPressed() }
         val widths = mutableListOf<Float>()
