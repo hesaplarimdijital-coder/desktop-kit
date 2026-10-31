@@ -259,6 +259,9 @@ fun GlassBottomSheet(
         if (visible) {
             drag.snapTo(0f)
             progress.animateTo(1f, DeskMotion.spatial(tier, tween(DeskMotion.LONG_MS, easing = DeskMotion.EmphasizedDecelerate), 0.001f))
+        } else if (drag.value > 0f) {
+            // pulled or flung out by the finger: it is already gone, nothing to animate
+            progress.snapTo(0f)
         } else {
             progress.animateTo(0f, DeskMotion.spatial(tier, tween(DeskMotion.MEDIUM_MS, easing = DeskMotion.EmphasizedAccelerate), 0.001f))
         }
@@ -422,8 +425,9 @@ private fun SheetSurface(
  * The sheet pulled down by the finger. On the handle and the title the drag moves it directly; on
  * the list it comes as nested scrolling: what the list cannot scroll (it is at its top) pulls the
  * sheet down, and pushing up raises a pulled sheet before the list scrolls again. Letting go past a
- * third of the height or with a downward fling closes it; otherwise it springs back. On the way
- * past the closing point there is one haptic tick.
+ * third of the height or with a downward fling closes it: the sheet carries on down at the finger's
+ * speed and the dismiss comes once it is gone; otherwise it springs back. On the way past the
+ * closing point there is one haptic tick.
  */
 private class SheetPull(private val drag: Animatable<Float, AnimationVector1D>) : NestedScrollConnection {
     lateinit var scope: CoroutineScope
@@ -466,6 +470,11 @@ private class SheetPull(private val drag: Animatable<Float, AnimationVector1D>) 
         armed = false
         val far = height > 0 && offset > height / 3f
         if (far || velocity > flingPx) {
+            // out at the speed it was let go with, then dismissed (a close that started from rest
+            // paused for a frame or two after a fling)
+            val end = height.toFloat()
+            offset = end
+            drag.animateTo(end, settleSpec, initialVelocity = velocity.coerceAtLeast(0f))
             onDismiss()
         } else {
             offset = 0f

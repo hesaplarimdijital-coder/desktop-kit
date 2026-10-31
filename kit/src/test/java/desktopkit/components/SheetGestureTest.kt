@@ -71,6 +71,30 @@ class SheetGestureTest {
         assertEquals(1, dismissed)
     }
 
+    /** A fling carries the sheet out at its own speed, frame by frame; the dismiss comes once it is gone. */
+    @Test
+    fun aFlingCarriesTheSheetOutBeforeItIsDismissed() {
+        sheet()
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithTag("row1").performTouchInput { swipe(center, center + Offset(0f, 150f), durationMillis = 60) }
+        compose.waitForIdle()
+        assertEquals("not dismissed while still on its way out", 0, dismissed)
+        var last = compose.onNodeWithTag("row1").getBoundsInRoot().top
+        var frames = 0
+        while (dismissed == 0 && frames < 90) {
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+            frames++
+            if (dismissed == 0) {
+                val top = compose.onNodeWithTag("row1").getBoundsInRoot().top
+                assertTrue("frame $frames: the sheet stood still ($last → $top)", top > last)
+                last = top
+            }
+        }
+        compose.mainClock.autoAdvance = true
+        assertEquals(1, dismissed)
+    }
+
     @Test
     fun aSlowPullPastAThirdClosesTheSheet() {
         // far slower than a fling: only the distance can close it
