@@ -6,27 +6,8 @@ import android.graphics.Paint
 import android.graphics.Rect
 import androidx.activity.BackEventCompat
 import androidx.activity.ComponentActivity
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibilityScope
-import androidx.compose.animation.BoundsTransform
-import androidx.compose.animation.ContentTransform
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionLayout
-import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.AnimationVector1D
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -36,34 +17,23 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import desktopkit.SampleFullPlayer
 import desktopkit.SampleMiniPlayer
@@ -78,7 +48,9 @@ import desktopkit.components.DeskListRow
 import desktopkit.components.ExpandablePlayer
 import desktopkit.components.ExpandablePlayerState
 import desktopkit.components.GlassBottomSheet
+import desktopkit.components.listAppear
 import desktopkit.components.rememberExpandablePlayerState
+import desktopkit.components.rememberListAppear
 import desktopkit.mediaSpec
 import desktopkit.sampleArtwork
 import desktopkit.sampleMoreActions
@@ -89,8 +61,8 @@ import desktopkit.shell.ShellNavigator
 import desktopkit.shell.ShellTransitions
 import desktopkit.shell.WidthClass
 import desktopkit.shell.detailSharedBounds
+import desktopkit.shell.detailSharedCard
 import desktopkit.shell.detailSharedElement
-import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
 import desktopkit.theme.DesktopKitTheme
 import desktopkit.theme.InputMode
@@ -109,11 +81,10 @@ import java.io.FileOutputStream
 import kotlin.math.roundToInt
 
 /**
- * Frame strips of the phone's transitions, for choosing between motion proposals: each test plays a
- * transition with the clock advanced by hand and saves the frames side by side as
+ * Frame strips of the phone's transitions as the kit plays them: each test plays a transition with
+ * the clock advanced frame by frame and saves the frames side by side as
  * build/outputs/screenshots/motion/<name>.png (CI pushes them to the ci/screenshots-pr-<n> branch).
- * The "current" strips use the kit as it is; the "proposal" strips are sketches drawn in this file
- * with the proposed durations and springs, not kit code. Nothing is asserted beyond the strip existing.
+ * Nothing is asserted beyond the strip existing; they are there to be looked at.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -144,6 +115,17 @@ class MotionStripsTest {
         return bitmap
     }
 
+    /** Frame by frame (a run of frames without an idle in between leaves the recomposer asleep) up to [t] ms. */
+    private fun advanceTo(t: Long, now: Long): Long {
+        var at = now
+        while (at < t) {
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+            at += 16
+        }
+        return at
+    }
+
     /**
      * The window before [change] and [at] ms after it, as one strip. [change] runs on the UI thread
      * unless it drives the test's own input ([onUiThread] false), which synchronises itself.
@@ -154,10 +136,8 @@ class MotionStripsTest {
         if (onUiThread) compose.runOnIdle { change() } else change()
         var now = 0L
         for (t in at) {
-            compose.mainClock.advanceTimeBy(t - now)
-            now = t
-            compose.waitForIdle()
-            frames += "$t ms" to shot()
+            now = advanceTo(t, now)
+            frames += "$now ms" to shot()
         }
         compose.mainClock.autoAdvance = true
         saveStrip(name, frames)
@@ -166,7 +146,7 @@ class MotionStripsTest {
     // ---------------------------------------------------------------- screens (tab switch)
 
     @Test
-    fun tabSwitchCurrent() {
+    fun tabSwitch() {
         var navigator: ShellNavigator? = null
         phoneContent {
             TestShell(WidthClass.Compact, startRoute = "music", spec = mediaSpec, transitions = ShellTransitions.Default) { route, nav ->
@@ -174,104 +154,43 @@ class MotionStripsTest {
                 if (route == "podcasts") PodcastList() else SampleTrackList()
             }
         }
-        strip("tab-switch-current") { navigator?.navigate("podcasts") }
-    }
-
-    /** A: the scale starts with the fade, as Material's fade-through does. */
-    @Test
-    fun tabSwitchProposalA() = tabProposal("tab-switch-a-aligned") {
-        (fadeIn(tween(210, delayMillis = 90, easing = DeskMotion.EmphasizedDecelerate)) +
-            scaleIn(tween(210, delayMillis = 90, easing = DeskMotion.EmphasizedDecelerate), initialScale = 0.96f))
-            .togetherWith(fadeOut(tween(90, easing = DeskMotion.EmphasizedAccelerate)))
-    }
-
-    /** B: a calm cross-fade, no movement. */
-    @Test
-    fun tabSwitchProposalB() = tabProposal("tab-switch-b-crossfade") {
-        fadeIn(tween(180, easing = DeskMotion.StandardDecelerate)) togetherWith fadeOut(tween(120, easing = DeskMotion.StandardAccelerate))
-    }
-
-    /** C: the old screen sinks (shrinks and fades), the new one rises from 94 % on a spring. */
-    @Test
-    fun tabSwitchProposalC() = tabProposal("tab-switch-c-depth") {
-        (fadeIn(tween(200, delayMillis = 40, easing = DeskMotion.EmphasizedDecelerate)) +
-            scaleIn(spring(dampingRatio = 0.9f, stiffness = 600f), initialScale = 0.94f))
-            .togetherWith(fadeOut(tween(110, easing = DeskMotion.EmphasizedAccelerate)) + scaleOut(tween(110, easing = DeskMotion.EmphasizedAccelerate), targetScale = 0.97f))
-    }
-
-    private fun tabProposal(name: String, transform: () -> ContentTransform) {
-        var screen by mutableStateOf("music")
-        phoneContent {
-            AnimatedContent(targetState = screen, transitionSpec = { transform() }, label = name) { route ->
-                Box(Modifier.fillMaxSize().background(DeskTheme.colors.background)) {
-                    if (route == "podcasts") PodcastList() else SampleTrackList()
-                }
-            }
-        }
-        strip(name) { screen = "podcasts" }
+        strip("tab-switch") { navigator?.navigate("podcasts") }
     }
 
     // ---------------------------------------------------------------- list → detail
 
     @Test
-    fun detailOpenCurrent() {
+    fun detailOpen() {
         var detail by mutableStateOf<Album?>(null)
-        phoneContent {
-            DetailTransition(detail = detail, onBack = { detail = null }, detailKey = { it.id }, list = { AlbumList(kit = true) }) { album ->
-                AlbumDetail(album, kit = true)
-            }
-        }
-        strip("detail-open-current") { detail = albums[2] }
+        phoneContent { Albums(detail) { detail = it } }
+        strip("detail-open") { detail = albums[2] }
     }
 
-    private val offsetSpring = spring(dampingRatio = 0.9f, stiffness = 700f, visibilityThreshold = IntOffset(1, 1))
-
-    /** A: depth. The detail slides in 12 % and fades; the list sinks to 95 % under it. */
+    /** Back a few frames into the opening: the card turns around where it is. */
     @Test
-    fun detailOpenProposalA() = detailProposal("detail-open-a-depth", card = false) {
-        (slideInHorizontally(offsetSpring) { it * 12 / 100 } + fadeIn(tween(200, easing = DeskMotion.StandardDecelerate)))
-            .togetherWith(scaleOut(tween(300, easing = DeskMotion.Emphasized), targetScale = 0.95f) + fadeOut(tween(160, easing = DeskMotion.StandardAccelerate)))
-    }
-
-    /** B: the card grows into the detail's header; the rest of the detail fades in after it. */
-    @Test
-    fun detailOpenProposalB() = detailProposal("detail-open-b-card", card = true) {
-        fadeIn(tween(220, delayMillis = 60, easing = DeskMotion.StandardDecelerate)) togetherWith fadeOut(tween(120, easing = DeskMotion.StandardAccelerate))
-    }
-
-    /** C: shared axis with a longer way: 30 % in from the end, the list 30 % out. */
-    @Test
-    fun detailOpenProposalC() = detailProposal("detail-open-c-axis", card = false) {
-        (slideInHorizontally(offsetSpring) { it * 3 / 10 } + fadeIn(tween(200, easing = DeskMotion.StandardDecelerate)))
-            .togetherWith(slideOutHorizontally(offsetSpring) { -it * 3 / 10 } + fadeOut(tween(120, easing = DeskMotion.StandardAccelerate)))
-    }
-
-    @OptIn(ExperimentalSharedTransitionApi::class)
-    private fun detailProposal(name: String, card: Boolean, transform: () -> ContentTransform) {
+    fun detailTurnAround() {
         var detail by mutableStateOf<Album?>(null)
-        phoneContent {
-            SharedTransitionLayout(Modifier.fillMaxSize()) {
-                val shared = this
-                AnimatedContent(targetState = detail, transitionSpec = { transform() }, contentKey = { it?.id }, label = name) { target ->
-                    val visibility = this
-                    if (target == null) AlbumList(kit = false, shared = shared, visibility = visibility, card = card)
-                    else AlbumDetail(target, kit = false, shared = shared, visibility = visibility, card = card)
-                }
-            }
+        phoneContent { Albums(detail) { detail = it } }
+        compose.mainClock.autoAdvance = false
+        val frames = mutableListOf("önce" to shot())
+        compose.runOnIdle { detail = albums[2] }
+        var now = advanceTo(96, 0)
+        frames += "açılırken $now ms" to shot()
+        compose.runOnIdle { detail = null }
+        for (t in listOf(16L, 48L, 96L, 160L, 240L, 320L)) {
+            now = advanceTo(96 + t, now)
+            frames += "geri +$t ms" to shot()
         }
-        strip(name) { detail = albums[2] }
+        compose.mainClock.autoAdvance = true
+        saveStrip("detail-turn-around", frames)
     }
 
     // ---------------------------------------------------------------- predictive back on a detail
 
     @Test
-    fun detailBackCurrent() {
+    fun detailBack() {
         var detail by mutableStateOf<Album?>(albums[2])
-        phoneContent {
-            DetailTransition(detail = detail, onBack = { detail = null }, detailKey = { it.id }, list = { AlbumList(kit = true) }) { album ->
-                AlbumDetail(album, kit = true)
-            }
-        }
+        phoneContent { Albums(detail) { detail = it } }
         val dispatcher = compose.activity.onBackPressedDispatcher
         fun back(progress: Float) = BackEventCompat(40f, 600f, progress, BackEventCompat.EDGE_LEFT)
         compose.mainClock.autoAdvance = false
@@ -286,126 +205,42 @@ class MotionStripsTest {
         compose.runOnUiThread { dispatcher.onBackPressed() }
         var now = 0L
         for (t in listOf(16L, 64L, 144L, 304L)) {
-            compose.mainClock.advanceTimeBy(t - now)
-            now = t
-            compose.waitForIdle()
-            frames += "bırakınca +$t ms" to shot()
+            now = advanceTo(t, now)
+            frames += "bırakınca +$now ms" to shot()
         }
         compose.mainClock.autoAdvance = true
-        saveStrip("detail-back-current", frames)
+        saveStrip("detail-back", frames)
     }
 
+    /** A Back gesture let go of half way: the detail springs back into place. */
     @Test
-    fun detailBackProposal() {
-        val progress = Animatable(0f)
-        var scope: CoroutineScope? = null
-        phoneContent {
-            scope = rememberCoroutineScope()
-            ProtoBack(progress)
-        }
+    fun detailBackCancelled() {
+        var detail by mutableStateOf<Album?>(albums[2])
+        phoneContent { Albums(detail) { detail = it } }
+        val dispatcher = compose.activity.onBackPressedDispatcher
+        fun back(progress: Float) = BackEventCompat(40f, 600f, progress, BackEventCompat.EDGE_LEFT)
         compose.mainClock.autoAdvance = false
         val frames = mutableListOf("önce" to shot())
-        for (p in listOf(0.25f, 0.5f, 0.8f)) {
-            compose.runOnIdle { scope?.launch { progress.snapTo(p) } }
-            compose.mainClock.advanceTimeByFrame()
-            compose.waitForIdle()
-            frames += "parmak $p" to shot()
-        }
-        compose.runOnIdle { scope?.launch { progress.animateTo(2f, tween(220, easing = DeskMotion.EmphasizedAccelerate)) } }
+        compose.runOnUiThread { dispatcher.dispatchOnBackStarted(back(0f)) }
+        compose.runOnUiThread { dispatcher.dispatchOnBackProgressed(back(0.5f)) }
+        compose.mainClock.advanceTimeByFrame()
+        compose.waitForIdle()
+        frames += "parmak 0.5" to shot()
+        compose.runOnUiThread { dispatcher.dispatchOnBackCancelled() }
         var now = 0L
         for (t in listOf(16L, 64L, 144L, 304L)) {
-            compose.mainClock.advanceTimeBy(t - now)
-            now = t
-            compose.waitForIdle()
-            frames += "bırakınca +$t ms" to shot()
+            now = advanceTo(t, now)
+            frames += "vazgeçince +$now ms" to shot()
         }
         compose.mainClock.autoAdvance = true
-        saveStrip("detail-back-proposal", frames)
-    }
-
-    /**
-     * Proposal: the list is really behind the shrinking detail (from 94 % and dimmed to full as the
-     * finger moves); letting go slides the shrunken detail out to the edge from where the finger
-     * left it, over 220 ms. [progress]: 0..1 the finger, 1..2 the way out.
-     */
-    @Composable
-    private fun ProtoBack(progress: Animatable<Float, AnimationVector1D>) {
-        val colors = DeskTheme.colors
-        Box(Modifier.fillMaxSize()) {
-            Box(
-                Modifier.fillMaxSize().graphicsLayer {
-                    val p = progress.value.coerceIn(0f, 1f)
-                    val scale = 0.94f + 0.06f * p
-                    scaleX = scale
-                    scaleY = scale
-                    alpha = 0.6f + 0.4f * p
-                },
-            ) { AlbumList(kit = false) }
-            if (progress.value < 2f) {
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            val shrink = progress.value.coerceIn(0f, 1f)
-                            val leave = (progress.value - 1f).coerceIn(0f, 1f)
-                            val scale = 1f - 0.1f * shrink
-                            scaleX = scale
-                            scaleY = scale
-                            translationX = 24.dp.toPx() * shrink + size.width * 0.4f * leave
-                            alpha = 1f - leave
-                            shape = RoundedCornerShape((28f * shrink).dp)
-                            clip = true
-                        }
-                        .background(colors.background),
-                ) { AlbumDetail(albums[2], kit = false) }
-            }
-        }
+        saveStrip("detail-back-cancelled", frames)
     }
 
     // ---------------------------------------------------------------- player
 
-    @Test
-    fun playerExpandCurrent() {
-        var player: ExpandablePlayerState? = null
-        var scope: CoroutineScope? = null
-        phoneContent {
-            player = rememberExpandablePlayerState()
-            scope = rememberCoroutineScope()
-            TestShell(
-                WidthClass.Compact,
-                startRoute = "music",
-                spec = mediaSpec,
-                bottomBar = { ExpandablePlayer(player!!, mini = { SampleMiniPlayer(2) }, full = { SampleFullPlayer(2) }) },
-            ) { _, _ -> SampleTrackList() }
-        }
-        strip("player-expand-current") { scope?.launch { player?.expand() } }
-    }
-
-    /**
-     * Finding 1: the bars were hidden by a scroll, so the mini player sits at the bottom edge; a tap
-     * on it snaps the bars back at once (the strip jumps up) and the sheet opens from the old place.
-     */
-    @Test
-    fun playerTapWithBarsHiddenCurrent() {
-        playerWithBarsHidden()
-        strip("player-tap-bars-hidden-current", onUiThread = false) { compose.onNodeWithTag("mini").performClick() }
-    }
-
-    /** Finding 1, the way back: where the sheet lands and where the strip then appears. */
-    @Test
-    fun playerCollapseWithBarsHiddenCurrent() {
-        val player = playerWithBarsHidden()
-        compose.onNodeWithTag("mini").performClick()
-        compose.waitForIdle()
-        strip("player-collapse-bars-hidden-current", at = listOf(16L, 96L, 208L, 304L, 448L, 608L, 800L)) {
-            playerScope?.launch { player.collapse() }
-        }
-    }
-
     private var playerScope: CoroutineScope? = null
 
-    /** The phone shell with the player, after a long swipe up that hides the bars. */
-    private fun playerWithBarsHidden(): ExpandablePlayerState {
+    private fun playerShell(): ExpandablePlayerState {
         var player: ExpandablePlayerState? = null
         phoneContent {
             player = rememberExpandablePlayerState()
@@ -419,239 +254,133 @@ class MotionStripsTest {
                 },
             ) { _, _ -> SampleTrackList() }
         }
-        compose.onNodeWithTag("tracks").performTouchInput { swipeUp(startY = centerY + 300f, endY = top + 200f, durationMillis = 800) }
-        compose.waitForIdle()
         return player!!
     }
 
     @Test
-    fun playerExpandProposal() {
-        val progress = Animatable(0f)
-        var scope: CoroutineScope? = null
-        phoneContent {
-            scope = rememberCoroutineScope()
-            ProtoPlayer(progress)
-        }
-        strip("player-expand-proposal") { scope?.launch { progress.animateTo(1f, spring(dampingRatio = 0.9f, stiffness = 500f, visibilityThreshold = 0.001f)) } }
+    fun playerExpand() {
+        val player = playerShell()
+        strip("player-expand") { playerScope?.launch { player.expand() } }
     }
 
-    /**
-     * Proposal: one surface grows from the mini player's strip to the full screen; the cover and
-     * the title fly to their places, the mini controls fade out early, the full controls come late.
-     */
-    @Composable
-    private fun ProtoPlayer(progress: Animatable<Float, AnimationVector1D>) {
-        val colors = DeskTheme.colors
-        val density = LocalDensity.current
-        val track = sampleTracks[2]
-        val artwork = sampleArtwork[2]
-        BoxWithConstraints(Modifier.fillMaxSize()) {
-            val width = maxWidth
-            val height = maxHeight
-            val navHeight = 64.dp
-            val miniHeight = 64.dp
-            SampleTrackList()
-            // the bottom bar look-alike, pushed down as the player opens
-            Box(
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .height(navHeight)
-                    .graphicsLayer { translationY = progress.value * size.height }
-                    .background(colors.chrome),
-            )
-            Box(Modifier.fillMaxSize().graphicsLayer { alpha = progress.value }.background(colors.scrim))
-            val collapsedTop = with(density) { (height - navHeight - miniHeight).toPx() }
-            val stripColor = colors.chrome.copy(alpha = 0.96f)
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        val p = progress.value
-                        translationY = collapsedTop * (1f - p)
-                        // rounded while it travels, square at both ends (the spring may overshoot 1)
-                        val travel = p.coerceIn(0f, 1f)
-                        shape = RoundedCornerShape((20f * 4f * travel * (1f - travel)).dp)
-                        clip = true
-                    }
-                    .background(stripColor),
-            ) {
-                Box(Modifier.fillMaxSize().graphicsLayer { alpha = progress.value }.background(colors.background))
-                // the cover: 44 dp beside the strip's edge → 232 dp centred near the top
-                val coverStart = 12.dp
-                val coverEnd = (width - 232.dp) / 2
-                Box(
-                    Modifier
-                        .graphicsLayer {
-                            val p = progress.value
-                            val scale = (44f + (232f - 44f) * p) / 232f
-                            transformOrigin = TransformOrigin(0f, 0f)
-                            scaleX = scale
-                            scaleY = scale
-                            translationX = lerpDp(coverStart, coverEnd, p).toPx()
-                            translationY = lerpDp(10.dp, 72.dp, p).toPx()
-                            shape = RoundedCornerShape((8f + 8f * p).dp)
-                            clip = true
-                        }
-                        .size(232.dp)
-                        .background(artwork),
-                )
-                // the title and artist: beside the cover → under it, growing
-                Column(
-                    Modifier.graphicsLayer {
-                        val p = progress.value
-                        val scale = 1f + 0.35f * p
-                        transformOrigin = TransformOrigin(0f, 0f)
-                        scaleX = scale
-                        scaleY = scale
-                        // beside the cover until it has passed under it, then to its place under it
-                        val coverX = lerpDp(coverStart, coverEnd, p).toPx()
-                        val coverY = lerpDp(10.dp, 72.dp, p).toPx()
-                        val coverSize = (44f + 188f * p).dp.toPx()
-                        val y = lerpDp(14.dp, 72.dp + 232.dp + 20.dp, (p * 1.5f).coerceAtMost(1f)).toPx()
-                        val x = lerpDp(68.dp, 24.dp, p).toPx()
-                        val clear = ((y - (coverY + coverSize)) / 40.dp.toPx()).coerceIn(0f, 1f)
-                        translationX = x + ((coverX + coverSize + 8.dp.toPx()) - x).coerceAtLeast(0f) * (1f - clear)
-                        translationY = y
-                    },
-                ) {
-                    Text(track.first, style = DeskTheme.type.bodyStrong, color = colors.text, maxLines = 1)
-                    Text(track.second, style = DeskTheme.type.labelSmall, color = colors.textSecondary, maxLines = 1)
-                }
-                // mini controls go first, the full controls come last
-                Row(
-                    Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(end = 12.dp, top = 8.dp)
-                        .graphicsLayer { alpha = (1f - progress.value * 4f).coerceIn(0f, 1f) },
-                ) {
-                    DeskIconButton(DeskIcons.Pause, "Duraklat", {})
-                    DeskIconButton(DeskIcons.Next, "Sonraki", {})
-                }
-                Row(
-                    Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = 72.dp + 232.dp + 20.dp + 64.dp)
-                        .graphicsLayer { alpha = ((progress.value - 0.6f) / 0.4f).coerceIn(0f, 1f) },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    DeskIconButton(DeskIcons.Previous, "Önceki", {})
-                    Spacer(Modifier.width(16.dp))
-                    DeskIconButton(DeskIcons.Pause, "Duraklat", {}, size = 64.dp, iconSize = 28.dp)
-                    Spacer(Modifier.width(16.dp))
-                    DeskIconButton(DeskIcons.Next, "Sonraki", {})
-                }
-            }
+    @Test
+    fun playerCollapse() {
+        val player = playerShell()
+        compose.onNodeWithTag("mini").performClick()
+        compose.waitForIdle()
+        strip("player-collapse") { playerScope?.launch { player.collapse() } }
+    }
+
+    /** The predictive Back gesture on the open player: the shrink rides down with the sheet once let go. */
+    @Test
+    fun playerBack() {
+        playerShell()
+        compose.onNodeWithTag("mini").performClick()
+        compose.waitForIdle()
+        val dispatcher = compose.activity.onBackPressedDispatcher
+        fun back(progress: Float) = BackEventCompat(40f, 600f, progress, BackEventCompat.EDGE_LEFT)
+        compose.mainClock.autoAdvance = false
+        val frames = mutableListOf("önce" to shot())
+        compose.runOnUiThread { dispatcher.dispatchOnBackStarted(back(0f)) }
+        for (p in listOf(0.4f, 0.8f)) {
+            compose.runOnUiThread { dispatcher.dispatchOnBackProgressed(back(p)) }
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+            frames += "parmak $p" to shot()
         }
+        compose.runOnUiThread { dispatcher.onBackPressed() }
+        var now = 0L
+        for (t in listOf(16L, 64L, 144L, 240L, 400L)) {
+            now = advanceTo(t, now)
+            frames += "bırakınca +$now ms" to shot()
+        }
+        compose.mainClock.autoAdvance = true
+        saveStrip("player-back", frames)
+    }
+
+    /** The bars were hidden by a scroll, so the mini player sits at the bottom edge: the sheet opens from there. */
+    @Test
+    fun playerTapWithBarsHidden() {
+        playerWithBarsHidden()
+        strip("player-tap-bars-hidden", onUiThread = false) { compose.onNodeWithTag("mini").performClick() }
+    }
+
+    /** The way back with the bars hidden: the sheet lands on the strip at the bottom edge. */
+    @Test
+    fun playerCollapseWithBarsHidden() {
+        val player = playerWithBarsHidden()
+        compose.onNodeWithTag("mini").performClick()
+        compose.waitForIdle()
+        strip("player-collapse-bars-hidden", at = listOf(16L, 96L, 208L, 304L, 448L, 608L)) {
+            playerScope?.launch { player.collapse() }
+        }
+    }
+
+    /** The phone shell with the player, after a long swipe up that hides the bars. */
+    private fun playerWithBarsHidden(): ExpandablePlayerState {
+        val player = playerShell()
+        compose.onNodeWithTag("tracks").performTouchInput { swipeUp(startY = centerY + 300f, endY = top + 200f, durationMillis = 800) }
+        compose.waitForIdle()
+        return player
     }
 
     // ---------------------------------------------------------------- the "⋯" sheet
 
-    @Test
-    fun sheetOpenCurrent() {
-        var open by mutableStateOf(false)
+    private fun sheetShell(open: () -> Boolean, close: () -> Unit) {
         phoneContent {
             TestShell(
                 WidthClass.Compact,
                 startRoute = "music",
                 spec = mediaSpec,
                 overlays = {
-                    GlassBottomSheet(visible = open, onDismiss = { open = false }, title = "Daha fazla") {
-                        ActionGroupList(sampleMoreActions, onDismiss = { open = false })
+                    GlassBottomSheet(visible = open(), onDismiss = close, title = "Daha fazla") {
+                        ActionGroupList(sampleMoreActions, onDismiss = close)
                     }
                 },
             ) { _, _ -> SampleTrackList() }
         }
-        strip("sheet-open-current") { open = true }
     }
 
     @Test
-    fun sheetOpenProposalA() = sheetProposal("sheet-open-a-scale", scale = true, dampingRatio = 0.9f, stiffness = 600f)
-
-    @Test
-    fun sheetOpenProposalB() = sheetProposal("sheet-open-b-quick", scale = false, dampingRatio = 0.92f, stiffness = 800f)
-
-    private fun sheetProposal(name: String, scale: Boolean, dampingRatio: Float, stiffness: Float) {
-        val progress = Animatable(0f)
-        var scope: CoroutineScope? = null
-        phoneContent {
-            scope = rememberCoroutineScope()
-            ProtoSheet(progress, scale)
-        }
-        strip(name) { scope?.launch { progress.animateTo(1f, spring(dampingRatio = dampingRatio, stiffness = stiffness, visibilityThreshold = 0.001f)) } }
+    fun sheetOpen() {
+        var open by mutableStateOf(false)
+        sheetShell({ open }) { open = false }
+        strip("sheet-open") { open = true }
     }
 
-    /** Proposal: the sheet rises on a quicker spring, with the scrim; [scale] grows it from 96 % at its bottom edge too. */
-    @Composable
-    private fun ProtoSheet(progress: Animatable<Float, AnimationVector1D>, scale: Boolean) {
-        val colors = DeskTheme.colors
-        Box(Modifier.fillMaxSize()) {
-            SampleTrackList()
-            Box(Modifier.fillMaxSize().graphicsLayer { alpha = progress.value }.background(colors.scrim))
-            Column(
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .graphicsLayer {
-                        val p = progress.value
-                        translationY = (1f - p) * size.height
-                        if (scale) {
-                            val s = 0.96f + 0.04f * p
-                            transformOrigin = TransformOrigin(0.5f, 1f)
-                            scaleX = s
-                            scaleY = s
-                        }
-                    }
-                    .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-                    .background(colors.surfaceRaised.copy(alpha = 0.96f))
-                    .padding(bottom = 12.dp),
-            ) {
-                Box(Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 6.dp), contentAlignment = Alignment.Center) {
-                    Box(Modifier.size(width = 36.dp, height = 4.dp).background(colors.borderStrong, RoundedCornerShape(2.dp)))
-                }
-                Text("Daha fazla", style = DeskTheme.type.title, color = colors.text, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
-                ActionGroupList(sampleMoreActions, onDismiss = {})
-            }
-        }
+    @Test
+    fun sheetClose() {
+        var open by mutableStateOf(true)
+        sheetShell({ open }) { open = false }
+        strip("sheet-close") { open = false }
     }
 
-    // ---------------------------------------------------------------- list items appearing
+    // ---------------------------------------------------------------- a list's rows arriving
 
     @Test
-    fun listAppearProposal() {
+    fun listAppear() {
         var shown by mutableStateOf(false)
         phoneContent {
-            if (shown) ProtoAppearList()
-        }
-        strip("list-appear-proposal") { shown = true }
-    }
-
-    /** Proposal: rows come in with a short staggered rise and fade, in the draw phase only. */
-    @Composable
-    private fun ProtoAppearList() {
-        LazyColumn(Modifier.fillMaxSize()) {
-            items(12) { i ->
-                val appear = remember { Animatable(0f) }
-                LaunchedEffect(Unit) { appear.animateTo(1f, tween(180, delayMillis = i * 20, easing = DeskMotion.EmphasizedDecelerate)) }
-                Box(
-                    Modifier.graphicsLayer {
-                        alpha = appear.value
-                        translationY = (1f - appear.value) * 12.dp.toPx()
-                    },
-                ) {
-                    val track = sampleTracks[i % sampleTracks.size]
-                    DeskListRow(
-                        title = track.first,
-                        subtitle = track.second,
-                        leadingContent = { Box(Modifier.size(40.dp).background(sampleArtwork[i % sampleArtwork.size], RoundedCornerShape(6.dp))) },
-                        trailing = "3:${10 + i}",
-                    )
+            if (shown) {
+                val appear = rememberListAppear()
+                Column(Modifier.fillMaxSize()) {
+                    PageHeader("Parçalar", subtitle = "${sampleTracks.size} parça")
+                    sampleTracks.forEachIndexed { i, (title, artist) ->
+                        DeskListRow(
+                            title = title,
+                            modifier = Modifier.listAppear(appear, i),
+                            subtitle = artist,
+                            leadingContent = { Box(Modifier.size(40.dp).background(sampleArtwork[i % sampleArtwork.size], RoundedCornerShape(6.dp))) },
+                            trailing = "3:${20 + i}",
+                        )
+                    }
                 }
             }
         }
+        strip("list-appear", at = listOf(16L, 64L, 112L, 160L, 208L, 256L, 320L)) { shown = true }
     }
 
-    // ---------------------------------------------------------------- sample content
+    // ---------------------------------------------------------------- the pieces
 
     private data class Album(val id: Int, val title: String, val artist: String, val color: Color)
 
@@ -674,106 +403,59 @@ class MotionStripsTest {
 
     private val cardShape = RoundedCornerShape(12.dp)
 
-    @OptIn(ExperimentalSharedTransitionApi::class)
-    private val bounds = BoundsTransform { _, _ -> spring(dampingRatio = 0.9f, stiffness = 700f) }
-
-    /** The albums grid: with [kit] the kit's shared elements, otherwise [shared]'s own (and the whole card with [card]). */
-    @OptIn(ExperimentalSharedTransitionApi::class)
+    /** The albums grid and the album's page in a [DetailTransition], as the sample has them: the card grows into the header. */
     @Composable
-    private fun AlbumList(
-        kit: Boolean,
-        shared: SharedTransitionScope? = null,
-        visibility: AnimatedVisibilityScope? = null,
-        card: Boolean = false,
-    ) {
+    private fun Albums(detail: Album?, onDetail: (Album?) -> Unit) {
+        DetailTransition(detail = detail, onBack = { onDetail(null) }, detailKey = { it.id }, list = { AlbumList() }) { album ->
+            AlbumDetail(album)
+        }
+    }
+
+    @Composable
+    private fun AlbumList() {
         val colors = DeskTheme.colors
         Column(Modifier.fillMaxSize().background(colors.background)) {
             PageHeader("Albümler", subtitle = "${albums.size} albüm")
             DeskGrid(items = albums, key = { it.id }, onItemClick = { _, _ -> }) { album ->
-                val coverModifier = when {
-                    kit -> Modifier.detailSharedElement("cover-${album.id}")
-                    shared != null && visibility != null && !card -> with(shared) {
-                        Modifier.sharedElement(sharedContentState = rememberSharedContentState("cover-${album.id}"), animatedVisibilityScope = visibility, boundsTransform = bounds)
-                    }
-                    else -> Modifier
-                }
-                val titleModifier = when {
-                    kit -> Modifier.detailSharedBounds("title-${album.id}")
-                    shared != null && visibility != null && !card -> with(shared) {
-                        Modifier.sharedBounds(
-                            sharedContentState = rememberSharedContentState("title-${album.id}"), animatedVisibilityScope = visibility, boundsTransform = bounds,
-                            resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds(ContentScale.Fit, Alignment.CenterStart),
-                        )
-                    }
-                    else -> Modifier
-                }
-                val cardModifier = if (card && shared != null && visibility != null) with(shared) {
-                    Modifier
-                        .sharedBounds(
-                            sharedContentState = rememberSharedContentState("card-${album.id}"), animatedVisibilityScope = visibility, boundsTransform = bounds,
-                            resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds(ContentScale.FillWidth, Alignment.TopStart),
-                            clipInOverlayDuringTransition = OverlayClip(cardShape),
-                        )
-                        .clip(cardShape)
-                        .background(colors.surface)
-                        .padding(6.dp)
-                } else Modifier
-                CoverCell(album.title, modifier = cardModifier, subtitle = album.artist, titleModifier = titleModifier) {
-                    Box(coverModifier.fillMaxSize().background(album.color))
+                CoverCell(
+                    album.title,
+                    modifier = Modifier.detailSharedCard("card-${album.id}"),
+                    subtitle = album.artist,
+                    titleModifier = Modifier.detailSharedBounds("title-${album.id}"),
+                ) {
+                    Box(Modifier.detailSharedElement("cover-${album.id}").fillMaxSize().background(album.color))
                 }
             }
         }
     }
 
-    /** The album's page: a top bar look-alike, the cover and the title that flew in, the tracks. */
-    @OptIn(ExperimentalSharedTransitionApi::class)
+    /** The album's page: a top bar look-alike, the header the card grows into, the tracks arriving in turn. */
     @Composable
-    private fun AlbumDetail(
-        album: Album,
-        kit: Boolean,
-        shared: SharedTransitionScope? = null,
-        visibility: AnimatedVisibilityScope? = null,
-        card: Boolean = false,
-    ) {
+    private fun AlbumDetail(album: Album) {
         val colors = DeskTheme.colors
-        val coverModifier = when {
-            kit -> Modifier.detailSharedElement("cover-${album.id}", shape = cardShape)
-            shared != null && visibility != null && !card -> with(shared) {
-                Modifier.sharedElement(sharedContentState = rememberSharedContentState("cover-${album.id}"), animatedVisibilityScope = visibility, boundsTransform = bounds).clip(cardShape)
-            }
-            else -> Modifier.clip(cardShape)
-        }
-        val titleModifier = when {
-            kit -> Modifier.detailSharedBounds("title-${album.id}")
-            shared != null && visibility != null && !card -> with(shared) {
-                Modifier.sharedBounds(
-                    sharedContentState = rememberSharedContentState("title-${album.id}"), animatedVisibilityScope = visibility, boundsTransform = bounds,
-                    resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds(ContentScale.Fit, Alignment.CenterStart),
-                )
-            }
-            else -> Modifier
-        }
-        val headerModifier = if (card && shared != null && visibility != null) with(shared) {
-            Modifier.sharedBounds(
-                sharedContentState = rememberSharedContentState("card-${album.id}"), animatedVisibilityScope = visibility, boundsTransform = bounds,
-                resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds(ContentScale.FillWidth, Alignment.TopStart),
-                clipInOverlayDuringTransition = OverlayClip(cardShape),
-            )
-        } else Modifier
+        val appear = rememberListAppear(album.id)
         Column(Modifier.fillMaxSize().background(colors.background)) {
             Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 DeskIconButton(DeskIcons.ArrowLeft, "Geri", {})
                 Spacer(Modifier.width(4.dp))
                 Text(album.title, style = DeskTheme.type.headline, color = colors.text, maxLines = 1)
             }
-            Column(headerModifier.fillMaxWidth().background(colors.background).padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(coverModifier.size(232.dp).background(album.color))
+            Column(
+                Modifier.detailSharedCard("card-${album.id}").fillMaxWidth().padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(Modifier.detailSharedElement("cover-${album.id}", shape = cardShape).size(232.dp).background(album.color))
                 Spacer(Modifier.height(16.dp))
-                Text(album.title, style = DeskTheme.type.headline, color = colors.text, modifier = titleModifier)
+                Text(album.title, style = DeskTheme.type.headline, color = colors.text, modifier = Modifier.detailSharedBounds("title-${album.id}"))
                 Text("${album.artist} · 2026 · 9 şarkı", style = DeskTheme.type.body, color = colors.textSecondary)
             }
             repeat(5) { i ->
-                DeskListRow(title = "${i + 1}. ${sampleTracks[(i + 1) % sampleTracks.size].first}", subtitle = album.artist, trailing = "3:${20 + i}")
+                DeskListRow(
+                    title = "${i + 1}. ${sampleTracks[(i + 1) % sampleTracks.size].first}",
+                    modifier = Modifier.listAppear(appear, i),
+                    subtitle = album.artist,
+                    trailing = "3:${20 + i}",
+                )
             }
         }
     }
@@ -800,6 +482,4 @@ class MotionStripsTest {
         dir.mkdirs()
         FileOutputStream(File(dir, "$name.png")).use { strip.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
-
-    private fun lerpDp(start: Dp, stop: Dp, fraction: Float): Dp = androidx.compose.ui.unit.lerp(start, stop, fraction)
 }
