@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,7 +23,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.lerp
 
-val LocalDeskColors = staticCompositionLocalOf { DeskPalette.dark(Accent.Blue) }
+/**
+ * The colour tokens. Dynamic, not static: an accent or theme change cross-fades over 150 ms, and a
+ * static local recomposed everything under the theme on each of those frames (a static change
+ * turns skipping off for the whole subtree); a dynamic one recomposes only what reads the colours.
+ */
+val LocalDeskColors = compositionLocalOf { DeskPalette.dark(Accent.Blue) }
 val LocalDeskType = staticCompositionLocalOf { DeskType.Pointer }
 val LocalDeskDimens = staticCompositionLocalOf { DeskDimens.Pointer }
 val LocalInputMode = staticCompositionLocalOf { InputMode.Pointer }
