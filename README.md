@@ -310,7 +310,8 @@ DesktopShell(…, bottomBar = { tur ->
   Perde ve alt çubuğun çekilmesi parmağı izler (`oynatici.progress`, çizimde okunur).
 - `mini` ve `full` içinde aynı anahtarla `Modifier.playerSharedElement("kapak", RoundedCornerShape(8.dp))` ile
   işaretlenen öğeler (kapak, başlık) şeritteki yerinden tam oynatıcıdaki yerine uçar ve geri; değiştiricilerde ilk
-  sırada, boyuttan önce.
+  sırada, boyuttan önce. Öğe çizildiği gibi kaydedilir (donanım bitmap'i olan bir kapak da); açık başlayan oynatıcıda
+  da ilk inişte uçar.
 - Öngörülü geri hareketi tam oynatıcıyı küçültür ve kapatır; küçülme sayfayla birlikte şeride iner.
 - Mini oynatıcıyı sola kaydırmak `onNext`, sağa `onPrevious`; şerit parmağı izler, eşikte titreşir, eşiğe
   varmazsa yaylanarak geri gelir.
@@ -327,8 +328,8 @@ MoreButton(groups = {
 ```
 
 Telefonda cam alt sayfa, genişte menü. Klavyeyle gezilir; Esc, Geri ya da aşağı çekmek kapatır (liste en
-üstteyken listenin her yerinden; fırlatılan sayfa parmağın hızıyla çıkar). Sayfa telefonda sert bir yayla gelir ve
-gider; menü telefonda açıldığı noktadan büyür (parmağın üstüne çevrildiyse alt köşesinden). `MenuEntry.Item(checked = …)`
+üstteyken listenin her yerinden; telefonda fırlatılan sayfa parmağın hızıyla çıkar). Sayfa telefonda sert bir yayla
+gelir ve gider; menü telefonda açıldığı noktadan büyür (parmağın üstüne çevrildiyse alt köşesinden). `MenuEntry.Item(checked = …)`
 sayfada satır sonunda bir anahtardır ve dokununca sayfayı kapatmadan değişir; menüde onay işaretidir. Kısayollar
 yalnızca fare ya da donanım klavyesi varken yazılır.
 
@@ -422,9 +423,10 @@ DetailTransition(
 - Telefonda kart: listedeki kart ve ayrıntının başlığı aynı anahtarla `Modifier.detailSharedCard("kart-$id")`
   alırsa kart başlığa büyür (köşeleri düzleşir, yüzeyi sayfaya döner), ayrıntının gerisi ardından solar; geri dönüşte
   başlık kartın yerine küçülür. Kapak ve başlık (`detailSharedElement`, `detailSharedBounds`) kartın üstünde uçar.
-- Android 14+ öngörülü geri hareketinde ayrıntı parmakla küçülür ve köşeleri yuvarlanır, liste arkasında parmakla
-  yükselir; bırakınca kalan yol parmağın bıraktığı yerden biter, vazgeçince her şey geri yaylanır. Yolun ortasındaki
-  fikir değişikliği (dokunuştan hemen sonra Geri) geçişi olduğu yerden geri oynatır.
+- Android 14+ öngörülü geri hareketinde ayrıntı parmakla küçülür ve köşeleri yuvarlanır; telefonda liste arkasında
+  parmakla yükselir, bırakınca kalan yol parmağın bıraktığı yerden biter, vazgeçince her şey geri yaylanır, yolun
+  ortasındaki fikir değişikliği (dokunuştan hemen sonra Geri) geçişi olduğu yerden geri oynatır. Tablet genişliğinden
+  yukarı ayrıntı gölge üstünde küçülür ve bırakınca paylaşılan eksenle kapanır (2.2.0'daki gibi).
   Manifestte `<application android:enableOnBackInvokedCallback="true">` gerekir. Eski sürümlerde Geri yine kapatır.
 - Geri hareketini `DetailTransition` üstlenir (`CompactTopBar` içindeyken de); ayrıca `BackHandler` gerekmez.
 

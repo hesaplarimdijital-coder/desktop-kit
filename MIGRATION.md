@@ -267,8 +267,10 @@ Kod değişmeden derlenir; sürümü `2.2.0` yapmak yeter.
 
 ## 2.2.0'dan 2.3.0'a
 
-Kod değişmeden derlenir; sürümü `2.3.0` yapmak yeter. Değişenlerin hepsi telefonda (`WidthClass.Compact`);
-tablet ve DeX'te süreler ve görünüm aynı. Ayrıntılar [CHANGELOG](CHANGELOG.md#230-2026-10-31) içinde.
+Kod değişmeden derlenir (2.2.0'a karşı derlenmiş kod da bağlanır); sürümü `2.3.0` yapmak yeter. Davranış
+değişikliklerinin hepsi telefonda (`WidthClass.Compact`); tablet ve DeX'te süreler ve görünüm aynı, iki tarafta ortak
+olan birkaç düzeltme (yayların eşiği, alt sayfanın yerleşimle kayması, azaltılmış harekette her şeyin bir anda olması)
+CHANGELOG'un "Tablet ve DeX" bölümünde. Ayrıntılar [CHANGELOG](CHANGELOG.md#230-2026-10-31) içinde.
 
 - **Telefonda farklı görünenler:** ayrıntı derinlikte açılır (yüzde 12 kayıp solar, liste altında küçülür) ve
   öngörülü geri hareketinde liste gerçekten arkadadır; oynatıcı şeritten tek parça büyür; alt sayfa daha sert bir
@@ -284,8 +286,10 @@ tablet ve DeX'te süreler ve görünüm aynı. Ayrıntılar [CHANGELOG](CHANGELO
   köşesi (varsayılan `radiusCard`).
 - **Oynatıcıda uçan kapak ve başlık:** `mini` ve `full` içeriğinde aynı öğeyi aynı anahtarla
   `Modifier.playerSharedElement("kapak", RoundedCornerShape(8.dp))` ile işaretle (öğenin değiştiricilerinde ilk
-  sırada, boyutundan önce). İşaretlenmeyen içerik eskisi gibi solar. Tam oynatıcının içeriği sayfa rengi gelmeden
-  görünmez; şeridin denetimleri yolun ilk çeyreğinde solar ve sonra yerleştirilmez (dokunulmaz, okunmaz).
+  sırada, boyutundan önce). İşaretlenmeyen içerik eskisi gibi solar. Öğe çizildiği gibi kaydedilir (donanım tuvalinde
+  kendi grafik katmanına: Coil ya da Glide'ın donanım bitmap'i olan bir kapak da olur); açık başlayan oynatıcıda
+  (geri yüklenen durum) ilk inişte de uçar. Tam oynatıcının içeriği sayfa rengi gelmeden görünmez; şeridin denetimleri
+  yolun ilk çeyreğinde solar ve sonra yerleştirilmez (dokunulmaz, okunmaz).
 - **Satırların sırayla gelişi:** listenin olduğu yerde `val gelis = rememberListAppear(yuklendi)` al, her satıra
   `Modifier.listAppear(gelis, index)` ver. Anahtar, satırların ne zaman geldiğini söyleyen şeydir (yüklenme bayrağı,
   gösterilen albüm); anahtarsız yalnızca listenin ilk görünüşü sayılır. `DetailTransition` listesinde `rememberListAppear`'ı
