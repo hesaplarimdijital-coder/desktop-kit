@@ -137,7 +137,8 @@ fun BottomNavBar(
     val sheet = spec.moreStyle == MoreStyle.Sheet
     val needsMore = spec.overflow(NavKind.BottomBar).isNotEmpty() || (sheet && hasMoreActions)
     val items = spec.shown(NavKind.BottomBar) + if (!needsMore) emptyList() else listOf(if (sheet) moreSheetItem() else moreItem())
-    Column(modifier.fillMaxWidth().glass(DeskGlass.chrome(colors, GlassThickness.Regular))) {
+    // in the phone's shell the bar lies on the shell's one bottom glass
+    Column(modifier.fillMaxWidth().glass(DeskGlass.chrome(colors, GlassThickness.Regular), enabled = LocalShellBottomGlass.current == null)) {
         HorizontalRule()
         // the bar's height, or more with large text (the labels keep their lines whole)
         Row(

@@ -99,6 +99,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.util.lerp
 import desktopkit.R
+import desktopkit.shell.LocalShellBottomGlass
 import desktopkit.shell.LocalShellOverlayHost
 import desktopkit.shell.bottomInsetPadding
 import desktopkit.theme.DeskGlass
@@ -242,6 +243,13 @@ fun ExpandablePlayer(
     val tier = LocalMotionTier.current
     SideEffect { state.tier = tier }
     val expandLabel = stringResource(R.string.dk_player_expand)
+    val sharedGlass = LocalShellBottomGlass.current
+    if (sharedGlass != null) {
+        DisposableEffect(sharedGlass) {
+            sharedGlass.strip = true
+            onDispose { sharedGlass.strip = false }
+        }
+    }
     var miniCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     fun measureAnchor() {
         val coordinates = miniCoordinates ?: return
@@ -264,7 +272,8 @@ fun ExpandablePlayer(
                 miniCoordinates = it
                 measureAnchor()
             }
-            .glass(DeskGlass.chrome(colors, GlassThickness.Regular))
+            // in the phone's shell the strip lies on the shell's one bottom glass
+            .glass(DeskGlass.chrome(colors, GlassThickness.Regular), enabled = sharedGlass == null)
             // hidden while the sheet (which starts with the same strip) is out
             .graphicsLayer { alpha = if (state.progress > SHEET_OUT) 0f else 1f }
             .anchoredDraggable(

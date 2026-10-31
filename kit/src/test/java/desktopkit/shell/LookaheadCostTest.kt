@@ -19,12 +19,14 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import desktopkit.theme.DesktopKitTheme
 import desktopkit.theme.LocalMotionTier
 import desktopkit.theme.MotionTier
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 
-/** How a list inside a [DetailTransition] is measured while it scrolls at rest: counted, printed. */
+/** A list inside a [DetailTransition] scrolled at rest is measured once a frame: no lookahead pass while nothing moves. */
 @RunWith(AndroidJUnit4::class)
 @Config(qualifiers = "tr-w411dp-h891dp-hdpi")
 class LookaheadCostTest {
@@ -62,15 +64,20 @@ class LookaheadCostTest {
         return lookahead to main
     }
 
+    /** It was 57 lookahead measures for 57 main ones: every frame of the scroll measured the list twice. */
     @Test
-    fun countTheMeasuresOfAScrollAtRest() {
+    fun aListScrolledAtRestIsMeasuredOnceAFrame() {
         val (withLookahead, withMain) = scroll(shared = true)
         println("LOOKAHEAD-COST shared=true lookahead=$withLookahead main=$withMain")
+        assertTrue("the scroll was measured: $withMain", withMain > 5)
+        assertEquals("no lookahead pass while nothing moves", 0, withLookahead)
     }
 
     @Test
-    fun countTheMeasuresWithoutSharedElements() {
+    fun withoutSharedElementsAsBefore() {
         val (withLookahead, withMain) = scroll(shared = false)
         println("LOOKAHEAD-COST shared=false lookahead=$withLookahead main=$withMain")
+        assertEquals(0, withLookahead)
+        assertTrue(withMain > 5)
     }
 }

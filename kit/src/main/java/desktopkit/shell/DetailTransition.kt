@@ -39,6 +39,8 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -165,7 +167,11 @@ fun <T : Any> DetailTransition(
                 if (shared != null && animated) DetailSharedScopes(shared, this, tier, side, cards) else null
             }
             val held = phone && dropped && target?.let(detailKey) != seekable.currentState?.let(detailKey)
-            CompositionLocalProvider(LocalDetailSharedScopes provides (if (held) null else scopes)) {
+            CompositionLocalProvider(
+                LocalDetailSharedScopes provides (if (held) null else scopes),
+                // the list's cards register at rest too: the opening decides on its first frame whether a card carries it
+                LocalDetailCards provides (if (target == null && animated && tier == MotionTier.Gesture) cards else null),
+            ) {
                 if (target == null) {
                     // opaque, so the shade left behind a closed detail never shows through the list
                     Box(Modifier.fillMaxSize().background(page)) { list() }
@@ -196,7 +202,19 @@ fun <T : Any> DetailTransition(
             }
         }
     }
-    if (sharedElements) SharedTransitionLayout(container) { content(this) } else Box(container) { content(null) }
+    // the lookahead pass of shared elements is paid only while something moves: a list scrolled at rest inside a
+    // SharedTransitionLayout was measured twice on every frame. At rest the content sits in a plain Box and moves
+    // into the layout (state and all) when a transition or a Back gesture starts, and back out once it is over.
+    val latestContent by rememberUpdatedState(content)
+    val body = remember { movableContentOf { shared: SharedTransitionScope? -> latestContent(shared) } }
+    val moving by remember(transition) {
+        derivedStateOf {
+            latestDetail?.let(detailKey) != transition.currentState?.let(detailKey) ||
+                transition.targetState?.let(detailKey) != transition.currentState?.let(detailKey) ||
+                transition.isRunning || gestureClose || dropped || undoing?.isActive == true
+        }
+    }
+    if (sharedElements && animated && moving) SharedTransitionLayout(container) { body(this) } else Box(container) { body(null) }
 
     if (phone) {
         /**
@@ -431,6 +449,9 @@ internal class DetailSharedState {
 
 internal val LocalDetailSharedScopes = staticCompositionLocalOf<DetailSharedScopes?> { null }
 
+/** The list side's card count of a phone's [DetailTransition], also while no transition runs. */
+internal val LocalDetailCards = staticCompositionLocalOf<DetailSharedState?> { null }
+
 /** Bounds of a shared element move on the opening spring on a phone, on the emphasized curve wider up. */
 private fun boundsTransform(tier: MotionTier) = BoundsTransform { _, _ ->
     if (tier == MotionTier.Gesture) DeskMotion.open(Rect.VisibilityThreshold)
@@ -499,16 +520,17 @@ fun Modifier.detailSharedBounds(key: Any): Modifier {
  */
 @Composable
 fun Modifier.detailSharedCard(key: Any, shape: CornerBasedShape = RoundedCornerShape(DeskTheme.dimens.radiusCard)): Modifier {
+    val cards = LocalDetailCards.current
+    if (cards != null) {
+        DisposableEffect(cards) {
+            cards.registered++
+            onDispose { cards.registered-- }
+        }
+    }
     val scopes = LocalDetailSharedScopes.current ?: return this
     if (scopes.tier != MotionTier.Gesture) return this
     val colors = DeskTheme.colors
     val list = scopes.side == DetailSide.List
-    if (list) {
-        DisposableEffect(scopes.cards) {
-            scopes.cards.registered++
-            onDispose { scopes.cards.registered-- }
-        }
-    }
     val density = LocalDensity.current
     // the corners: the card's at rest in the list, none at rest in the detail, moving with the transition
     val rested = with(density) { shape.topStart.toPx(Size(100f, 100f), this) }

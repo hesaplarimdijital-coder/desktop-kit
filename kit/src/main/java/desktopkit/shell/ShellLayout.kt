@@ -1,6 +1,16 @@
 package desktopkit.shell
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -18,9 +28,11 @@ private const val SLOT_CONTENT = "content"
 private const val SLOT_PLAYER = "player"
 private const val SLOT_OVERLAY = "overlay"
 private const val SLOT_BAND = "band"
+private const val SLOT_GLASS = "glass"
 
-// drawn in this order: the content, the chrome over it, the system band over the sliding bars, the
+// drawn in this order: the content, the phone's bottom glass, the chrome over it, the system band over the sliding bars, the
 // overlay over everything. Within a layer, slots are drawn (and reached with Tab) in the order placed.
+private const val GLASS = 0.5f
 private const val CHROME = 1f
 private const val BAND = 2f
 private const val OVERLAY = 3f
@@ -73,8 +85,38 @@ fun ShellLayout(
     floatingMaxWidth: androidx.compose.ui.unit.Dp = 760.dp,
     systemBottom: () -> Int = { 0 },
     systemBand: @Composable () -> Unit = {},
+) = ShellLayout(
+    navKind, topBar, navigation, player, content, modifier, navigationOffset, overlay, floatingPlayer,
+    floatingMargin, floatingMaxWidth, systemBottom, systemBand, bottomGlass = null,
+)
+
+/**
+ * [ShellLayout] with the phone's one bottom glass: with a [bottomGlass], the strip (when [bottomGlass]
+ * says one is shown), the bottom navigation and the system band lie on one glass surface drawn by the
+ * layout, placed (not translated) from the strip's top down to the window's bottom and moved with
+ * [navigationOffset]: one blur instead of three, and it blurs what is behind it where it is now, also
+ * while the bars slide. The navigation is clipped at the band, which no longer hides it with glass of
+ * its own.
+ */
+@Composable
+internal fun ShellLayout(
+    navKind: NavKind,
+    topBar: @Composable () -> Unit,
+    navigation: @Composable () -> Unit,
+    player: @Composable () -> Unit,
+    content: @Composable () -> Unit,
+    modifier: Modifier,
+    navigationOffset: () -> Int,
+    overlay: @Composable () -> Unit,
+    floatingPlayer: Boolean,
+    floatingMargin: androidx.compose.ui.unit.Dp,
+    floatingMaxWidth: androidx.compose.ui.unit.Dp,
+    systemBottom: () -> Int,
+    systemBand: @Composable () -> Unit,
+    bottomGlass: ShellBottomGlass?,
 ) {
     val slides = navKind == NavKind.BottomBar
+    val shared = if (slides) bottomGlass else null
     // reading order for TalkBack; the Tab key follows the order the slots are placed in (below)
     val navOrder = if (slides) 3f else 0.5f
     Layout(
@@ -82,10 +124,21 @@ fun ShellLayout(
         content = {
             Box(Modifier.layoutId(SLOT_CONTENT).readingOrder(1f)) { content() }
             Box(Modifier.layoutId(SLOT_TOP).readingOrder(0f)) { topBar() }
+            if (shared != null) {
+                Box(Modifier.layoutId(SLOT_GLASS)) {
+                    Box(Modifier.fillMaxSize().offset { IntOffset(0, navigationOffset()) }.then(shared.surface()))
+                }
+            }
             Box(
                 Modifier
                     .layoutId(SLOT_NAV)
                     .readingOrder(navOrder)
+                    .then(
+                        // what slides down into the system band is cut off there (the band has no glass of its own to hide it)
+                        if (shared == null) Modifier else Modifier.drawWithContent {
+                            clipRect(bottom = size.height - navigationOffset()) { this@drawWithContent.drawContent() }
+                        },
+                    )
                     .graphicsLayer { translationY = if (slides) navigationOffset().toFloat() else 0f },
             ) { navigation() }
             Box(
@@ -118,9 +171,14 @@ fun ShellLayout(
                 val player = playerM.measure(Constraints(minWidth = width, maxWidth = width, maxHeight = height))
                 // the content fills the window and never changes size while the bars move: they are drawn over it
                 val content = contentM.measure(Constraints.fixed(width, fullHeight))
+                // the one glass: from the strip's top (or the navigation's) to the window's bottom
+                val glassTop = height - nav.height - (if (shared?.strip == true) player.height else 0)
+                val glass = measurables.firstOrNull { it.layoutId == SLOT_GLASS }
+                    ?.measure(Constraints.fixed(width, (fullHeight - glassTop).coerceAtLeast(0)))
                 layout(width, fullHeight) {
                     top.placeRelative(0, 0, CHROME)
                     content.placeRelative(0, 0)
+                    glass?.placeRelative(0, glassTop, GLASS)
                     player.placeRelative(0, height - nav.height - player.height, CHROME)
                     nav.placeRelative(0, height - nav.height, CHROME)
                     band.placeRelative(0, height, BAND)
@@ -196,3 +254,18 @@ fun ShellLayout(
         }
     }
 }
+
+/**
+ * The phone's one glass surface behind the player strip, the bottom navigation and the system band
+ * (see the internal [ShellLayout]). The shell provides it ([LocalShellBottomGlass]); the bottom bar
+ * and the band then draw no glass of their own, and an [desktopkit.components.ExpandablePlayer]
+ * strip registers itself ([strip]) and draws none either.
+ */
+@Stable
+internal class ShellBottomGlass(val surface: @Composable () -> Modifier) {
+    /** An expandable player's strip lies on the glass, above the navigation. */
+    var strip by mutableStateOf(false)
+}
+
+/** The shell's bottom glass on a phone, or null: then each surface draws its own. */
+internal val LocalShellBottomGlass = staticCompositionLocalOf<ShellBottomGlass?> { null }

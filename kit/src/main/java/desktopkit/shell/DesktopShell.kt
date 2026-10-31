@@ -370,12 +370,17 @@ private fun ShellContent(
         }
     }
 
+    // on a phone one glass lies behind the player strip, the bottom bar and the system band
+    val bottomGlass = remember { ShellBottomGlass { Modifier.glass(DeskGlass.chrome(DeskTheme.colors, GlassThickness.Regular)) } }
+    val sharedGlass = if (navKind == NavKind.BottomBar) bottomGlass else null
+
     CompositionLocalProvider(
         LocalWidthClass provides widthClass,
         LocalCompactTopBarHost provides topBarHost,
         LocalGlassSource provides glassSource,
         LocalShellOverlayHost provides overlayHost,
         LocalShellContentPadding provides padding,
+        LocalShellBottomGlass provides sharedGlass,
     ) {
         ShellLayout(
             navKind = navKind,
@@ -504,6 +509,8 @@ private fun ShellContent(
             floatingMargin = floatingMargin,
             systemBottom = systemBottom,
             systemBand = { SystemBand(navKind, scroll) },
+            floatingMaxWidth = 760.dp,
+            bottomGlass = sharedGlass,
         )
 
         if (spec.moreStyle == MoreStyle.Sheet) {
@@ -528,7 +535,8 @@ private fun SystemBand(navKind: NavKind, scroll: ShellScrollState) {
         Box(
             Modifier
                 .fillMaxSize()
-                .glass(DeskGlass.chrome(colors, GlassThickness.Regular))
+                // the shell's one bottom glass lies behind the band; only without it the band has its own
+                .glass(DeskGlass.chrome(colors, GlassThickness.Regular), enabled = LocalShellBottomGlass.current == null)
                 .drawBehind {
                     val hidden = if (scroll.maxOffsetPx > 0f) (scroll.offsetPx / scroll.maxOffsetPx).coerceIn(0f, 1f) else 0f
                     if (hidden > 0f) drawRect(rule.copy(alpha = rule.alpha * hidden), size = Size(size.width, 1.dp.toPx()))
