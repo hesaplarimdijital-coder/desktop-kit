@@ -4,7 +4,6 @@ import android.graphics.Rect
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationSpec
-import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
@@ -258,14 +257,17 @@ fun GlassBottomSheet(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val tier = LocalMotionTier.current
-    val progress = remember { Animatable(0f) }
-    val drag = remember { Animatable(0f) }
+    val way = remember { SheetWay() }
+    val progress = way.progress
     LaunchedEffect(visible) {
         if (visible) {
-            drag.snapTo(0f)
+            way.drag.snapTo(0f)
+            way.carriedOut = false
             progress.animateTo(1f, sheetWay(tier, tween(DeskMotion.LONG_MS, easing = DeskMotion.EmphasizedDecelerate)))
-        } else if (drag.value > 0f) {
-            // pulled or flung out by the finger: it is already gone, nothing to animate
+        } else if (way.carriedOut) {
+            // pulled or flung out by the finger: it is already gone, nothing to animate (a sheet dismissed
+            // part way down, from the scrim or with Back, still leaves from where it is)
+            way.carriedOut = false
             progress.snapTo(0f)
         } else {
             progress.animateTo(0f, sheetWay(tier, tween(DeskMotion.MEDIUM_MS, easing = DeskMotion.EmphasizedAccelerate)))
@@ -275,11 +277,11 @@ fun GlassBottomSheet(
     if (!showing) return
     val latestDismiss by rememberUpdatedState(onDismiss)
     val sheet: @Composable () -> Unit = {
-        SheetSurface(progress, drag, tier, title, modifier, { latestDismiss() }, content)
+        SheetSurface(way, tier, title, modifier, { latestDismiss() }, content)
     }
     val host = LocalShellOverlayHost.current
     if (host != null) {
-        OverlayLayer(host) { SheetSurface(progress, drag, tier, title, modifier, { latestDismiss() }, content, host.systemBottomPx) }
+        OverlayLayer(host) { SheetSurface(way, tier, title, modifier, { latestDismiss() }, content, host.systemBottomPx) }
         ReturnFocusOnClose(host, visible)
         BackHandler(enabled = visible) { latestDismiss() }
     } else {
@@ -305,6 +307,15 @@ private fun sheetWay(tier: MotionTier, timed: FiniteAnimationSpec<Float>): Finit
     MotionTier.Gesture -> spring(dampingRatio = 0.92f, stiffness = 800f, visibilityThreshold = 0.001f)
     MotionTier.Timed -> timed
     MotionTier.Reduced -> snap()
+}
+
+/** Where a sheet is: how far in ([progress], 0 to 1), how far the finger has pulled it down ([drag], px), and whether the finger took it out. */
+private class SheetWay {
+    val progress = Animatable(0f)
+    val drag = Animatable(0f)
+
+    /** Set when a pull or fling carried the sheet out: the dismiss that follows has nothing left to animate. */
+    var carriedOut = false
 }
 
 /**
@@ -337,8 +348,7 @@ internal fun OverlayLayer(host: ShellOverlayHost, content: @Composable () -> Uni
 
 @Composable
 private fun SheetSurface(
-    progress: Animatable<Float, AnimationVector1D>,
-    drag: Animatable<Float, AnimationVector1D>,
+    way: SheetWay,
     tier: MotionTier,
     title: String?,
     modifier: Modifier,
@@ -346,6 +356,8 @@ private fun SheetSurface(
     content: @Composable ColumnScope.() -> Unit,
     bottomInset: () -> Int = { 0 },
 ) {
+    val progress = way.progress
+    val drag = way.drag
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
     val scope = rememberCoroutineScope()
@@ -357,12 +369,13 @@ private fun SheetSurface(
     val haptics = rememberDeskHaptics()
     val latestDismiss by rememberUpdatedState(onDismiss)
     // pulled down on the handle, or anywhere on the sheet while its list is at the top
-    val pull = remember(drag) { SheetPull(drag) }
+    val pull = remember(way) { SheetPull(way) }
     val settleSpec = DeskMotion.spatial(tier, tween<Float>(DeskMotion.MEDIUM_MS, easing = DeskMotion.Emphasized), 0.5f)
     SideEffect {
         pull.scope = scope
         pull.flingPx = with(density) { 800.dp.toPx() }
         pull.settleSpec = settleSpec
+        pull.carriesOut = tier == MotionTier.Gesture
         pull.onThreshold = { haptics.threshold() }
         pull.onDismiss = { latestDismiss() }
     }
@@ -442,15 +455,18 @@ private fun SheetSurface(
  * The sheet pulled down by the finger. On the handle and the title the drag moves it directly; on
  * the list it comes as nested scrolling: what the list cannot scroll (it is at its top) pulls the
  * sheet down, and pushing up raises a pulled sheet before the list scrolls again. Letting go past a
- * third of the height or with a downward fling closes it: the sheet carries on down at the finger's
- * speed and the dismiss comes once it is gone; otherwise it springs back. On the way past the
- * closing point there is one haptic tick.
+ * third of the height or with a downward fling closes it: on a phone ([carriesOut]) the sheet carries
+ * on down at the finger's speed and the dismiss comes the moment it is out; wider up the dismiss comes
+ * at once and the sheet leaves from where it is, as in 2.2.0. Otherwise it springs back. On the way
+ * past the closing point there is one haptic tick.
  */
-private class SheetPull(private val drag: Animatable<Float, AnimationVector1D>) : NestedScrollConnection {
+private class SheetPull(private val way: SheetWay) : NestedScrollConnection {
+    private val drag = way.drag
     lateinit var scope: CoroutineScope
     var height = 0
     var flingPx = 0f
     var settleSpec: AnimationSpec<Float> = tween()
+    var carriesOut = false
     var onThreshold: () -> Unit = {}
     var onDismiss: () -> Unit = {}
     var pressed = false
@@ -487,12 +503,24 @@ private class SheetPull(private val drag: Animatable<Float, AnimationVector1D>) 
         armed = false
         val far = height > 0 && offset > height / 3f
         if (far || velocity > flingPx) {
-            // out at the speed it was let go with, then dismissed (a close that started from rest
-            // paused for a frame or two after a fling)
+            if (!carriesOut) {
+                onDismiss()
+                return
+            }
+            // out at the speed it was let go with and dismissed the moment it is out, whatever the spring
+            // still does (a close that started from rest paused for a frame or two after a fling)
             val end = height.toFloat()
             offset = end
-            drag.animateTo(end, settleSpec, initialVelocity = velocity.coerceAtLeast(0f))
-            onDismiss()
+            var gone = false
+            fun dismiss() {
+                gone = true
+                way.carriedOut = true
+                onDismiss()
+            }
+            drag.animateTo(end, settleSpec, initialVelocity = velocity.coerceAtLeast(0f)) {
+                if (!gone && value >= end - 0.5f) dismiss()
+            }
+            if (!gone) dismiss()
         } else {
             offset = 0f
             drag.animateTo(0f, settleSpec, initialVelocity = velocity)

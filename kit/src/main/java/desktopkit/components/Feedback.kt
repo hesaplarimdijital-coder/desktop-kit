@@ -9,6 +9,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -440,8 +441,11 @@ private fun ToastCard(toast: DeskToast) {
                                 }
                             }
                             if (!gone) toast.dismiss()
-                        } else {
+                        } else if (tier == MotionTier.Gesture) {
                             swipe.animateTo(0f, DeskMotion.gesture(0.5f), initialVelocity = velocity)
+                        } else {
+                            // the 2.2.0 spring back wider up (a jump with reduced motion)
+                            swipe.animateTo(0f, DeskMotion.fade(tier, spring(dampingRatio = 1f, stiffness = 400f)))
                         }
                     },
                 ),
