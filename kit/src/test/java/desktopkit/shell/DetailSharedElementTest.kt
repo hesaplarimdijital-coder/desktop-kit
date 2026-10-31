@@ -226,32 +226,37 @@ class DetailSharedElementTest {
         }
         assertTrue("the header is still on its way at ${before.last()} dp", before.last() < 400f)
         compose.runOnIdle { detail = null }
+        val window = compose.activity.window.decorView
+        val bitmap = Bitmap.createBitmap(window.width, window.height, Bitmap.Config.ARGB_8888)
+        fun cardIsRed(): Boolean {
+            compose.runOnIdle { window.draw(Canvas(bitmap)) }
+            val card = compose.onNodeWithTag("card", useUnmergedTree = true).fetchSemanticsNode().boundsInWindow
+            return red(bitmap.getPixel(card.center.x.roundToInt(), card.center.y.roundToInt()))
+        }
         val after = mutableListOf<Float>()
         repeat(40) {
             compose.mainClock.advanceTimeByFrame()
             compose.waitForIdle()
-            if (compose.onAllNodesWithTag("header", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()) {
-                after += compose.onNodeWithTag("header", useUnmergedTree = true).getBoundsInRoot().let { (it.right - it.left).value }
+            val header = compose.onAllNodesWithTag("header", useUnmergedTree = true).fetchSemanticsNodes().firstOrNull()
+            if (header != null) after += (header.boundsInWindow.width / compose.density.density)
+            // once the header is back at the card's size (or standing at its own, faded out, before it leaves), the
+            // card draws itself where it is: it was left dark, waiting for an overlay that no longer drew it
+            if (header == null || after.last() < 170f || after.last() >= 400f) {
+                assertTrue("frame $it: the card is red (header ${after.lastOrNull()})", cardIsRed())
             }
         }
         compose.mainClock.autoAdvance = true
-        // in the frame the transition is over the detail stands at its own size, faded out, for the composition that
-        // removes it: not drawn, not a jump
+        // after the way back the detail stands at its own size, faded out, for the compositions that let its shared
+        // elements go and remove it: not drawn, not a jump
         val gone = compose.onAllNodesWithTag("header", useUnmergedTree = true).fetchSemanticsNodes().isEmpty()
-        val drawn = if (gone && after.size > 1) after.dropLast(1) else after
+        val tail = after.takeLastWhile { it >= 400f }
+        val drawn = after.dropLast(tail.size)
+        assertTrue("the header came back: $after", gone && drawn.isNotEmpty() && drawn.last() < 170f && tail.size <= 4)
         val largestStep = drawn.zipWithNext { a, b -> b - a }.plus(drawn.first() - before.last()).max()
-        assertTrue("the header came back: $after", gone && drawn.last() < 170f)
         // the opening grows the header by 40 dp a frame at most; a jump to its full width is 250
         assertTrue("the header jumped $largestStep dp wider in one frame on the way back (before $before, after $after)", largestStep < 60f)
-        // and once everything has settled the card draws itself again where it is (it was left dark: its content
-        // still thought the overlay would draw it)
         compose.waitForIdle()
-        val window = compose.activity.window.decorView
-        val bitmap = Bitmap.createBitmap(window.width, window.height, Bitmap.Config.ARGB_8888)
-        compose.runOnIdle { window.draw(Canvas(bitmap)) }
-        val card = compose.onNodeWithTag("card", useUnmergedTree = true).fetchSemanticsNode().boundsInWindow
-        val middle = bitmap.getPixel(card.center.x.roundToInt(), card.center.y.roundToInt())
-        assertTrue("the card is red again after the turn-around (${Integer.toHexString(middle)})", red(middle))
+        assertTrue("the card is red once everything has settled", cardIsRed())
     }
 
     /** The whole way: open, close, and the card draws itself again where it is once the detail is gone. */
