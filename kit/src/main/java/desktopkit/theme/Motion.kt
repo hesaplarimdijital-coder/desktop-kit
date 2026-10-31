@@ -73,9 +73,9 @@ object DeskMotion {
     fun <T> effects(): FiniteAnimationSpec<T> = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 1600f)
 
     /**
-     * The phone's spring for everything a finger moves or flings: bars, sheets, the player, screen
-     * scale. No bounce, medium-low stiffness, so a new touch can catch it anywhere and a fling hands
-     * over its speed.
+     * The phone's spring for everything a finger lets go of: bars, sheets, the player, a swiped
+     * strip. Critically damped at 600, so a new touch can catch it anywhere, a fling hands over its
+     * speed, and it settles in about 300 ms without the long soft tail of the 0.2.0 spring.
      *
      * [visibilityThreshold] is where the spring counts as arrived: half a pixel for pixel values,
      * [androidx.compose.animation.core.VisibilityThreshold] for offsets and rects, a thousandth for
@@ -85,7 +85,15 @@ object DeskMotion {
      * sheet's height is left to jump at the end.
      */
     fun <T> gesture(visibilityThreshold: T? = null): SpringSpec<T> =
-        spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow, visibilityThreshold = visibilityThreshold)
+        spring(dampingRatio = 0.92f, stiffness = 600f, visibilityThreshold = visibilityThreshold)
+
+    /**
+     * The phone's spring for what a tap opens or closes: a detail and the things flying into it, a
+     * sheet. Android's own standard spatial spring (0.9 at 700): quicker than [gesture], settled in
+     * about 250 ms, its overshoot too small to see. [visibilityThreshold] as for [gesture].
+     */
+    fun <T> open(visibilityThreshold: T? = null): SpringSpec<T> =
+        spring(dampingRatio = 0.9f, stiffness = 700f, visibilityThreshold = visibilityThreshold)
 
     /** The tier for a window: springs on a phone, the timed curves from tablet width up, nothing with [reduced] motion. */
     fun tier(widthClass: WidthClass, reduced: Boolean = false): MotionTier = when {
@@ -117,7 +125,7 @@ object DeskMotion {
 
 /** How the kit moves in a window; see [DeskMotion.tier]. */
 enum class MotionTier {
-    /** Phone: interruptible, velocity-aware springs for spatial and finger-driven motion. */
+    /** Phone: interruptible, velocity-aware springs for spatial and finger-driven motion ([DeskMotion.gesture], [DeskMotion.open]). */
     Gesture,
 
     /** Tablet and DeX: the timed Material curves (90 ms fade-out, 210 ms scale-in, 150 ms cross-fade, 300 ms panels). */
