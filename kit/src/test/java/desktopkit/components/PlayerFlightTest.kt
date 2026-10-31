@@ -49,11 +49,11 @@ class PlayerFlightTest {
 
     private lateinit var player: ExpandablePlayerState
 
-    private fun phone() {
+    private fun phone(initial: PlayerValue = PlayerValue.Collapsed) {
         compose.runOnUiThread { compose.activity.actionBar?.hide() }
         compose.setContent {
             DesktopKitTheme(themeMode = ThemeMode.Dark, inputMode = InputMode.Touch) {
-                player = rememberExpandablePlayerState()
+                player = rememberExpandablePlayerState(initial)
                 TestShell(
                     WidthClass.Compact,
                     startRoute = "music",
@@ -146,5 +146,49 @@ class PlayerFlightTest {
         draw()
         assertTrue("the strip shows the cover again", bitmap.showsArtworkAt(strip))
         assertEquals(1, covers("cover-mini").size)
+    }
+
+    /**
+     * A player that starts open (restored expanded) has never shown the strip's copy: it is placed until it has
+     * drawn once, so the cover still flies back to the strip on the first way down.
+     */
+    @Test
+    fun theCoverFliesBackFromAPlayerThatStartedOpen() {
+        phone(PlayerValue.Expanded)
+        assertTrue(player.isExpanded)
+        val window = compose.activity.window.decorView
+        val bitmap = Bitmap.createBitmap(window.width, window.height, Bitmap.Config.ARGB_8888)
+        fun draw() = compose.runOnIdle { window.draw(Canvas(bitmap)) }
+        // drawn once, the strip's copy in the sheet leaves; the strip itself is still there (hidden under the sheet)
+        draw()
+        compose.waitForIdle()
+        assertEquals("the strip's copy in the sheet is gone once it has drawn", 1, covers("cover-mini").size)
+        val full = covers("cover-full").single()
+        draw()
+        assertTrue("the full player shows the cover at its place", bitmap.showsArtworkAt(full))
+        compose.mainClock.autoAdvance = false
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        var back = 0
+        var strip: Rect? = null
+        repeat(90) {
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+            val p = player.progress
+            if (p <= 0f || p >= 1f) return@repeat
+            val fullNow = covers("cover-full").singleOrNull() ?: return@repeat
+            // the strip's place, from the strip itself (the one cover that is not in the sheet)
+            val stripNow = covers("cover-mini").maxBy { it.top }
+            strip = stripNow
+            val flying = lerp(stripNow.translate(0f, -p * player.collapsedTop), fullNow, p)
+            draw()
+            assertTrue("frame $it (p=$p) on the way back: the cover is drawn where the way has it, at $flying", bitmap.showsArtworkAt(flying))
+            back++
+        }
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        assertTrue("the way back was checked in $back frames", back >= 6)
+        assertTrue(!player.isExpanded)
+        draw()
+        assertTrue("the strip shows the cover at the end", bitmap.showsArtworkAt(strip!!))
     }
 }
