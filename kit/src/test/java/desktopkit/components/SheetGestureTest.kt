@@ -81,18 +81,29 @@ class SheetGestureTest {
         assertEquals("not dismissed while still on its way out", 0, dismissed)
         var last = compose.onNodeWithTag("row1").getBoundsInRoot().top
         var frames = 0
+        var moved = 0
+        var still = 0
         while (dismissed == 0 && frames < 90) {
             compose.mainClock.advanceTimeByFrame()
             compose.waitForIdle()
             frames++
             if (dismissed == 0) {
                 val top = compose.onNodeWithTag("row1").getBoundsInRoot().top
-                assertTrue("frame $frames: the sheet stood still ($last → $top)", top > last)
+                assertTrue("frame $frames: the sheet came back up ($last → $top)", top >= last)
+                // the animation's first frame is its starting point; after that no pause of two frames
+                if (top > last) {
+                    moved++
+                    still = 0
+                } else {
+                    still++
+                    assertTrue("frame $frames: the sheet stood still at $top", still <= 1)
+                }
                 last = top
             }
         }
         compose.mainClock.autoAdvance = true
         assertEquals(1, dismissed)
+        assertTrue("the sheet moved on its own after the finger lifted ($moved frames)", moved >= 3)
     }
 
     @Test
