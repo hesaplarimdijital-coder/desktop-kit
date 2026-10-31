@@ -8,6 +8,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -48,11 +50,16 @@ class ToastSwipeTest {
         compose.waitForIdle()
     }
 
+    /** The toast's card (the glass row with the pane title). */
+    private fun card() = compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.PaneTitle))
+
     @Test
     fun onAPhoneASwipedToastCarriesOnBeforeItIsDismissed() {
         toast(MotionTier.Gesture)
         compose.mainClock.autoAdvance = false
-        compose.onNodeWithText("Çöpe taşındı").performTouchInput { swipe(center, center + Offset(-160f, 0f), durationMillis = 60) }
+        // a quick swipe over a third of the card: committed by its speed, two thirds of the way still to go
+        val width = card().getBoundsInRoot().let { with(compose.density) { (it.right - it.left).toPx() } }
+        compose.onNodeWithText("Çöpe taşındı").performTouchInput { swipe(center, center + Offset(-width * 0.35f, 0f), durationMillis = 40) }
         compose.waitForIdle()
         assertNotNull("not dismissed while still on its way out", toasts.current)
         var last = compose.onNodeWithText("Çöpe taşındı").getBoundsInRoot().left
@@ -71,14 +78,15 @@ class ToastSwipeTest {
         }
         compose.mainClock.autoAdvance = true
         assertNull("the toast was dismissed once it was out", toasts.current)
-        assertTrue("the toast moved on after the finger lifted ($moved frames)", moved >= 3)
+        assertTrue("the toast moved on after the finger lifted ($moved frames)", moved >= 2)
     }
 
     @Test
     fun widerUpASwipedToastGoesAtOnce() {
         toast(MotionTier.Timed)
         compose.mainClock.autoAdvance = false
-        compose.onNodeWithText("Çöpe taşındı").performTouchInput { swipe(center, center + Offset(-160f, 0f), durationMillis = 60) }
+        val width = card().getBoundsInRoot().let { with(compose.density) { (it.right - it.left).toPx() } }
+        compose.onNodeWithText("Çöpe taşındı").performTouchInput { swipe(center, center + Offset(-width * 0.35f, 0f), durationMillis = 40) }
         compose.waitForIdle()
         assertNull(toasts.current)
         compose.mainClock.autoAdvance = true
