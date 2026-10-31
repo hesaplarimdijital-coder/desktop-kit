@@ -243,6 +243,57 @@ class DetailSharedElementTest {
         assertTrue("the header came back: $after", gone && drawn.last() < 170f)
         // the opening grows the header by 40 dp a frame at most; a jump to its full width is 250
         assertTrue("the header jumped $largestStep dp wider in one frame on the way back (before $before, after $after)", largestStep < 60f)
+        // and once everything has settled the card draws itself again where it is (it was left dark: its content
+        // still thought the overlay would draw it)
+        compose.waitForIdle()
+        val window = compose.activity.window.decorView
+        val bitmap = Bitmap.createBitmap(window.width, window.height, Bitmap.Config.ARGB_8888)
+        compose.runOnIdle { window.draw(Canvas(bitmap)) }
+        val card = compose.onNodeWithTag("card", useUnmergedTree = true).fetchSemanticsNode().boundsInWindow
+        val middle = bitmap.getPixel(card.center.x.roundToInt(), card.center.y.roundToInt())
+        assertTrue("the card is red again after the turn-around (${Integer.toHexString(middle)})", red(middle))
+    }
+
+    /** The whole way: open, close, and the card draws itself again where it is once the detail is gone. */
+    @Test
+    fun theCardIsDrawnAgainOnceTheDetailIsGone() {
+        var detail by mutableStateOf<String?>(null)
+        compose.runOnUiThread { compose.activity.actionBar?.hide() }
+        compose.setContent {
+            DesktopKitTheme {
+                androidx.compose.runtime.CompositionLocalProvider(LocalMotionTier provides MotionTier.Gesture) {
+                    DetailTransition(
+                        detail = detail,
+                        onBack = { detail = null },
+                        list = {
+                            Column {
+                                Box(Modifier.detailSharedCard("card").size(160.dp).background(Color.Red).testTag("card"))
+                            }
+                        },
+                    ) {
+                        Column {
+                            Box(Modifier.detailSharedCard("card").fillMaxWidth().height(300.dp).background(Color.Blue).testTag("header"))
+                        }
+                    }
+                }
+            }
+        }
+        compose.waitForIdle()
+        val window = compose.activity.window.decorView
+        val bitmap = Bitmap.createBitmap(window.width, window.height, Bitmap.Config.ARGB_8888)
+        fun cardIsRed(): Boolean {
+            compose.runOnIdle { window.draw(Canvas(bitmap)) }
+            val card = compose.onNodeWithTag("card", useUnmergedTree = true).fetchSemanticsNode().boundsInWindow
+            return red(bitmap.getPixel(card.center.x.roundToInt(), card.center.y.roundToInt()))
+        }
+        assertTrue("the card is red before", cardIsRed())
+        compose.runOnIdle { detail = "album" }
+        compose.waitForIdle()
+        compose.onNodeWithTag("header", useUnmergedTree = true).assertExists()
+        compose.runOnIdle { detail = null }
+        compose.waitForIdle()
+        compose.onNodeWithTag("header", useUnmergedTree = true).assertDoesNotExist()
+        assertTrue("the card is red again once the detail is gone", cardIsRed())
     }
 
     private fun red(pixel: Int): Boolean {

@@ -127,7 +127,10 @@ fun <T : Any> DetailTransition(
     var gestureClose by remember { mutableStateOf(false) }
     var swipeEdge by remember { mutableIntStateOf(BackEventCompat.EDGE_LEFT) }
     // the run back after a cancelled gesture; a change of the detail takes over from it
-    var undo by remember { mutableStateOf<Job?>(null) }
+    var undoing by remember { mutableStateOf<Job?>(null) }
+    // after a run back the content that was on its way lets its shared elements go before the transition stands
+    // still: in between, its partners would wait for an overlay that no longer draws them and vanish for a frame
+    var dropped by remember { mutableStateOf(false) }
 
     val container = modifier.fillMaxSize().background(page)
     val content: @Composable (SharedTransitionScope?) -> Unit = { shared ->
@@ -145,7 +148,8 @@ fun <T : Any> DetailTransition(
             val scopes = remember(shared, this, animated, side) {
                 if (shared != null && animated) DetailSharedScopes(shared, this, tier, side, cards) else null
             }
-            CompositionLocalProvider(LocalDetailSharedScopes provides scopes) {
+            val held = dropped && target?.let(detailKey) != seekable.currentState?.let(detailKey)
+            CompositionLocalProvider(LocalDetailSharedScopes provides (if (held) null else scopes)) {
                 if (target == null) {
                     Box(Modifier.fillMaxSize().background(page)) { list() }
                 } else {
@@ -174,10 +178,24 @@ fun <T : Any> DetailTransition(
     }
     if (sharedElements) SharedTransitionLayout(container) { content(this) } else Box(container) { content(null) }
 
+    /**
+     * The transition turned around: run back to where it came from, the content that was on its way
+     * lets its shared elements go (a composition), then the transition stands still at its current state.
+     */
+    suspend fun undo(spec: FiniteAnimationSpec<Float>) {
+        seekable.runBack(spec)
+        dropped = true
+        withFrameNanos { }
+        withFrameNanos { }
+        seekable.snapTo(seekable.currentState)
+        gestureClose = false
+    }
+
     // the app's detail drives the transition; a Back gesture that was let go finishes from where the finger left it
     LaunchedEffect(detail?.let(detailKey)) {
-        undo?.cancel()
-        undo = null
+        undoing?.cancel()
+        undoing = null
+        dropped = false
         val target = detail
         when {
             !animated -> seekable.snapTo(target)
@@ -187,10 +205,8 @@ fun <T : Any> DetailTransition(
             }
             // a change of mind on the way (Back right after the tap, the tap again right after Back): the way is run
             // back from where it is
-            seekable.targetState != seekable.currentState && seekable.currentState?.let(detailKey) == target?.let(detailKey) -> {
-                gestureClose = false
-                seekable.runBack(DeskMotion.spatial(tier, tween(COMMIT_MS, easing = DeskMotion.Standard), FRACTION))
-            }
+            seekable.targetState != seekable.currentState && seekable.currentState?.let(detailKey) == target?.let(detailKey) ->
+                undo(DeskMotion.spatial(tier, tween(COMMIT_MS, easing = DeskMotion.Standard), FRACTION))
             else -> {
                 gestureClose = false
                 seekable.animateTo(target)
@@ -214,21 +230,13 @@ fun <T : Any> DetailTransition(
                 latestOnBack()
                 // an app that keeps its detail: the gesture is undone
                 if (animated) {
-                    undo = scope.launch {
+                    undoing = scope.launch {
                         withFrameNanos { }
-                        if (latestDetail != null && gestureClose) {
-                            seekable.runBack(DeskMotion.gesture(FRACTION))
-                            gestureClose = false
-                        }
+                        if (latestDetail != null && gestureClose) undo(DeskMotion.gesture(FRACTION))
                     }
                 }
             } catch (e: CancellationException) {
-                if (animated) {
-                    undo = scope.launch {
-                        seekable.runBack(DeskMotion.gesture(FRACTION))
-                        gestureClose = false
-                    }
-                }
+                if (animated) undoing = scope.launch { undo(DeskMotion.gesture(FRACTION)) }
                 throw e
             }
         }
@@ -239,23 +247,22 @@ fun <T : Any> DetailTransition(
 private const val GESTURE_END = 0.85f
 
 /**
- * A transition turned around on its way: its fraction runs back to 0 on [spec], then it stands at its
- * current state again. Retargeted at its own current state instead, a seekable transition drops the
- * shared elements' match for a frame: the detail's header jumped to its full size and left from there.
- * Run back, the shared elements fly back along their path and the content's entering is undone.
+ * A transition turned around on its way: its fraction runs back to 0 on [spec], the target held.
+ * Retargeted at its own current state instead, a seekable transition drops the shared elements'
+ * match for a frame: the detail's header jumped to its full size and left from there. Run back,
+ * the shared elements fly back along their path and the content's entering is undone. The caller
+ * then stands the transition at its current state (see `undo` in [DetailTransition]).
  */
 private suspend fun <S> SeekableTransitionState<S>.runBack(spec: FiniteAnimationSpec<Float>) {
     val held = targetState
-    if (held != currentState && fraction > 0f) {
-        val way = TargetBasedAnimation(spec, Float.VectorConverter, fraction, 0f)
-        val start = withFrameNanos { it }
-        while (true) {
-            val played = withFrameNanos { it } - start
-            seekTo(way.getValueFromNanos(played).coerceIn(0f, 1f), held)
-            if (way.isFinishedFromNanos(played)) break
-        }
+    if (held == currentState || fraction <= 0f) return
+    val way = TargetBasedAnimation(spec, Float.VectorConverter, fraction, 0f)
+    val start = withFrameNanos { it }
+    while (true) {
+        val played = withFrameNanos { it } - start
+        seekTo(way.getValueFromNanos(played).coerceIn(0f, 1f), held)
+        if (way.isFinishedFromNanos(played)) break
     }
-    snapTo(currentState)
 }
 
 /** The way out after the finger lets go, from wherever it was. */
