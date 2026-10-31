@@ -45,6 +45,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -63,7 +64,10 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -83,6 +87,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
@@ -125,9 +130,9 @@ class ExpandablePlayerState(initialValue: PlayerValue, @Suppress("unused") densi
     /** The motion tier of the surrounding shell; set by [ExpandablePlayer], so [expand] jumps with reduced motion. */
     internal var tier: MotionTier = MotionTier.Gesture
 
-    /** A tap's expand or collapse: the opening spring's damping, a little softer for the whole screen's way. */
+    /** A tap's expand or collapse: the opening spring's damping, a little softer for the whole screen's way (a jump with reduced motion). */
     private fun settle(): FiniteAnimationSpec<Float> =
-        DeskMotion.spatial(tier, spring(dampingRatio = 0.9f, stiffness = 500f, visibilityThreshold = DeskMotion.PIXEL), DeskMotion.PIXEL)
+        DeskMotion.fade(tier, spring(dampingRatio = 0.9f, stiffness = 500f, visibilityThreshold = DeskMotion.PIXEL))
 
     /** The settled value, or the one being animated to. */
     val currentValue: PlayerValue get() = draggable.currentValue
@@ -260,13 +265,14 @@ fun ExpandablePlayer(
                 flingBehavior = playerFlingBehavior(state),
             )
             .semantics {
-                customActions = listOf(CustomAccessibilityAction(expandLabel) { scope.launch { state.expand() }; true })
+                customActions = listOf(CustomAccessibilityAction(expandLabel) { measureAnchor(); scope.launch { state.expand() }; true })
             }
             // the sheet opens from where the strip is drawn, also when a scroll has moved the bars
             // (the bars are left where they are: the expanding sheet covers them, and the strip is
             // back in the same place when it closes). Measured on every press, since a moved bar
-            // moves the strip without laying it out again.
-            .pointerInput(Unit) {
+            // moves the strip without laying it out again (and once more on the click, for one
+            // that comes without a press: TalkBack's).
+            .pointerInput(host, state) {
                 awaitPointerEventScope {
                     while (true) {
                         val event = awaitPointerEvent(PointerEventPass.Initial)
@@ -275,6 +281,7 @@ fun ExpandablePlayer(
                 }
             }
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClickLabel = expandLabel) {
+                measureAnchor()
                 scope.launch { state.expand() }
             },
     ) {
@@ -314,6 +321,11 @@ private fun PlayerSheet(
     val flight = remember { PlayerFlight() }
     SideEffect { flight.progress = { state.progress } }
     val label = stringResource(R.string.dk_player)
+    // the glass is under the page colour once the sheet is up: no blur for the open player
+    val glassOn by remember(state) { derivedStateOf { state.progress < 1f } }
+    // the strip's controls are placed while the way is in its first part, and until they have drawn once: a
+    // sheet that starts up (restored expanded) records them for the way down from the first frame
+    val miniPlaced by remember(state, flight) { derivedStateOf { state.progress < MINI_GONE || !flight.miniDrawn } }
     // drawn no more from the frame the mini player is back (it leaves the overlay a frame later)
     Box(Modifier.fillMaxSize().graphicsLayer { alpha = if (state.progress > SHEET_OUT || state.targetValue == PlayerValue.Expanded) 1f else 0f }) {
         Box(
@@ -340,7 +352,7 @@ private fun PlayerSheet(
                     clip = true
                 }
                 // the strip's glass, turning into the page as the sheet rises
-                .glass(DeskGlass.chrome(colors, GlassThickness.Regular))
+                .glass(DeskGlass.chrome(colors, GlassThickness.Regular), enabled = glassOn)
                 .onGloballyPositioned { flight.sheet = it }
                 .anchoredDraggable(state.draggable, Orientation.Vertical, flingBehavior = playerFlingBehavior(state))
                 .semantics { paneTitle = label },
@@ -354,7 +366,11 @@ private fun PlayerSheet(
                         .fillMaxWidth()
                         .height(miniHeight)
                         .graphicsLayer { alpha = (1f - state.progress / MINI_FADE).coerceIn(0f, 1f) }
-                        .placedWhile { state.progress < MINI_GONE },
+                        .placedWhile { miniPlaced }
+                        .drawWithContent {
+                            drawContent()
+                            if (!flight.miniDrawn) flight.miniDrawn = true
+                        },
                 ) { mini() }
             }
             CompositionLocalProvider(LocalPlayerFlight provides flight, LocalPlayerSide provides PlayerSide.Full) {
@@ -377,10 +393,12 @@ private fun PlayerSheet(
             events.collect { event -> backProgress.snapTo(event.progress) }
             collapse()
             // the shrink rides down with the sheet (the layer above scales it by the progress) and lets go once
-            // the sheet has landed on the strip, or a finger has caught it on the way
+            // the sheet has landed on the strip, or a finger has caught it on the way. The collapse starts with
+            // the next frame; should it not (a finger already on the sheet, nowhere to go), the shrink lets go now
             scope.launch {
-                snapshotFlow { state.draggable.isAnimationRunning }.first { it }
-                snapshotFlow { state.draggable.isAnimationRunning }.first { !it }
+                var waited = 0
+                while (!state.draggable.isAnimationRunning && waited++ < 2) withFrameNanos { }
+                if (state.draggable.isAnimationRunning) snapshotFlow { state.draggable.isAnimationRunning }.first { !it }
                 if (state.progress <= SHEET_OUT) backProgress.snapTo(0f)
                 else backProgress.animateTo(0f, DeskMotion.spatial(state.tier, tween(DeskMotion.MEDIUM_MS, easing = DeskMotion.Emphasized), 0.001f))
             }
@@ -423,105 +441,155 @@ internal val LocalPlayerSide = staticCompositionLocalOf { PlayerSide.Mini }
  * [shape] is the element's own rounded shape, kept in flight. In flight the element marked first in
  * [mini] lies on top (a title crossing the cover's path passes under it). Outside an
  * [ExpandablePlayer]'s sheet nothing flies, and with reduced motion the player jumps as a whole.
+ *
+ * Each copy is recorded as it draws (into a graphics layer, so an image's hardware bitmap draws as
+ * anywhere else; into a picture on a software canvas, as in a screenshot test) and flies as it last
+ * drew: the strip's copy as it looked when the strip's controls went, the full player's as it looks now.
  */
 @Composable
 fun Modifier.playerSharedElement(key: Any, shape: CornerBasedShape? = null): Modifier {
     val flight = LocalPlayerFlight.current ?: return this
     val side = LocalPlayerSide.current
     val density = LocalDensity.current
+    val layer = rememberGraphicsLayer()
     val entry = remember(flight, key) { flight.entry(key) }
-    DisposableEffect(entry, side) { onDispose { entry.clear(side) } }
+    DisposableEffect(entry, side) { onDispose { flight.release(key, side) } }
     return this
         .onGloballyPositioned { coordinates ->
             val radius = shape?.topStart?.toPx(coordinates.size.toSize(), density) ?: 0f
-            entry.place(side, coordinates, radius)
+            entry.on(side).place(coordinates, radius)
         }
         .drawWithContent {
             // the element is recorded for the flight on every draw; in flight the flight draws it, else it draws itself
-            val picture = entry.record(side, this)
-            if (!flight.flying(entry)) drawIntoCanvas { it.nativeCanvas.drawPicture(picture) }
+            val copy = entry.on(side)
+            copy.record(this, layer)
+            if (!flight.flying(entry)) copy.draw(this)
         }
 }
 
 /** The elements flying between the strip and the full player, and the sheet they fly in. */
 internal class PlayerFlight {
-    /** One shared element: its place and picture on both sides. */
+    /** One copy of a shared element (the strip's or the full player's): where it is and what it last drew. */
+    class Copy {
+        var coordinates: LayoutCoordinates? = null
+        var radius = 0f
+
+        /** The element's own layer, recorded into on a hardware canvas: its content draws there as it does anywhere. */
+        private var layer: GraphicsLayer? = null
+
+        /** Recorded into on a software canvas (a test's bitmap), which cannot draw a layer: a picture plays back on any canvas. */
+        private val picture = Picture()
+
+        /** Where the latest recording is: in [layer] (true), in [picture] (false), nowhere yet (null). */
+        private var inLayer: Boolean? = null
+
+        /** The copy is in the tree and has drawn once. */
+        val ready: Boolean get() = coordinates?.isAttached == true && inLayer != null
+
+        /** The recorded size. */
+        val width: Int get() = if (inLayer == true) layer?.size?.width ?: 0 else picture.width
+        val height: Int get() = if (inLayer == true) layer?.size?.height ?: 0 else picture.height
+
+        fun place(coordinates: LayoutCoordinates, radius: Float) {
+            this.coordinates = coordinates
+            this.radius = radius
+        }
+
+        /** Records the element's content as it draws into [scope]: into [layer] on a hardware canvas, into the picture else. */
+        fun record(scope: ContentDrawScope, layer: GraphicsLayer) {
+            val width = scope.size.width.roundToInt().coerceAtLeast(1)
+            val height = scope.size.height.roundToInt().coerceAtLeast(1)
+            if (scope.drawContext.canvas.nativeCanvas.isHardwareAccelerated) {
+                with(scope) { layer.record(IntSize(width, height)) { scope.drawContent() } }
+                this.layer = layer
+                inLayer = true
+            } else {
+                val canvas = Canvas(picture.beginRecording(width, height))
+                val own = scope.drawContext.canvas
+                scope.drawContext.canvas = canvas
+                try {
+                    scope.drawContent()
+                } finally {
+                    scope.drawContext.canvas = own
+                    picture.endRecording()
+                }
+                inLayer = false
+            }
+        }
+
+        /** Draws the latest recording at the origin of [scope], as recorded. */
+        fun draw(scope: DrawScope) {
+            val recorded = layer
+            if (inLayer == true && recorded != null) scope.drawLayer(recorded)
+            else scope.drawIntoCanvas { it.nativeCanvas.drawPicture(picture) }
+        }
+
+        fun clear() {
+            coordinates = null
+            layer = null
+            inLayer = null
+        }
+    }
+
+    /** One shared element: its two copies and its way between them. */
     class Entry {
-        var mini: LayoutCoordinates? = null
-        var full: LayoutCoordinates? = null
-        var miniRadius = 0f
-        var fullRadius = 0f
-        val miniPicture = Picture()
-        val fullPicture = Picture()
-        private var miniRecorded = false
-        private var fullRecorded = false
+        val mini = Copy()
+        val full = Copy()
+
+        /** Where the element is in the strip and in the full player, in the sheet's coordinates (see [PlayerFlight.locate]). */
+        var from = Rect.Zero
+        var to = Rect.Zero
         val path = Path()
 
-        fun place(side: PlayerSide, coordinates: LayoutCoordinates, radius: Float) {
-            if (side == PlayerSide.Mini) {
-                mini = coordinates
-                miniRadius = radius
-            } else {
-                full = coordinates
-                fullRadius = radius
-            }
-        }
+        fun on(side: PlayerSide): Copy = if (side == PlayerSide.Mini) mini else full
 
-        /** Records the element's drawing (a picture plays back on any canvas, a software one too) and returns it. */
-        fun record(side: PlayerSide, scope: ContentDrawScope): Picture {
-            val picture = if (side == PlayerSide.Mini) miniPicture else fullPicture
-            val canvas = Canvas(picture.beginRecording(scope.size.width.roundToInt().coerceAtLeast(1), scope.size.height.roundToInt().coerceAtLeast(1)))
-            val own = scope.drawContext.canvas
-            scope.drawContext.canvas = canvas
-            try {
-                scope.drawContent()
-            } finally {
-                scope.drawContext.canvas = own
-                picture.endRecording()
-            }
-            if (side == PlayerSide.Mini) miniRecorded = true else fullRecorded = true
-            return picture
-        }
-
-        fun clear(side: PlayerSide) {
-            if (side == PlayerSide.Mini) {
-                mini = null
-                miniRecorded = false
-            } else {
-                full = null
-                fullRecorded = false
-            }
-        }
-
-        /** Both sides are placed and recorded. */
-        val ready: Boolean get() = mini?.isAttached == true && full?.isAttached == true && miniRecorded && fullRecorded
+        /** Both copies are in the tree and have drawn. */
+        val ready: Boolean get() = mini.ready && full.ready
     }
 
     val entries = LinkedHashMap<Any, Entry>()
     var sheet: LayoutCoordinates? = null
     var progress: () -> Float = { 0f }
+
+    /** Set once the strip's copy of the content has drawn in the sheet; until then it is placed whatever the progress. */
+    var miniDrawn by mutableStateOf(false)
+
     private val fade = Paint()
 
     fun entry(key: Any): Entry = entries.getOrPut(key) { Entry() }
 
-    /** Whether the flight draws [entry] now (on the way, with both sides known). */
-    fun flying(entry: Entry): Boolean {
-        val p = progress()
-        return p > 0f && p < 1f && sheet?.isAttached == true && entry.ready
+    /** One side of the element with [key] has left; with both gone the element is forgotten. */
+    fun release(key: Any, side: PlayerSide) {
+        val entry = entries[key] ?: return
+        entry.on(side).clear()
+        if (entry.mini.coordinates == null && entry.full.coordinates == null) entries.remove(key)
     }
 
-    /** Draws every ready element at [progress] of its way; the strip's picture fades away over the first [CROSS], the full player's is under it. */
+    /** Finds [entry]'s way in [sheet] (its [Entry.from] and [Entry.to]); false while one end is unknown or empty. */
+    private fun locate(entry: Entry, sheet: LayoutCoordinates): Boolean {
+        if (!entry.ready) return false
+        entry.from = sheet.localBoundingBoxOf(entry.mini.coordinates!!, clipBounds = false)
+        entry.to = sheet.localBoundingBoxOf(entry.full.coordinates!!, clipBounds = false)
+        return !entry.from.isEmpty && !entry.to.isEmpty
+    }
+
+    /** Whether the flight draws [entry] now (on the way, with both ends known): then the element does not draw itself. */
+    fun flying(entry: Entry): Boolean {
+        val p = progress()
+        if (p <= 0f || p >= 1f) return false
+        val sheet = sheet?.takeIf { it.isAttached } ?: return false
+        return locate(entry, sheet)
+    }
+
+    /** Draws every ready element at [progress] of its way; the strip's copy fades away over the first [CROSS], the full player's is under it. */
     fun draw(scope: DrawScope, progress: Float) {
         if (progress <= 0f || progress >= 1f) return
         val sheet = sheet?.takeIf { it.isAttached } ?: return
         // the first element marked lies on top: a title crossing the cover's path passes under it
         for (entry in entries.values.reversed()) {
-            if (!entry.ready) continue
-            val from = sheet.localBoundingBoxOf(entry.mini!!, clipBounds = false)
-            val to = sheet.localBoundingBoxOf(entry.full!!, clipBounds = false)
-            if (from.isEmpty || to.isEmpty) continue
-            val bounds = lerp(from, to, progress)
-            val radius = lerp(entry.miniRadius, entry.fullRadius, progress)
+            if (!locate(entry, sheet)) continue
+            val bounds = lerp(entry.from, entry.to, progress)
+            val radius = lerp(entry.mini.radius, entry.full.radius, progress)
             val cross = (progress / CROSS).coerceIn(0f, 1f)
             entry.path.reset()
             entry.path.addRoundRect(RoundRect(0f, 0f, bounds.width, bounds.height, CornerRadius(radius)))
@@ -530,38 +598,37 @@ internal class PlayerFlight {
                     translate(bounds.left, bounds.top)
                     clipPath(entry.path)
                 }) {
-                    // the full player's picture lies under the strip's from the start, so a cover (the same
+                    // the full player's copy lies under the strip's from the start, so a cover (the same
                     // picture twice) never thins out while the strip's fades away
-                    drawPicture(entry.fullPicture, bounds.size, 1f)
-                    if (cross < 1f) drawPicture(entry.miniPicture, bounds.size, 1f - cross)
+                    drawCopy(entry.full, bounds.size, 1f)
+                    if (cross < 1f) drawCopy(entry.mini, bounds.size, 1f - cross)
                 }
             }
         }
     }
 
-    /** [picture], fitted into [size] from its recorded size (not stretched: a title keeps its letters' shape), at [alpha]. */
-    private fun DrawScope.drawPicture(picture: Picture, size: Size, alpha: Float) {
-        val width = picture.width.toFloat()
-        val height = picture.height.toFloat()
+    /** [copy], fitted into [size] from its recorded size (not stretched: a title keeps its letters' shape), at [alpha]. */
+    private fun DrawScope.drawCopy(copy: Copy, size: Size, alpha: Float) {
+        val width = copy.width.toFloat()
+        val height = copy.height.toFloat()
         if (width <= 0f || height <= 0f) return
         val fit = minOf(size.width / width, size.height / height)
         withTransform({
             translate((size.width - width * fit) / 2f, (size.height - height * fit) / 2f)
             scale(fit, fit, Offset.Zero)
         }) {
-            drawIntoCanvas { canvas ->
-                if (alpha < 1f) {
-                    fade.alpha = alpha
-                    canvas.saveLayer(Rect(0f, 0f, width, height), fade)
-                }
-                canvas.nativeCanvas.drawPicture(picture)
-                if (alpha < 1f) canvas.restore()
+            val canvas = drawContext.canvas
+            if (alpha < 1f) {
+                fade.alpha = alpha
+                canvas.saveLayer(Rect(0f, 0f, width, height), fade)
             }
+            copy.draw(this)
+            if (alpha < 1f) canvas.restore()
         }
     }
 
     private companion object {
-        /** The part of the way over which the strip's picture of an element fades away, leaving the full player's. */
+        /** The part of the way over which the strip's copy of an element fades away, leaving the full player's. */
         const val CROSS = 0.25f
     }
 }
