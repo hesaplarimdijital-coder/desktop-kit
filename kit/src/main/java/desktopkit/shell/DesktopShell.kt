@@ -88,11 +88,12 @@ val LocalNavKind = compositionLocalOf { NavKind.Sidebar }
  * How the shell animates switching screens.
  *
  * - [Default]: Android's fade-through between top-level screens on phones and tablets (bottom bar,
- *   rail): the old screen fades out in 90 ms, the new one fades in over 210 ms while growing from
- *   96 % (phone, on the gesture spring) or 98 % (tablet, on the emphasized curve) to full size. In the sidebar layout (large
- *   windows, DeX) a plain 150 ms cross-fade without movement, as on a desktop. Going back looks the
- *   same and, on Android 14 and later with `android:enableOnBackInvokedCallback="true"`, follows the
- *   predictive Back gesture: the transition plays along with the finger and can be cancelled.
+ *   rail): the old screen fades out in 90 ms, then the new one fades in over 210 ms while growing
+ *   from 96 % (phone) or 98 % (tablet) to full size on the emphasized curve; the two never overlap.
+ *   In the sidebar layout (large windows, DeX) a plain 150 ms cross-fade without movement, as on a
+ *   desktop. Going back looks the same and, on Android 14 and later with
+ *   `android:enableOnBackInvokedCallback="true"`, follows the predictive Back gesture: the
+ *   transition plays along with the finger and can be cancelled.
  * - [None]: no animation, e.g. for screenshot tests.
  *
  * Durations follow the system's animation scale (Developer options, "Remove animations").
@@ -542,14 +543,12 @@ private const val CROSSFADE_MS = 150
 
 /**
  * Fade-through (Material motion) between top-level screens; desktop cross-fade in the sidebar layout.
- * On a phone the scale-in is the gesture spring; the fades stay timed.
+ * The growth starts with the fade-in, on the phone too: on the gesture spring it used to start 90 ms
+ * earlier, while the screen was still invisible, and was mostly over by the time it could be seen.
  */
 internal fun shellEnter(transitions: ShellTransitions, kind: NavKind, tier: MotionTier = MotionTier.Timed): EnterTransition = when {
     transitions == ShellTransitions.None || tier == MotionTier.Reduced -> EnterTransition.None
     kind == NavKind.Sidebar -> fadeIn(tween(CROSSFADE_MS, easing = DeskMotion.Standard))
-    kind == NavKind.BottomBar && tier == MotionTier.Gesture ->
-        fadeIn(tween(FADE_IN_MS, delayMillis = FADE_OUT_MS, easing = DeskMotion.EmphasizedDecelerate)) +
-            scaleIn(DeskMotion.gesture(0.001f), initialScale = 0.96f)
     else -> {
         val scale = if (kind == NavKind.BottomBar) 0.96f else 0.98f
         fadeIn(tween(FADE_IN_MS, delayMillis = FADE_OUT_MS, easing = DeskMotion.EmphasizedDecelerate)) +
