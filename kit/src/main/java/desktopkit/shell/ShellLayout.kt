@@ -11,6 +11,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.platform.testTag
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -29,6 +30,9 @@ private const val SLOT_PLAYER = "player"
 private const val SLOT_OVERLAY = "overlay"
 private const val SLOT_BAND = "band"
 private const val SLOT_GLASS = "glass"
+
+/** The test tag of the phone's one bottom glass. */
+internal const val BOTTOM_GLASS_TAG = "dk-bottom-glass"
 
 // drawn in this order: the content, the phone's bottom glass, the chrome over it, the system band over the sliding bars, the
 // overlay over everything. Within a layer, slots are drawn (and reached with Tab) in the order placed.
@@ -126,7 +130,7 @@ internal fun ShellLayout(
             Box(Modifier.layoutId(SLOT_TOP).readingOrder(0f)) { topBar() }
             if (shared != null) {
                 Box(Modifier.layoutId(SLOT_GLASS)) {
-                    Box(Modifier.fillMaxSize().offset { IntOffset(0, navigationOffset()) }.then(shared.surface()))
+                    Box(Modifier.fillMaxSize().offset { IntOffset(0, navigationOffset()) }.testTag(BOTTOM_GLASS_TAG).then(shared.surface()))
                 }
             }
             Box(
