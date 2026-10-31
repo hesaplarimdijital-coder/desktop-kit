@@ -43,6 +43,8 @@ import desktopkit.components.TableColumn
 import desktopkit.components.TableSort
 import desktopkit.components.WorkstationLayout
 import desktopkit.components.rememberInspectorState
+import desktopkit.components.rememberListAppear
+import desktopkit.components.listAppear
 import desktopkit.components.rememberTableColumnsState
 import desktopkit.screens.PageHeader
 import desktopkit.settings.DeskPreferences
@@ -196,6 +198,8 @@ private fun FilesGrid(
         .filter { kinds.isEmpty() || it.kind in kinds }
         .sortedBy { it.name }
     val dimens = DeskTheme.dimens
+    // the files arrive in turn when the grid is new, or when a filter leaves a new set
+    val appear = rememberListAppear(filter, kinds)
     DeskGrid(
         items = shown,
         key = { it.name },
@@ -212,7 +216,7 @@ private fun FilesGrid(
             DeskDragPayload(DragKinds.FILE, names, if (names.size == 1) names[0] else "${names.size} files")
         },
     ) { file ->
-        CoverCell(file.name, subtitle = "${file.kind} · ${file.size}") {
+        CoverCell(file.name, modifier = Modifier.listAppear(appear, shown.indexOf(file)), subtitle = "${file.kind} · ${file.size}") {
             Box(Modifier.fillMaxSize().background(DeskTheme.colors.surface), contentAlignment = Alignment.Center) {
                 Icon(kindIcon(file.kind), contentDescription = null, tint = DeskTheme.colors.textSecondary, modifier = Modifier.size(36.dp))
             }

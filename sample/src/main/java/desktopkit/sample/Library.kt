@@ -37,6 +37,8 @@ import desktopkit.components.MenuEntry
 import desktopkit.components.MoreButton
 import desktopkit.components.StatusBanner
 import desktopkit.components.dropZone
+import desktopkit.components.listAppear
+import desktopkit.components.rememberListAppear
 import desktopkit.screens.PageHeader
 import desktopkit.shell.CompactTopBar
 import desktopkit.shell.DetailTransition
@@ -74,6 +76,8 @@ fun AlbumsScreen(opened: String?, onOpen: (String?) -> Unit, onPlay: (Int) -> Un
         delay(900)
         loading = false
     }
+    // the covers arrive in turn once the placeholders go (not again on the way back from an album)
+    val appear = rememberListAppear(loading)
     DetailTransition(
         detail = albums.firstOrNull { it.id == opened },
         onBack = { onOpen(null) },
@@ -108,7 +112,7 @@ fun AlbumsScreen(opened: String?, onOpen: (String?) -> Unit, onPlay: (Int) -> Un
                 ) { album ->
                     CoverCell(
                         album.title,
-                        modifier = Modifier.detailSharedCard("card-${album.id}"),
+                        modifier = Modifier.listAppear(appear, albums.indexOf(album)).detailSharedCard("card-${album.id}"),
                         subtitle = "${album.artist} · ${album.year}",
                         onPlay = { onPlay(albums.indexOf(album) % tracks.size) },
                         playLabel = "Play ${album.title}",
@@ -128,6 +132,8 @@ fun AlbumsScreen(opened: String?, onOpen: (String?) -> Unit, onPlay: (Int) -> Un
 @Composable
 private fun AlbumPage(album: Album, onBack: () -> Unit, onPlay: (Int) -> Unit) {
     val compact = currentWidthClass() == WidthClass.Compact
+    // the songs arrive in turn under the header the card grows into
+    val appear = rememberListAppear(album.id)
     CompactTopBar(
         title = album.title,
         onBack = onBack,
@@ -173,6 +179,7 @@ private fun AlbumPage(album: Album, onBack: () -> Unit, onPlay: (Int) -> Unit) {
         itemsIndexed(album.songs) { i, song ->
             DeskListRow(
                 title = "${i + 1}. ${song.title}",
+                modifier = Modifier.listAppear(appear, i),
                 subtitle = song.artist,
                 trailing = song.length,
                 onClick = { onPlay(tracks.indexOfFirst { it.title == song.title }.coerceAtLeast(0)) },
@@ -190,11 +197,13 @@ private fun AlbumPage(album: Album, onBack: () -> Unit, onPlay: (Int) -> Unit) {
 @Composable
 fun TracksScreen(playing: Int, onPlay: (Int) -> Unit) {
     val padding = rememberShellContentPadding()
+    val appear = rememberListAppear()
     LazyColumn(Modifier.fillMaxSize(), contentPadding = padding) {
         item { PageHeader("Tracks", subtitle = "${tracks.size * 8} tracks") }
         itemsIndexed(List(tracks.size * 8) { tracks[it % tracks.size] }) { i, track ->
             DeskListRow(
                 title = track.title,
+                modifier = Modifier.listAppear(appear, i),
                 subtitle = track.artist,
                 selected = i % tracks.size == playing,
                 leadingContent = { Box(Modifier.size(40.dp).background(track.artwork, RoundedCornerShape(6.dp))) },
@@ -214,6 +223,7 @@ fun TracksScreen(playing: Int, onPlay: (Int) -> Unit) {
 @Composable
 fun PlaylistsScreen(library: LibraryState, onPlay: (Int) -> Unit) {
     var opened by rememberSaveable { mutableStateOf<String?>(null) }
+    val appear = rememberListAppear()
     DetailTransition(
         detail = library.playlists.firstOrNull { it.name == opened },
         onBack = { opened = null },
@@ -235,7 +245,7 @@ fun PlaylistsScreen(library: LibraryState, onPlay: (Int) -> Unit) {
                         subtitle = "${playlist.count} songs",
                         leading = DeskIcons.Queue,
                         onClick = { opened = playlist.name },
-                        modifier = Modifier.dropZone(
+                        modifier = Modifier.listAppear(appear, index).dropZone(
                             setOf(DragKinds.ALBUM, DragKinds.TRACK),
                             onDrop = { payload ->
                                 library.addToPlaylist(index, songsIn(payload))
@@ -254,6 +264,7 @@ fun PlaylistsScreen(library: LibraryState, onPlay: (Int) -> Unit) {
 /** A playlist's songs (the sample's tracks over and over, as many as the playlist holds). */
 @Composable
 private fun PlaylistPage(playlist: Playlist, onBack: () -> Unit, onPlay: (Int) -> Unit) {
+    val appear = rememberListAppear(playlist.name)
     CompactTopBar(
         title = playlist.name,
         onBack = onBack,
@@ -269,6 +280,7 @@ private fun PlaylistPage(playlist: Playlist, onBack: () -> Unit, onPlay: (Int) -
         itemsIndexed(List(playlist.count) { tracks[it % tracks.size] }) { i, track ->
             DeskListRow(
                 title = track.title,
+                modifier = Modifier.listAppear(appear, i),
                 subtitle = track.artist,
                 leadingContent = { Box(Modifier.size(40.dp).background(track.artwork, RoundedCornerShape(6.dp))) },
                 trailing = track.length,
@@ -281,6 +293,7 @@ private fun PlaylistPage(playlist: Playlist, onBack: () -> Unit, onPlay: (Int) -
 /** Files dropped on "Bin" in the sidebar (the hint shows with a mouse), with a way back. */
 @Composable
 fun BinScreen(library: LibraryState) {
+    val appear = rememberListAppear()
     Column(Modifier.fillMaxSize().shellContentPadding()) {
         PageHeader("Bin", subtitle = if (library.binned.isEmpty()) "Empty" else "${library.binned.size} files") {
             if (library.binned.isNotEmpty()) DeskButton("Restore all", { library.binned.clear() }, icon = DeskIcons.Undo)
@@ -292,9 +305,10 @@ fun BinScreen(library: LibraryState) {
                 Modifier.padding(horizontal = DeskTheme.dimens.pagePadding),
             )
         }
-        library.binned.toList().forEach { name ->
+        library.binned.toList().forEachIndexed { index, name ->
             DeskListRow(
                 title = name,
+                modifier = Modifier.listAppear(appear, index),
                 leading = DeskIcons.Delete,
                 trailingContent = { DeskButton("Restore", { library.binned.remove(name) }) },
             )
