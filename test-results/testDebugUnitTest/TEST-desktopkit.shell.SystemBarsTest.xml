@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.shell.SystemBarsTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-05T08:05:52.850Z" hostname="runnervmnwato" time="0.215">
+  <properties/>
+  <testcase name="phoneBarsReachBehindTheButtons" classname="desktopkit.shell.SystemBarsTest" time="0.055"/>
+  <testcase name="buttonsFollowTheTheme" classname="desktopkit.shell.SystemBarsTest" time="0.03"/>
+  <testcase name="lightButtonsOnTheDarkTheme" classname="desktopkit.shell.SystemBarsTest" time="0.033"/>
+  <testcase name="keyboardCoversTheButtons" classname="desktopkit.shell.SystemBarsTest" time="0.032"/>
+  <testcase name="tabletChromeFillsTheNavigationBar" classname="desktopkit.shell.SystemBarsTest" time="0.063"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

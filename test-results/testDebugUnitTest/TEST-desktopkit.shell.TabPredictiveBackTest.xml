@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.shell.TabPredictiveBackTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-05T08:05:53.067Z" hostname="runnervmnwato" time="0.166">
+  <properties/>
+  <testcase name="theBackButtonFadesThroughInsteadOfShrinking" classname="desktopkit.shell.TabPredictiveBackTest" time="0.05"/>
+  <testcase name="theTabShrinksWithTheFingerAndTheStartTabIsBehindIt" classname="desktopkit.shell.TabPredictiveBackTest" time="0.05"/>
+  <testcase name="theTabIsWholeInFrontOfTheStartTab" classname="desktopkit.shell.TabPredictiveBackTest" time="0.064"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.shell.DetailNoDoubleExposureTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-05T08:05:49.301Z" hostname="runnervmnwato" time="1.562">
+  <properties/>
+  <testcase name="onAPhoneABackGestureGivenUpSpringsBackOpaque" classname="desktopkit.shell.DetailNoDoubleExposureTest" time="0.197"/>
+  <testcase name="widerUpTheSharedAxisFadesInTurn" classname="desktopkit.shell.DetailNoDoubleExposureTest" time="0.246"/>
+  <testcase name="onAPhoneTheBackGestureShrinksTheOpaqueDetailOverTheDimmedList" classname="desktopkit.shell.DetailNoDoubleExposureTest" time="0.216"/>
+  <testcase name="onAPhoneAnOpeningTurnedAroundStaysOpaque" classname="desktopkit.shell.DetailNoDoubleExposureTest" time="0.175"/>
+  <testcase name="onAPhoneTheDetailSlidesInOpaqueOverTheListAndOutAgain" classname="desktopkit.shell.DetailNoDoubleExposureTest" time="0.307"/>
+  <testcase name="onAPhoneWithACardTheScreensFadeThroughNotOverEachOther" classname="desktopkit.shell.DetailNoDoubleExposureTest" time="0.418"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
