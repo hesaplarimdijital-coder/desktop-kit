@@ -33,8 +33,8 @@ class TabPredictiveBackTest {
 
     private fun back(progress: Float) = BackEventCompat(40f, 400f, progress, BackEventCompat.EDGE_LEFT)
 
-    @Test
-    fun theTabShrinksWithTheFingerAndTheStartTabIsBehindIt() {
+    /** The shell on the "documents" tab, come from the start tab, so that Back goes back to it. */
+    private fun onTheDocumentsTab() {
         compose.setContent {
             DesktopKitTheme(inputMode = InputMode.Touch) {
                 TestShell(WidthClass.Compact, transitions = ShellTransitions.Default) { route, _ ->
@@ -45,6 +45,11 @@ class TabPredictiveBackTest {
         compose.waitForIdle()
         compose.onNodeWithText("Belgeler").performClick()
         compose.waitForIdle()
+    }
+
+    @Test
+    fun theTabShrinksWithTheFingerAndTheStartTabIsBehindIt() {
+        onTheDocumentsTab()
         val full = compose.onNodeWithTag("screen-documents").getBoundsInRoot()
         val dispatcher = compose.activity.onBackPressedDispatcher
         compose.runOnUiThread {
@@ -72,6 +77,46 @@ class TabPredictiveBackTest {
         }
         compose.waitForIdle()
         compose.onNodeWithTag("screen-documents").assertDoesNotExist()
+        compose.onNodeWithTag("screen-home").assertExists()
+    }
+
+    /**
+     * The three-button Back: since Android 16 a press starts a predictive Back with no edge ([BackEventCompat.EDGE_NONE])
+     * and completes it on the release, so Navigation seeks the predictive transitions and plays them through. The
+     * button is no swipe: the tab fades through as a Back without the gesture does, instead of shrinking and
+     * leaning for 300 ms. The fade-out takes 90 ms; after that the tab is gone and the start tab is fading in.
+     */
+    @Test
+    fun theBackButtonFadesThroughInsteadOfShrinking() {
+        onTheDocumentsTab()
+        val full = compose.onNodeWithTag("screen-documents").getBoundsInRoot()
+        val dispatcher = compose.activity.onBackPressedDispatcher
+        compose.mainClock.autoAdvance = false
+        // the press: Navigation seeks the transition to its start and the transitions are chosen now
+        compose.runOnUiThread { dispatcher.dispatchOnBackStarted(BackEventCompat(0f, 0f, 0f, BackEventCompat.EDGE_NONE)) }
+        compose.mainClock.advanceTimeByFrame()
+        compose.waitForIdle()
+        val pressed = compose.onNodeWithTag("screen-documents").getBoundsInRoot()
+        assertEquals("width while pressed", (full.right - full.left).value, (pressed.right - pressed.left).value, 0.5f)
+        // the release, a frame later as a tap is: the rest of the transition plays
+        compose.runOnUiThread { dispatcher.onBackPressed() }
+        // three frames in: still there, full size (the gesture's exit would have it at 98.4 % and leaning)
+        repeat(3) {
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+        }
+        val fading = compose.onNodeWithTag("screen-documents").getBoundsInRoot()
+        assertEquals("width while fading out", (full.right - full.left).value, (fading.right - fading.left).value, 0.5f)
+        assertEquals("left edge while fading out", full.left.value, fading.left.value, 0.5f)
+        // past the fade-out: gone, where the gesture's exit would keep it until 300 ms
+        repeat(7) {
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+        }
+        compose.onNodeWithTag("screen-documents").assertDoesNotExist()
+        compose.onNodeWithTag("screen-home").assertExists()
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
         compose.onNodeWithTag("screen-home").assertExists()
     }
 }

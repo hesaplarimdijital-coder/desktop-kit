@@ -312,9 +312,10 @@ private fun ShellContent(
         remember { { shellEnter(currentTransitions, currentKind, currentTier) } }
     val exit: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition =
         remember { { shellExit(currentTransitions, currentKind, currentTier) } }
-    // the predictive Back gesture between tabs (gesture navigation): the phone's own, wider up Navigation's as before
+    // the predictive Back gesture between tabs (gesture navigation): the phone's own, wider up Navigation's as before;
+    // the Back button, which Android 16 also starts a predictive Back for, keeps the fade-through everywhere
     val predictiveEnter: AnimatedContentTransitionScope<NavBackStackEntry>.(Int) -> EnterTransition =
-        remember { { _ -> shellPredictiveEnter(currentTransitions, currentKind, currentTier) ?: NavigationPredictiveEnter } }
+        remember { { edge -> shellPredictiveEnter(currentTransitions, currentKind, currentTier, edge) ?: NavigationPredictiveEnter } }
     val predictiveExit: AnimatedContentTransitionScope<NavBackStackEntry>.(Int) -> ExitTransition =
         remember { { edge -> shellPredictiveExit(currentTransitions, currentKind, currentTier, edge) ?: NavigationPredictiveExit } }
     val topBarHost = remember { CompactTopBarHost() }
@@ -589,8 +590,15 @@ private const val PREDICTIVE_MS = 300
  * the last tenth of the way; the screen it goes back to rises from 94 % and brightens behind it.
  * Navigation seeks this with the finger, plays the rest once let go and runs it back on a cancel.
  * Null (Navigation's own) wider up, as before; with reduced motion nothing moves.
+ *
+ * The Back button is not a swipe: since Android 16 a press of the three-button Back (and of a hardware
+ * Back key) starts a predictive Back too, with [BackEventCompat.EDGE_NONE] for its edge, and Navigation
+ * takes it for a gesture, choosing these transitions and playing them through on the release. The button
+ * keeps the fade-through of a Back without the gesture, on every width (wider up Navigation's own predictive
+ * pop used to play on the button as well).
  */
-internal fun shellPredictiveEnter(transitions: ShellTransitions, kind: NavKind, tier: MotionTier): EnterTransition? = when {
+internal fun shellPredictiveEnter(transitions: ShellTransitions, kind: NavKind, tier: MotionTier, swipeEdge: Int): EnterTransition? = when {
+    swipeEdge == BackEventCompat.EDGE_NONE -> shellEnter(transitions, kind, tier)
     transitions == ShellTransitions.None || tier == MotionTier.Reduced -> EnterTransition.None
     tier != MotionTier.Gesture || kind != NavKind.BottomBar -> null
     else -> scaleIn(tween(PREDICTIVE_MS, easing = DeskMotion.Standard), initialScale = 0.94f) +
@@ -598,6 +606,7 @@ internal fun shellPredictiveEnter(transitions: ShellTransitions, kind: NavKind, 
 }
 
 internal fun shellPredictiveExit(transitions: ShellTransitions, kind: NavKind, tier: MotionTier, swipeEdge: Int): ExitTransition? = when {
+    swipeEdge == BackEventCompat.EDGE_NONE -> shellExit(transitions, kind, tier)
     transitions == ShellTransitions.None || tier == MotionTier.Reduced -> ExitTransition.None
     tier != MotionTier.Gesture || kind != NavKind.BottomBar -> null
     else -> {

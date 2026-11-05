@@ -146,8 +146,7 @@ class MotionStripsTest {
 
     // ---------------------------------------------------------------- screens (tab switch)
 
-    @Test
-    fun tabSwitch() {
+    private fun tabShell(): ShellNavigator {
         var navigator: ShellNavigator? = null
         phoneContent {
             TestShell(WidthClass.Compact, startRoute = "music", spec = mediaSpec, transitions = ShellTransitions.Default) { route, nav ->
@@ -155,7 +154,44 @@ class MotionStripsTest {
                 if (route == "podcasts") PodcastList() else SampleTrackList()
             }
         }
-        strip("tab-switch") { navigator?.navigate("podcasts") }
+        return navigator!!
+    }
+
+    @Test
+    fun tabSwitch() {
+        val navigator = tabShell()
+        strip("tab-switch") { navigator.navigate("podcasts") }
+    }
+
+    /** The shell on the podcasts tab, come from the music tab: Back goes back to the music. */
+    private fun onThePodcastsTab() {
+        val navigator = tabShell()
+        compose.runOnIdle { navigator.navigate("podcasts") }
+        compose.waitForIdle()
+    }
+
+    /**
+     * The three-button Back between tabs (Android 16 starts a predictive Back for the button too, with no edge):
+     * the fade-through of a Back without the gesture, the press a frame before the release as a tap is.
+     */
+    @Test
+    fun tabBackButton() {
+        onThePodcastsTab()
+        val dispatcher = compose.activity.onBackPressedDispatcher
+        compose.mainClock.autoAdvance = false
+        val frames = mutableListOf("önce" to shot())
+        compose.runOnUiThread { dispatcher.dispatchOnBackStarted(BackEventCompat(0f, 0f, 0f, BackEventCompat.EDGE_NONE)) }
+        compose.mainClock.advanceTimeByFrame()
+        compose.waitForIdle()
+        frames += "basılı" to shot()
+        compose.runOnUiThread { dispatcher.onBackPressed() }
+        var now = 0L
+        for (t in listOf(16L, 48L, 96L, 144L, 208L, 304L)) {
+            now = advanceTo(t, now)
+            frames += "bırakınca +$now ms" to shot()
+        }
+        compose.mainClock.autoAdvance = true
+        saveStrip("tab-back-button", frames)
     }
 
     // ---------------------------------------------------------------- list → detail
