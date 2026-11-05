@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.screenshots.FormsScreenshotTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-05T12:10:28.333Z" hostname="runnervmnwato" time="0.522">
+  <properties/>
+  <testcase name="settingsLightTouch" classname="desktopkit.screenshots.FormsScreenshotTest" time="0.098"/>
+  <testcase name="tabsAndToastDarkPointer" classname="desktopkit.screenshots.FormsScreenshotTest" time="0.13"/>
+  <testcase name="settingsDarkPointer" classname="desktopkit.screenshots.FormsScreenshotTest" time="0.118"/>
+  <testcase name="listRowsDarkTouch" classname="desktopkit.screenshots.FormsScreenshotTest" time="0.087"/>
+  <testcase name="settingsDarkTouch" classname="desktopkit.screenshots.FormsScreenshotTest" time="0.086"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

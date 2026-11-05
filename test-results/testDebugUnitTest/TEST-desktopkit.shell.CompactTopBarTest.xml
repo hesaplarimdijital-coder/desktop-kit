@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.shell.CompactTopBarTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-05T12:10:33.851Z" hostname="runnervmnwato" time="0.599">
+  <properties/>
+  <testcase name="widthClassIsProvided" classname="desktopkit.shell.CompactTopBarTest" time="0.069"/>
+  <testcase name="defaultTransitionsKeepState" classname="desktopkit.shell.CompactTopBarTest" time="0.173"/>
+  <testcase name="compactShowsBackTitleActionsAndOverflow" classname="desktopkit.shell.CompactTopBarTest" time="0.11"/>
+  <testcase name="compactSystemBackCallsOnBack" classname="desktopkit.shell.CompactTopBarTest" time="0.061"/>
+  <testcase name="expandedIsUnchanged" classname="desktopkit.shell.CompactTopBarTest" time="0.076"/>
+  <testcase name="lastComposedWinsAndLeavingRestores" classname="desktopkit.shell.CompactTopBarTest" time="0.08"/>
+  <testcase name="overflowKeepsPrimaryActionsInTheBar" classname="desktopkit.shell.CompactTopBarTest" time="0.027"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

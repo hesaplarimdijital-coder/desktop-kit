@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.screenshots.ShellScreenshotTest" tests="16" skipped="0" failures="0" errors="0" timestamp="2026-11-05T12:10:31.176Z" hostname="runnervmnwato" time="1.646">
+  <properties/>
+  <testcase name="mediumDark" classname="desktopkit.screenshots.ShellScreenshotTest" time="0.101"/>
+  <testcase name="largeTopBarUnchanged" classname="desktopkit.screenshots.ShellScreenshotTest" time="0.098"/>
+  <testcase name="placeholderLarge" classname="desktopkit.screenshots.ShellScreenshotTest" time="0.101"/>
+  <testcase name="expandedTopBarUnchanged" classname="desktopkit.screenshots.ShellScreenshotTest" time="0.076"/>
+  <testcase name="compactDark" classname="desktopkit.screenshots.ShellScreenshotTest" time="0.096"/>
+  <testcase name="expandedDark" classname="desktopkit.screenshots.ShellScreenshotTest" time="0.094"/>
+  <testcase name="compactTopBarLight" classname="desktopkit.screenshots.ShellScreenshotTest" time="0.1"/>
+  <testcase name="extraLargeDark" classname="desktopkit.screenshots.ShellScreenshotTest" time="0.135"/>
+  <testcase name="extraLargeOled" classname="desktopkit.screenshots.ShellScreenshotTest" time="0.114"/>
+  <testcase name="compactLight" classname="desktopkit.screenshots.ShellScreenshotTest" time="0.093"/>
+  <testcase name="compactTopBarDark" classname="desktopkit.screenshots.ShellScreenshotTest" time="0.094"/>
+  <testcase name="largeDark" classname="desktopkit.screenshots.ShellScreenshotTest" time="0.097"/>
+  <testcase name="extraLargeLight" classname="desktopkit.screenshots.ShellScreenshotTest" time="0.148"/>
+  <testcase name="mediumLight" classname="desktopkit.screenshots.ShellScreenshotTest" time="0.102"/>
+  <testcase name="expandedLight" classname="desktopkit.screenshots.ShellScreenshotTest" time="0.093"/>
+  <testcase name="largeLight" classname="desktopkit.screenshots.ShellScreenshotTest" time="0.1"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
