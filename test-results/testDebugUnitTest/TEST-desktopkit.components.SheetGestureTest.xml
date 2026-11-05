@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.components.SheetGestureTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-05T05:59:43.508Z" hostname="runnervmnwato" time="0.529">
+  <properties/>
+  <testcase name="aShortSlowPullSpringsBack" classname="desktopkit.components.SheetGestureTest" time="0.115"/>
+  <testcase name="aPullDownOnTheListClosesTheSheet" classname="desktopkit.components.SheetGestureTest" time="0.085"/>
+  <testcase name="anOnOffActionIsASwitchThatLeavesTheSheetOpen" classname="desktopkit.components.SheetGestureTest" time="0.086"/>
+  <testcase name="aFlingCarriesTheSheetOutBeforeItIsDismissed" classname="desktopkit.components.SheetGestureTest" time="0.092"/>
+  <testcase name="aSlowPullPastAThirdClosesTheSheet" classname="desktopkit.components.SheetGestureTest" time="0.148"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

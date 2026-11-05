@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.components.GridTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-05T05:59:37.780Z" hostname="runnervmnwato" time="0.628">
+  <properties/>
+  <testcase name="shiftDownSelectsARowFurther" classname="desktopkit.components.GridTest" time="0.272"/>
+  <testcase name="gridSelectingOnPhone" classname="desktopkit.components.GridTest" time="0.145"/>
+  <testcase name="gridOnDex" classname="desktopkit.components.GridTest" time="0.207"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

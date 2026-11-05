@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.shell.KeyboardDismissTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-05T06:00:04.192Z" hostname="runnervmnwato" time="1.27">
+  <properties/>
+  <testcase name="aMouseWheelKeepsTheField" classname="desktopkit.shell.KeyboardDismissTest" time="0.232"/>
+  <testcase name="aTapElsewhereClosesTheKeyboard" classname="desktopkit.shell.KeyboardDismissTest" time="0.128"/>
+  <testcase name="aTapOnASendButtonKeepsTheKeyboard" classname="desktopkit.shell.KeyboardDismissTest" time="0.123"/>
+  <testcase name="withAKeyboardCoverTypingGoesOn" classname="desktopkit.shell.KeyboardDismissTest" time="0.15"/>
+  <testcase name="aScrollClosesTheKeyboard" classname="desktopkit.shell.KeyboardDismissTest" time="0.15"/>
+  <testcase name="aTapOnAnotherFieldMovesTheFocusThere" classname="desktopkit.shell.KeyboardDismissTest" time="0.136"/>
+  <testcase name="withoutTheOnScreenKeyboardTheFieldKeepsTheFocus" classname="desktopkit.shell.KeyboardDismissTest" time="0.183"/>
+  <testcase name="aScrollInsideALongFieldKeepsTheKeyboard" classname="desktopkit.shell.KeyboardDismissTest" time="0.165"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
