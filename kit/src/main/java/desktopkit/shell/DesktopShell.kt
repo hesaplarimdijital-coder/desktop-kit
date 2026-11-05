@@ -539,32 +539,28 @@ private val TAB_CORNER = 28.dp
  * the gesture to [TAB_CORNER], as the detail's do. The rounding is read off the scale the gesture's exit
  * animates on this content ([shellPredictiveExit], toward 90 %): a fade-through, which scales nothing on
  * its way out, keeps the corners square. At rest the surface is the shell's colour and nothing looks
- * different; wider up the content is as it was.
+ * different; wider up there is no surface and the content is as it was. The content sits in the same
+ * box on every width, so a window resized across width classes keeps the screen's state.
  */
 @Composable
 private fun TabPage(transition: Transition<EnterExitState>, content: @Composable () -> Unit) {
-    if (LocalNavKind.current == NavKind.BottomBar) {
-        val page = DeskTheme.colors.background
-        Box(
-            Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    val scale = if (transition.targetState == EnterExitState.PostExit) {
-                        transition.animations.firstOrNull { it.label.endsWith(" scale") }?.value as? Float
-                    } else {
-                        null
-                    }
-                    val p = if (scale == null) 0f else ((1f - scale) / 0.1f).coerceIn(0f, 1f)
-                    if (p > 0f) {
-                        shape = RoundedCornerShape(TAB_CORNER * p)
-                        clip = true
-                    }
-                }
-                .background(page),
-        ) { content() }
-    } else {
-        content()
-    }
+    val phone = LocalNavKind.current == NavKind.BottomBar
+    val page = DeskTheme.colors.background
+    val surface = if (!phone) Modifier else Modifier
+        .graphicsLayer {
+            val scale = if (transition.targetState == EnterExitState.PostExit) {
+                transition.animations.firstOrNull { it.label.endsWith(" scale") }?.value as? Float
+            } else {
+                null
+            }
+            val p = if (scale == null) 0f else ((1f - scale) / 0.1f).coerceIn(0f, 1f)
+            if (p > 0f) {
+                shape = RoundedCornerShape(TAB_CORNER * p)
+                clip = true
+            }
+        }
+        .background(page)
+    Box(Modifier.fillMaxSize().then(surface)) { content() }
 }
 
 /**
