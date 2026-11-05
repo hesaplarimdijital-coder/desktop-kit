@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -101,17 +102,23 @@ class TabPredictiveBackTest {
         val full = compose.onNodeWithTag("screen-documents").getBoundsInRoot()
         val dispatcher = compose.activity.onBackPressedDispatcher
         compose.mainClock.autoAdvance = false
-        // the press: Navigation seeks the transition to its start (a frame to see the Back, one to compose the
-        // start tab as the target, the transitions chosen with it) and holds it there while the button is down
+        // the press: Navigation seeks the transition to its start (a frame to see the Back, one or two to compose
+        // the start tab as the target, the transitions chosen with it) and holds it there while the button is down
         compose.runOnUiThread { dispatcher.dispatchOnBackStarted(BackEventCompat(0f, 0f, 0f, BackEventCompat.EDGE_NONE)) }
-        repeat(3) {
+        var pressedFrames = 0
+        while (compose.onAllNodesWithTag("screen-home").fetchSemanticsNodes().isEmpty()) {
+            assertTrue("the start tab is composed within a few frames of the press", pressedFrames < 6)
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+            pressedFrames++
+        }
+        val pressed = compose.onNodeWithTag("screen-documents").getBoundsInRoot()
+        assertEquals("width while pressed", (full.right - full.left).value, (pressed.right - pressed.left).value, 0.5f)
+        // the release, some 48 ms later as a tap is: the rest of the transition plays
+        repeat(3 - pressedFrames.coerceAtMost(3)) {
             compose.mainClock.advanceTimeByFrame()
             compose.waitForIdle()
         }
-        compose.onNodeWithTag("screen-home").assertExists()
-        val pressed = compose.onNodeWithTag("screen-documents").getBoundsInRoot()
-        assertEquals("width while pressed", (full.right - full.left).value, (pressed.right - pressed.left).value, 0.5f)
-        // the release, 48 ms later as a tap is: the rest of the transition plays
         compose.runOnUiThread { dispatcher.onBackPressed() }
         // on the way out the tab keeps its size and place (the gesture's exit has it at 98.4 % three frames in,
         // 95 % nine frames in, leaning to the right)

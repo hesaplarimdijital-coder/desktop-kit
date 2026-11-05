@@ -533,20 +533,24 @@ private fun ShellContent(
 private val TAB_CORNER = 28.dp
 
 /**
- * A tab's page on the phone, on its own page-coloured surface. The screens used to lie on the shell's
- * background: in the predictive Back gesture the tab being left shrank in front of the start tab, and
- * the start tab showed through its text. On the surface the tab is whole, and its corners round with
- * the gesture to [TAB_CORNER], as the detail's do. The rounding is read off the scale the gesture's exit
- * animates on this content ([shellPredictiveExit], toward 90 %): a fade-through, which scales nothing on
- * its way out, keeps the corners square. At rest the surface is the shell's colour and nothing looks
- * different; wider up there is no surface and the content is as it was. The content sits in the same
- * box on every width, so a window resized across width classes keeps the screen's state.
+ * A tab's page on the phone, on its own page-coloured surface while a transition is on. The screens
+ * used to lie on the shell's background: in the predictive Back gesture the tab being left shrank in
+ * front of the start tab, and the start tab showed through its text. On the surface the tab is whole,
+ * and its corners round with the gesture to [TAB_CORNER], as the detail's do. The rounding is read off
+ * the scale the gesture's exit animates on this content ([shellPredictiveExit], toward 90 %), found by
+ * the label Compose gives AnimatedVisibility's built-in scale ("Built-in scale", an internal name: were
+ * it to change, the corners would stay square and nothing else would be lost); a fade-through, which
+ * scales nothing on its way out, keeps the corners square. At rest, and wider up, there is no surface
+ * and the content is as it was (the surface is the shell's colour, so the transitions look the same
+ * where it is not needed). The content sits in the same box on every width, so a window resized across
+ * width classes keeps the screen's state.
  */
 @Composable
 private fun TabPage(transition: Transition<EnterExitState>, content: @Composable () -> Unit) {
-    val phone = LocalNavKind.current == NavKind.BottomBar
+    // composed again on the frame the transition starts, which is the frame the other tab is composed
+    val moving = LocalNavKind.current == NavKind.BottomBar && transition.currentState != transition.targetState
     val page = DeskTheme.colors.background
-    val surface = if (!phone) Modifier else Modifier
+    val surface = if (!moving) Modifier else Modifier
         .graphicsLayer {
             val scale = if (transition.targetState == EnterExitState.PostExit) {
                 transition.animations.firstOrNull { it.label.endsWith(" scale") }?.value as? Float

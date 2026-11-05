@@ -45,15 +45,16 @@ sekmenin kendi yüzeyi yoktu. İkisi de bu sürümde; kare şeritleri `ci/screen
   kaydırma sayıp `NavHost`'un öngörülü geçişlerini seçiyor ve düğme bırakılınca sonuna kadar oynatıyordu: 2.3.0'ın
   sekme hareketi bir dokunuşla 300 ms oynuyordu, sekme yüzde 90'a küçülüp sağa yaslanıyor, son onda birde soluyordu.
   Düğme kaydırma değildir: `EDGE_NONE` gelince kabuk Navigation'a hareketsiz bir Geri'nin fade-through'unu verir
-  (eski sekme 90 ms'de solar, yenisi 210 ms'de belirir), Android 15'teki gibi. Düğmeye uzun basmanın ön izlemesi de
-  bu geçişi parmakla oynatır.
+  (eski sekme 90 ms'de solar, yenisi 210 ms'de belirir), Android 15'teki gibi.
 - **Harekette giden sekmenin yüzeyi:** kabuğun `NavHost`'undaki ekranlar kabuğun arka planında duruyordu, kendi
   yüzeyleri yoktu; yazıdan ibaret bir ekran saydamdı. Öngörülü geri hareketinde küçülen sekmenin yazılarının
   arasından arkadaki başlangıç sekmesi görünüyordu: ayrıntıdaki çift görüntünün sekmedeki eşi. Telefonda her sekme
   sayfası ("⋯" ekranı da) artık kendi sayfa renkli yüzeyinde: hareket boyunca bütün, başlangıç sekmesi yalnızca
-  çevresinde görünür; köşeleri ayrıntınınki gibi parmakla 28 dp'ye kadar yuvarlanır. Yuvarlanma çıkış geçişinin
-  o içerikte oynattığı ölçekten okunur (yüzde 90'a doğru); hiçbir şeyi küçültmeyen fade-through'da köşeler düz
-  kalır. Durağanken ve sekme geçişlerinde görünüm aynı (yüzey kabuğun rengi); 50 ekran görüntüsü aynı.
+  çevresinde görünür; köşeleri ayrıntınınki gibi parmakla 28 dp'ye doğru yuvarlanır. Yuvarlanma çıkış geçişinin
+  o içerikte oynattığı ölçekten okunur (yüzde 90'a doğru; Compose'un yerleşik ölçek animasyonu adıyla bulunur, ad
+  değişirse köşeler düz kalır, başka bir şey kaybolmaz); hiçbir şeyi küçültmeyen fade-through'da köşeler düz kalır.
+  Yüzey yalnızca bir geçiş sürerken var ve kabuğun rengindedir: durağanken ve sekme geçişlerinde görünüm aynı,
+  durağan sayfaya katman eklenmez; 50 ekran görüntüsü aynı.
 
 ### Tablet ve DeX
 
@@ -75,9 +76,9 @@ sekmenin kendi yüzeyi yoktu. İkisi de bu sürümde; kare şeritleri `ci/screen
   biri pay var; 2.3.0'ın çift görüntüsü yüz binlerce pikseldi.
 - Kare şeritleri: yazılı bir liste ve ayrıntıyla (raflar → bir rafın kitapları; uydurma adlar) açılış, kapanış ve
   geri hareketi; aynısı tablet katmanında; kartlı kapanış.
-- `TabPredictiveBackTest`: Geri düğmesi (başlangıç `EDGE_NONE`, 48 ms sonra bırakma; basış bir kareyle görülür,
-  bir kare sonra Navigation başlangıç sekmesini hedef olarak kompoze eder): sekme yolda tam boyutunda ve yerinde
-  kalır, hareketin çıkışı onu üç karede yüzde 98,4'e, dokuz karede yüzde 95'e küçültüp sağa yaslardı. Hareket:
+- `TabPredictiveBackTest`: Geri düğmesi (başlangıç `EDGE_NONE`; Navigation başlangıç sekmesini birkaç kare içinde
+  hedef olarak kompoze eder, bırakma 48 ms sonra): sekme yolda tam boyutunda ve yerinde kalır, hareketin çıkışı onu
+  üç karede yüzde 98,4'e, dokuz karede yüzde 95'e küçültüp sağa yaslardı. Hareket:
   başlangıç sekmesi kırmızı, giden sekme arka planı olmayan bir mavi kare; yolun yarısında pencerenin ortasında
   kırmızımsı piksel yok (yarı saydam bir ekranın içinden görünen kırmızı da sayılır), sekme gidince hepsi kırmızı.
 - Kare şeritleri: `tab-back` (hareket: giden sekme kendi yüzeyinde küçülür, başlangıç sekmesi çevresinde yükselir)
