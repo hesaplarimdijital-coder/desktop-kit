@@ -501,8 +501,10 @@ geçiş olmaz). Alt çubuk, ray ve kenar çubuğundaki seçim rengi 150 ms'de yu
 0.2.0 ile telefon ve tablette (alt çubuk, ray) Android'in fade-through geçişi kullanılır: eski ekran 90 ms'de
 solar, yenisi 210 ms'de %96 (telefon) ya da %98'den (tablet) büyüyerek belirir. Kenar çubuklu düzende (DeX)
 150 ms'lik sade geçiş kalır. Manifestte `android:enableOnBackInvokedCallback="true"` varsa hareketle gezinmede
-sekmeler arası öngörülü geri parmakla oynar: telefonda sekme yüzde 90'a doğru küçülüp yaslanır, başlangıç sekmesi
-arkasında yükselir; genişte Navigation'ın kendi geçişi.
+sekmeler arası öngörülü geri parmakla oynar: telefonda sekme kendi sayfa renkli yüzeyinde yüzde 90'a doğru küçülüp
+yaslanır ve köşeleri yuvarlanır, başlangıç sekmesi yalnızca çevresinde, arkasında yükselir; genişte Navigation'ın
+kendi geçişi. Üç düğmeli Geri ve donanım Geri tuşu (Android 16'da onlar da öngörülü Geri başlatır) her genişlikte
+hareketsiz Geri'nin geçişiyle döner: telefonda fade-through.
 
 ### Telefonda kaydırma ve boyutlar
 
