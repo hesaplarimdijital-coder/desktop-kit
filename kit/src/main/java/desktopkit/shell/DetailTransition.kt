@@ -3,9 +3,12 @@ package desktopkit.shell
 import androidx.activity.BackEventCompat
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.Animatable
@@ -16,14 +19,13 @@ import androidx.compose.animation.core.TargetBasedAnimation
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.animateDp
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.rememberTransition
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -52,6 +54,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Path
@@ -80,19 +83,25 @@ import kotlinx.coroutines.launch
  * A list screen and the detail screen opened from it, with Android's own screen transition between
  * them and the predictive Back gesture:
  *
- * - opening ([detail] becomes non-null): on a phone the detail comes in from the end edge over the
- *   list, which sinks to 95 % and fades under it (depth, on the [desktopkit.theme.DeskMotion.open]
- *   spring); with a [detailSharedCard] the card carries the way and the detail only fades in after
- *   it. From tablet width up the 0.2.0 shared axis: the detail slides in a short way from the end
- *   edge while fading in, the list slides the other way and fades out (emphasized curve);
+ * - opening ([detail] becomes non-null): on a phone as Android's own list → detail: the detail,
+ *   opaque from its first frame, slides in from the end edge over the list on the
+ *   [desktopkit.theme.DeskMotion.open] spring; the list behind it is not faded, it sinks to 95 %
+ *   and darkens under a scrim, so its text never shows through the detail. With a
+ *   [detailSharedCard] the card carries the way and the rest fades through: the list is gone
+ *   before the detail starts to appear. From tablet width up the 0.2.0 shared axis: the detail
+ *   slides in a short way from the end edge, the list slides the other way; the list fades out
+ *   in the first third, only then the detail fades in (emphasized curve);
  * - closing ([detail] becomes null): the same, reversed;
  * - Back gesture (Android 14 and later with `android:enableOnBackInvokedCallback="true"`): while the
  *   finger moves, the detail shrinks toward 90 %, rounds its corners and leans away from the edge
- *   the swipe came from, with the finger. On a phone the list is really there behind it, rising
- *   and brightening with the finger; letting go closes it with [onBack] and the detail slides out
- *   the way it was leaning from wherever the finger left it, swiping back cancels and everything
- *   springs back. With a three-button Back only the way out plays. From tablet width up the 2.2.0
- *   gesture stays: the detail shrinks over a shade and, let go of, closes with the shared axis.
+ *   the swipe came from, with the finger. On a phone the list is really there behind it, dimmed,
+ *   rising with the finger; letting go closes it with [onBack]: the detail slides out the way it
+ *   was leaning from wherever the finger left it and the list's scrim lightens; swiping back
+ *   cancels and everything springs back. The detail stays opaque all the way. With a three-button Back only
+ *   the way out plays. From tablet width up the 2.2.0 gesture stays: the detail shrinks over a
+ *   shade and, let go of, closes with the shared axis.
+ *
+ * No frame has both screens part transparent: the text of one is never drawn over the other's.
  *
  * With reduced motion the detail simply appears. Works in every width class. The Back gesture is taken over while a detail is shown, also from a
  * [CompactTopBar] inside it (both normally call the same close function), unless [handleBack] is false.
@@ -127,6 +136,7 @@ fun <T : Any> DetailTransition(
     val cards = remember { DetailSharedState() }
     val page = colors.background
     val behind = colors.pressed
+    val scrim = colors.scrim
     val animated = animate && tier != MotionTier.Reduced
     // the phone's transition is seekable, so the Back gesture can play the closing along with the finger; wider
     // up the 2.2.0 transition stays as it was, the gesture shrinking the detail over a shade
@@ -173,8 +183,44 @@ fun <T : Any> DetailTransition(
                 LocalDetailCards provides (if (target == null && animated && tier == MotionTier.Gesture) cards else null),
             ) {
                 if (target == null) {
+                    // on the phone the list behind a detail is not faded: it sinks a little and darkens under a scrim
+                    // (each 0 at rest, 1 all the way behind the detail), on the detail's own spring so the scrim
+                    // follows its edge. During the Back gesture the list rises with the finger and stays dimmed, so
+                    // the shrunk detail stands out against it; the scrim lightens on the way out, once let go. The
+                    // scrim is drawn over the whole window, the margins left by the sinking list included.
+                    val behindDetail: (EnterExitState) -> Float = { state -> if (state == EnterExitState.Visible || !(phone && animated)) 0f else 1f }
+                    val depth = this.transition.animateFloat(
+                        transitionSpec = { if (gestureClose) tween(GESTURE_MS, easing = DeskMotion.Standard) else DeskMotion.open(FRACTION) },
+                        label = "listDepth",
+                    ) { behindDetail(it) }
+                    val dim = this.transition.animateFloat(
+                        transitionSpec = { if (gestureClose) tween(GESTURE_MS, easing = AfterTheFinger) else DeskMotion.open(FRACTION) },
+                        label = "listScrim",
+                    ) { behindDetail(it) }
                     // opaque, so the shade left behind a closed detail never shows through the list
-                    Box(Modifier.fillMaxSize().background(page)) { list() }
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .background(page)
+                            .drawWithContent {
+                                drawContent()
+                                val d = dim.value
+                                if (d > 0f) drawRect(scrim, alpha = SCRIM * d)
+                            },
+                    ) {
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    val d = depth.value
+                                    if (d > 0f) {
+                                        val scale = 1f - (if (gestureClose) 0.06f else 0.05f) * d
+                                        scaleX = scale
+                                        scaleY = scale
+                                    }
+                                },
+                        ) { list() }
+                    }
                 } else {
                     // the detail as the app has it now: the transition holds the object it was opened with, and an
                     // app that re-emits its detail under the same key (a count, a progress) expects the new one shown
@@ -252,7 +298,7 @@ fun <T : Any> DetailTransition(
                 gestureClose && target == null -> {
                     // let go early, the finger's part of the way is finished first, quickly, then the way out
                     seekable.seekOn(GESTURE_END, (COMMIT_MS * (GESTURE_END - seekable.fraction) / GESTURE_END).toInt())
-                    seekable.animateTo(null, tween(COMMIT_MS, easing = DeskMotion.EmphasizedAccelerate))
+                    seekable.animateTo(null, tween(COMMIT_MS, easing = DeskMotion.Standard))
                     gestureClose = false
                 }
                 // a change of mind on the way (Back right after the tap, the tap again right after Back): the way is
@@ -326,6 +372,9 @@ fun <T : Any> DetailTransition(
 /** How far the finger seeks the closing; the rest ([1 - GESTURE_END]) is the detail's way out once let go. */
 private const val GESTURE_END = 0.85f
 
+/** Over the Back gesture's closing: nothing while the finger seeks it, then the way out, evenly. */
+private val AfterTheFinger = Easing { fraction -> ((fraction - GESTURE_END) / (1f - GESTURE_END)).coerceIn(0f, 1f) }
+
 /**
  * A transition turned around on its way: its fraction runs back to 0 on [spec], the target held.
  * Retargeted at its own current state instead, a seekable transition drops the shared elements'
@@ -370,7 +419,18 @@ private const val FRACTION = 0.001f
 /** The length the Back gesture's closing transition is seeked over (the finger's part and the way out). */
 private const val GESTURE_MS = 300
 
-private fun <T> detailTransform(
+/** How much of the theme's scrim darkens the list all the way behind a detail on a phone. */
+private const val SCRIM = 0.7f
+
+/**
+ * Fade-through timing on a phone (with a [detailSharedCard]) and between two details: the screen going
+ * away is gone after [FADE_OUT_MS], only then the one coming in starts to appear, over [FADE_IN_MS].
+ * The card's own content (see [detailSharedCard]) fades on the same timing.
+ */
+private const val FADE_OUT_MS = DeskMotion.SHORT_MS - 10
+private const val FADE_IN_MS = DeskMotion.MEDIUM_MS + 10
+
+private fun <T> AnimatedContentTransitionScope<T?>.detailTransform(
     initial: T?,
     target: T?,
     animate: Boolean,
@@ -382,52 +442,54 @@ private fun <T> detailTransform(
     if (!animate) return fadeIn(tween(0)) togetherWith fadeOut(tween(0))
     val opening = initial == null && target != null
     val closing = initial != null && target == null
+    // (on the phone the list never fades on the way to or from a plain detail: its depth, a slight
+    // sinking and a scrim, is its own animation, see DetailTransition; it is held until the detail
+    // has arrived or gone)
     if (closing && gesture) {
         // the Back gesture seeks this: the list rises behind the shrinking detail from the first
-        // frame, the detail stays whole until GESTURE_END and only then (once the finger has let go)
-        // slides out away from the edge the swipe came from, with the finger, and fades
-        val wayOut = Easing { fraction -> DeskMotion.EmphasizedAccelerate.transform(((fraction - GESTURE_END) / (1f - GESTURE_END)).coerceIn(0f, 1f)) }
+        // frame, dimmed; the detail stays whole and opaque until GESTURE_END and only then (once the
+        // finger has let go) slides out away from the edge the swipe came from, with the finger, all
+        // the way out of the window, while the list's scrim lightens (the way out's curve is the
+        // commit's, see DetailTransition: a slide this long on an accelerating curve jumped at its end)
         val direction = if (swipeEdge == BackEventCompat.EDGE_RIGHT) -1 else 1
-        val enter = scaleIn(tween(GESTURE_MS, easing = DeskMotion.Standard), initialScale = 0.94f) + fadeIn(tween(GESTURE_MS, easing = DeskMotion.Standard))
-        val exit = slideOutHorizontally(tween(GESTURE_MS, easing = wayOut)) { direction * it * 2 / 5 } + fadeOut(tween(GESTURE_MS, easing = wayOut))
-        return (enter togetherWith exit).apply { targetContentZIndex = -1f }
+        val exit = slideOutHorizontally(tween(GESTURE_MS, easing = AfterTheFinger)) { direction * it }
+        return (EnterTransition.None togetherWith exit).apply { targetContentZIndex = -1f }
     }
     if (tier == MotionTier.Gesture && (opening || closing)) {
-        // phone: depth. The detail comes in 12 % from the end edge on the opening spring and fades in
-        // at once (no dead frames after the tap); the list sinks to 95 % and fades under it. With a
-        // card the card carries the way and the detail only fades in after it. Back the same way
-        // round, the list rising under the leaving detail.
+        // phone: as Android's own list -> detail. The detail, opaque from its first frame, slides in
+        // from the end edge over the list on the opening spring; the list is not faded, it sinks and
+        // darkens under it. Back the same way round. With a card the card carries the way and the rest
+        // fades through: the side going away is gone before the other starts to appear.
         val slide = DeskMotion.open(IntOffset.VisibilityThreshold)
-        val fadeIn = fadeIn(tween(DeskMotion.MEDIUM_MS, easing = DeskMotion.StandardDecelerate))
-        val fadeOut = fadeOut(tween(DeskMotion.SHORT_MS + 20, easing = DeskMotion.StandardAccelerate))
+        val fadeIn = fadeIn(tween(FADE_IN_MS, delayMillis = FADE_OUT_MS, easing = DeskMotion.StandardDecelerate))
+        val fadeOut = fadeOut(tween(FADE_OUT_MS, easing = DeskMotion.StandardAccelerate))
         return if (opening) {
-            val enter = if (card) fadeIn(tween(DeskMotion.MEDIUM_MS + 20, delayMillis = 60, easing = DeskMotion.StandardDecelerate))
-            else slideInHorizontally(slide) { it * 12 / 100 } + fadeIn
-            val exit = scaleOut(tween(DeskMotion.LONG_MS, easing = DeskMotion.Emphasized), targetScale = 0.95f) +
-                fadeOut(tween(DeskMotion.SHORT_MS + 60, easing = DeskMotion.StandardAccelerate))
-            enter togetherWith exit
+            if (card) fadeIn togetherWith (fadeOut + ExitTransition.KeepUntilTransitionsFinished)
+            else slideInHorizontally(slide) { it } togetherWith ExitTransition.KeepUntilTransitionsFinished
         } else {
-            val enter = scaleIn(tween(DeskMotion.LONG_MS, easing = DeskMotion.Emphasized), initialScale = 0.95f) + fadeIn
-            val exit = if (card) fadeOut else slideOutHorizontally(slide) { it * 12 / 100 } + fadeOut
-            (enter togetherWith exit).apply { targetContentZIndex = -1f }
+            val transform = if (card) fadeIn togetherWith fadeOut else EnterTransition.None togetherWith slideOutHorizontally(slide) { it }
+            transform.apply { targetContentZIndex = -1f }
         }
     }
+    // tablet and DeX: the shared axis, its fades in turn (Material's: the screen going away is gone
+    // after the first third, only then the other fades in); the slides and the lengths as in 0.2.0
     return when {
         opening ->
             (slideInHorizontally(tween(DeskMotion.LONG_MS + 50, easing = DeskMotion.EmphasizedDecelerate)) { it / 10 } +
-                fadeIn(tween(DeskMotion.MEDIUM_MS, delayMillis = 50, easing = DeskMotion.StandardDecelerate)))
+                fadeIn(tween(DeskMotion.MEDIUM_MS, delayMillis = DeskMotion.SHORT_MS, easing = DeskMotion.StandardDecelerate)))
                 .togetherWith(
                     slideOutHorizontally(tween(DeskMotion.LONG_MS, easing = DeskMotion.Emphasized)) { -it / 10 } +
                         fadeOut(tween(DeskMotion.SHORT_MS, easing = DeskMotion.StandardAccelerate)),
                 )
         closing ->
             (slideInHorizontally(tween(DeskMotion.LONG_MS, easing = DeskMotion.EmphasizedDecelerate)) { -it / 10 } +
-                fadeIn(tween(DeskMotion.MEDIUM_MS, delayMillis = 50, easing = DeskMotion.StandardDecelerate)))
+                fadeIn(tween(DeskMotion.MEDIUM_MS, delayMillis = DeskMotion.SHORT_MS, easing = DeskMotion.StandardDecelerate)))
                 .togetherWith(
                     slideOutHorizontally(tween(DeskMotion.LONG_MS - 50, easing = DeskMotion.EmphasizedAccelerate)) { it / 10 } +
-                        fadeOut(tween(DeskMotion.SHORT_MS + 50, easing = DeskMotion.StandardAccelerate)),
+                        fadeOut(tween(DeskMotion.SHORT_MS, easing = DeskMotion.StandardAccelerate)),
                 )
-        else -> fadeIn(tween(DeskMotion.MEDIUM_MS)) togetherWith fadeOut(tween(DeskMotion.SHORT_MS))
+        // one detail for another: fade-through
+        else -> fadeIn(tween(DeskMotion.MEDIUM_MS, delayMillis = DeskMotion.SHORT_MS)) togetherWith fadeOut(tween(DeskMotion.SHORT_MS))
     }
 }
 
@@ -515,8 +577,9 @@ fun Modifier.detailSharedBounds(key: Any): Modifier {
  * Inside a [DetailTransition] on a phone, the card of a list item (a [desktopkit.components.CoverCell]'s
  * `modifier`) and the header of its detail (the block holding the big cover and the title) marked
  * with the same [key] open into each other: the card grows into the header, its corners
- * straightening from [shape] and its surface turning into the page, while the header's content
- * fades in over the card's; on the way back the header shrinks into the card's place. A
+ * straightening from [shape] and its surface turning into the page; the card's content fades out
+ * before the header's fades in, and the card stays opaque all the way (the header is drawn over the
+ * card's surface); on the way back the header shrinks into the card's place. A
  * [detailSharedElement] cover and a [detailSharedBounds] title inside both still fly on their own,
  * above the card. Put it first in the modifiers of both. The card needs no background of its own
  * (it gets the surface colour while it flies), the header draws the page colour while it flies.
@@ -548,22 +611,38 @@ fun Modifier.detailSharedCard(key: Any, shape: CornerBasedShape = RoundedCornerS
     val cornerPx: () -> Float = { with(density) { corner.toPx() } }
     val surface = if (list) colors.surface else colors.background
     val clip = remember(scopes) { CornerClip(cornerPx) }
+    // the content fades through: the side going away is gone within FADE_OUT_MS, only then the other appears
+    val shown = scopes.visibility.transition.animateFloat(
+        transitionSpec = {
+            if (targetState == EnterExitState.Visible) tween(FADE_IN_MS, delayMillis = FADE_OUT_MS, easing = DeskMotion.StandardDecelerate)
+            else tween(FADE_OUT_MS, easing = DeskMotion.StandardAccelerate)
+        },
+        label = "cardContent",
+    ) { state -> if (state == EnterExitState.Visible) 1f else 0f }
     return with(scopes.transition) {
         val state = rememberSharedContentState(key)
+        val flying = { isTransitionActive && state.isMatchFound }
+        // a surface only while this card flies (the others in the list stay as bare as before)
+        val surfaceWhileFlying = Modifier.drawBehind {
+            if (flying()) drawRoundRect(surface, cornerRadius = CornerRadius(cornerPx()))
+        }
+        val fading = Modifier.graphicsLayer { alpha = if (flying()) shown.value else 1f }
         this@detailSharedCard
             .sharedBounds(
                 sharedContentState = state,
                 animatedVisibilityScope = scopes.visibility,
-                enter = fadeIn(tween(DeskMotion.MEDIUM_MS + 10, delayMillis = DeskMotion.SHORT_MS - 10, easing = DeskMotion.StandardDecelerate)),
-                exit = fadeOut(tween(DeskMotion.SHORT_MS - 10, easing = DeskMotion.StandardAccelerate)),
+                // both sides are drawn in full while they fly, the header above the card: the card's surface stays
+                // opaque under everything, only the contents fade (below)
+                enter = EnterTransition.None,
+                exit = ExitTransition.None,
                 boundsTransform = boundsTransform(scopes.tier),
                 resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds(ContentScale.FillWidth, Alignment.TopStart),
+                zIndexInOverlay = if (list) 0f else 0.5f,
                 clipInOverlayDuringTransition = clip,
             )
-            // a surface only while this card flies (the others in the list stay as bare as before)
-            .drawBehind {
-                if (isTransitionActive && state.isMatchFound) drawRoundRect(surface, cornerRadius = CornerRadius(cornerPx()))
-            }
+            // the card: an opaque surface under its fading content; the header: its page-coloured surface fading
+            // in and out with its content, over the card
+            .then(if (list) surfaceWhileFlying.then(fading) else fading.then(surfaceWhileFlying))
     }
 }
 

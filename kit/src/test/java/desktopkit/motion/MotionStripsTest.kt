@@ -97,11 +97,11 @@ class MotionStripsTest {
 
     private val times = listOf(16L, 48L, 96L, 144L, 208L, 304L, 448L)
 
-    private fun phoneContent(content: @Composable () -> Unit) {
+    private fun phoneContent(tier: MotionTier = MotionTier.Gesture, content: @Composable () -> Unit) {
         compose.runOnUiThread { compose.activity.actionBar?.hide() }
         compose.setContent {
             DesktopKitTheme(themeMode = ThemeMode.Dark, inputMode = InputMode.Touch) {
-                CompositionLocalProvider(LocalMotionTier provides MotionTier.Gesture) {
+                CompositionLocalProvider(LocalMotionTier provides tier) {
                     Box(Modifier.fillMaxSize().background(DeskTheme.colors.background)) { content() }
                 }
             }
@@ -165,6 +165,76 @@ class MotionStripsTest {
         var detail by mutableStateOf<Album?>(null)
         phoneContent { Albums(detail) { detail = it } }
         strip("detail-open") { detail = albums[2] }
+    }
+
+    /** Opened from the card first (a detail shown from the start was not opened with a card, and closes plain). */
+    @Test
+    fun detailClose() {
+        var detail by mutableStateOf<Album?>(null)
+        phoneContent { Albums(detail) { detail = it } }
+        compose.runOnIdle { detail = albums[2] }
+        compose.waitForIdle()
+        strip("detail-close") { detail = null }
+    }
+
+    /**
+     * A plain detail (no card), text on both sides, as an app's list of shelves and one shelf's books: the
+     * detail slides in opaque over the list, which only darkens; no frame shows one screen's text through
+     * the other's.
+     */
+    @Test
+    fun plainDetailOpen() {
+        var detail by mutableStateOf<String?>(null)
+        phoneContent { Shelves(detail) { detail = it } }
+        strip("detail-open-plain", at = listOf(16L, 48L, 80L, 112L, 160L, 224L, 352L)) { detail = "D2" }
+    }
+
+    @Test
+    fun plainDetailClose() {
+        var detail by mutableStateOf<String?>("D2")
+        phoneContent { Shelves(detail) { detail = it } }
+        strip("detail-close-plain", at = listOf(16L, 48L, 80L, 112L, 160L, 224L, 352L)) { detail = null }
+    }
+
+    /** The Back gesture on a plain detail: it shrinks opaque over the dimmed list, and slides out once let go. */
+    @Test
+    fun plainDetailBack() {
+        var detail by mutableStateOf<String?>("D2")
+        phoneContent { Shelves(detail) { detail = it } }
+        val dispatcher = compose.activity.onBackPressedDispatcher
+        fun back(progress: Float) = BackEventCompat(40f, 600f, progress, BackEventCompat.EDGE_LEFT)
+        compose.mainClock.autoAdvance = false
+        val frames = mutableListOf("önce" to shot())
+        compose.runOnUiThread { dispatcher.dispatchOnBackStarted(back(0f)) }
+        for (p in listOf(0.25f, 0.5f, 0.8f)) {
+            compose.runOnUiThread { dispatcher.dispatchOnBackProgressed(back(p)) }
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+            frames += "parmak $p" to shot()
+        }
+        compose.runOnUiThread { dispatcher.onBackPressed() }
+        var now = 0L
+        for (t in listOf(16L, 64L, 144L, 304L)) {
+            now = advanceTo(t, now)
+            frames += "bırakınca +$now ms" to shot()
+        }
+        compose.mainClock.autoAdvance = true
+        saveStrip("detail-back-plain", frames)
+    }
+
+    /** Tablets and DeX (the timed tier, here in a phone-sized window): the shared axis, its fades in turn. */
+    @Test
+    fun timedDetailOpen() {
+        var detail by mutableStateOf<String?>(null)
+        phoneContent(MotionTier.Timed) { Shelves(detail) { detail = it } }
+        strip("detail-open-timed", at = listOf(16L, 48L, 80L, 112L, 160L, 224L, 352L)) { detail = "D2" }
+    }
+
+    @Test
+    fun timedDetailClose() {
+        var detail by mutableStateOf<String?>("D2")
+        phoneContent(MotionTier.Timed) { Shelves(detail) { detail = it } }
+        strip("detail-close-timed", at = listOf(16L, 48L, 80L, 112L, 160L, 224L, 352L)) { detail = null }
     }
 
     /** Back a few frames into the opening: the card turns around where it is. */
@@ -403,6 +473,36 @@ class MotionStripsTest {
     }
 
     private val cardShape = RoundedCornerShape(12.dp)
+
+    private val shelves = listOf("A1" to 7, "A2" to 7, "B1" to 1, "B2" to 19, "D2" to 14, "E1" to 14, "E2" to 9, "F1" to 3, "F2" to 11, "G1" to 6)
+
+    private val books = listOf(
+        "Kayıp Fenerin Bekçisi" to "Ada Yılmaz", "Kuzey Rüzgârı" to "Cem Aydın", "Taş Köprünün Altında" to "Elif Kara",
+        "Gece Treni" to "Mert Şahin", "Mavi Defter" to "Selin Öz", "Son Mektup" to "Deniz Ak", "Bahçedeki Saat" to "Can Tekin",
+        "Sisli Liman" to "Zeynep Arı", "Eski Haritalar" to "Kaan Demir", "Yarım Kalan Yol" to "Nil Toprak",
+    )
+
+    /** A list of shelves and one shelf's books: text on both sides, in the same places, as in an app. */
+    @Composable
+    private fun Shelves(detail: String?, onDetail: (String?) -> Unit) {
+        val colors = DeskTheme.colors
+        DetailTransition(detail = detail, onBack = { onDetail(null) }, list = {
+            Column(Modifier.fillMaxSize().background(colors.background)) {
+                PageHeader("Raflar", subtitle = "Bu listede rafı yazılmamış 12 kitap var")
+                shelves.forEach { (code, count) -> DeskListRow(title = code, trailing = "$count kitap", strong = true) }
+            }
+        }) { shelf ->
+            Column(Modifier.fillMaxSize().background(colors.background)) {
+                Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    DeskIconButton(DeskIcons.ArrowLeft, "Geri", {})
+                    Spacer(Modifier.width(4.dp))
+                    Text(shelf, style = DeskTheme.type.headline, color = colors.text, maxLines = 1)
+                }
+                Text("Barış · ${books.size} kitap", style = DeskTheme.type.body, color = colors.textSecondary, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                books.forEach { (title, author) -> DeskListRow(title = title, subtitle = author) }
+            }
+        }
+    }
 
     /** The albums grid and the album's page in a [DetailTransition], as the sample has them: the card grows into the header. */
     @Composable

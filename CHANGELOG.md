@@ -1,5 +1,57 @@
 # Değişiklikler
 
+## 2.4.0 (2026-11-05)
+
+Ayrıntı geçişi: açılan sayfa baştan saydam değil, listenin üstüne kayarak gelir; liste yalnızca kararır, iki sayfanın
+yazıları hiçbir karede üst üste binmez. Bir telefonda (Galaxy, kit 2.3.0) çekilen videoda raflar listesinden bir rafın
+kitaplarına geçerken ve dönerken bir an iki sayfa birden yarı saydam çiziliyordu: rafın ilk kitabının adı listenin
+"MKE / Barış" seçicisinin üstünde, kapanırken kitap adları listenin raf kodlarının hemen yanında. Neden: 2.3.0'ın
+derinlik geçişinde ayrıntı 0'dan solarak gelirken liste altında solarak gidiyordu (açılışta yaklaşık 0–160 ms,
+kapanışta 0–120 ms ikisi birden yarı saydam), tablet ve DeX'in paylaşılan ekseninde de solmalar 50 ms üst üste
+biniyordu. Kod değişmeden derlenir, API aynı; telefonda görünür bir davranış değişikliği olduğu için sürüm, kuralımız
+gereği ikinci sayıyı artırır. Uygulamanın yapacağı bir şey yok ([MIGRATION.md](MIGRATION.md#230dan-240a)). Kare
+şeritleri CI'ın `ci/screenshots-pr-7` dalında, `motion/` altında (`detail-open-plain`, `detail-close-plain`,
+`detail-back-plain`, `detail-open-timed`, `detail-close-timed`, `detail-close` yeni).
+
+### Telefon
+
+- **Ayrıntı Android'in kendi liste → ayrıntı geçişiyle açılır** (Ayarlar uygulaması, Android 14'ün etkinlik geçişi):
+  ayrıntı ilk karesinden saydamsızdır (sayfa rengi kayan katmanın içinde, içeriğin altında), bitiş kenarından
+  pencerenin tamamı kadar kayarak `DeskMotion.open` yayıyla listenin üstüne gelir. Liste solmaz: aynı yayla yüzde
+  95'e küçülür ve temanın perdesinin yüzde 70'i kadar kararır (perde ayrıntının kenarıyla birlikte ilerler, listenin
+  küçülmesiyle açılan kenarları da örter). Kapanış tersi:
+  ayrıntı bitiş kenarına kayıp çıkar, perde açılır. Ayrıntı saydamsız olduğu için listenin yazısı onun içinden hiç
+  görünmez; liste yalnızca ayrıntının henüz örtmediği yerde görünür.
+- **Öngörülü geri:** davranış aynı (ayrıntı parmakla yüzde 90'a küçülür, köşeleri yuvarlanır, kaydırmanın geldiği
+  kenardan uzağa yaslanır; liste arkasında yüzde 94'ten yükselir). Liste solarak gelmez: parmak hareket ederken
+  perdenin altında koyu kalır (küçülen ayrıntı onun üstünde belirgin durur), bırakınca perde açılır. Ayrıntı
+  bırakınca solmadan, pencereden tamamen çıkana kadar kayar (önce beşte iki kayıp soluyordu); kalan yol yine 220 ms,
+  eğrisi hızlanan yerine standart (uzun bir kayma hızlanan eğride sonunda sıçrıyordu).
+  Vazgeçince ve yolun ortasında fikir değiştirince her şey eskisi gibi geldiği yoldan döner, iki sayfa da saydamsız.
+- **Kartla (`detailSharedCard`):** kart başlığa büyürken sayfaların gerisi sırayla solar: liste ilk 90 ms'de tamamen
+  gider, ayrıntı ancak ondan sonra 210 ms'de belirir; dönüşte tersi (önceden 60–160 ms arası ikisi birden yarı
+  saydamdı). Kartın kendisi uçarken saydam olmaz: iki tarafın kopyası da tam çizilir, başlık kartın üstünde; kartın
+  yüzeyi altta hep saydamsız, içerikler aynı sırayla solar (kartınki önce gider, başlığınki sonra gelir). Önceden iki
+  kopya birlikte solduğu için kart 90 ms civarında yarı saydam oluyordu.
+- **Bir ayrıntıdan ötekine** (anahtar değişince) geçiş de sıralı solar: eski 100 ms'de gider, yeni sonra gelir.
+
+### Tablet ve DeX
+
+- **Paylaşılan eksen sıralı solar** (Material'ın paylaşılan ekseni gibi): giden sayfa ilk 100 ms'de tamamen solar,
+  gelen ancak ondan sonra 200 ms'de belirir. Önceden açılışta 50–100 ms, kapanışta 50–150 ms ikisi birden yarı
+  saydamdı. Kaymalar (yüzde 10, 300 ve 350 ms) ve toplam süreler aynı; geri
+  hareketi 2.2.0'daki gibi (gölge üstünde küçülme). Ekran görüntüleri aynı.
+
+### Testler
+
+- `DetailNoDoubleExposureTest`: liste kırmızı, ayrıntı mavi; açılışın, kapanışın, öngörülü geri hareketinin (parmak
+  yolda, bırakınca, vazgeçince) ve yolun ortasında dönen açılışın her karesinde, telefonda ayrıntının da listenin de
+  saydamsız olduğu ve hiçbir pikselde iki sayfanın karışmadığı denetlenir; kartla, tablette ve DeX'te hiçbir karede
+  karışma olmadığı. Antialiasing'in küçülen sayfanın kenarlarında karıştırdığı birkaç piksel için pencerenin yüzde
+  biri pay var; 2.3.0'ın çift görüntüsü yüz binlerce pikseldi.
+- Kare şeritleri: yazılı bir liste ve ayrıntıyla (raflar → bir rafın kitapları; uydurma adlar) açılış, kapanış ve
+  geri hareketi; aynısı tablet katmanında; kartlı kapanış.
+
 ## 2.3.0 (2026-10-31)
 
 Galaxy S24'teki hareketlerin kare kare incelenmesi: takılan ve sıçrayan ne varsa düzeltildi, geçişler telefonun

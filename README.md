@@ -65,7 +65,7 @@ Uygulama modülünün `build.gradle.kts` dosyası:
 
 ```kotlin
 dependencies {
-    implementation("com.github.hesaplarimdijital-coder:desktop-kit:2.3.0")
+    implementation("com.github.hesaplarimdijital-coder:desktop-kit:2.4.0")
     implementation("androidx.activity:activity-compose:1.13.0")
 }
 ```
@@ -419,15 +419,19 @@ DetailTransition(
 }
 ```
 
-- Telefonda derinlik: ayrıntı bitiş kenarından yüzde 12 kayıp solarak gelir, liste altında yüzde 95'e küçülüp
-  solar; kapanırken tersi. Tablet genişliğinden yukarı paylaşılan eksen: ayrıntı kısa bir yoldan kayıp belirir,
-  liste öbür yana çekilir.
+- Telefonda Android'in kendi liste → ayrıntı geçişi: ayrıntı ilk karesinden saydam değildir, bitiş kenarından
+  listenin üstüne kayarak gelir; liste solmaz, yalnızca yüzde 95'e küçülüp bir perdenin altında kararır; kapanırken
+  tersi. Tablet genişliğinden yukarı paylaşılan eksen: ayrıntı kısa bir yoldan kayıp belirir, liste öbür yana
+  çekilir; liste ilk üçte birde tamamen solar, ayrıntı ancak ondan sonra belirir. Hiçbir karede iki sayfa birden yarı
+  saydam değildir: birinin yazısı ötekinin üstüne binmez.
 - Telefonda kart: listedeki kart ve ayrıntının başlığı aynı anahtarla `Modifier.detailSharedCard("kart-$id")`
-  alırsa kart başlığa büyür (köşeleri düzleşir, yüzeyi sayfaya döner), ayrıntının gerisi ardından solar; geri dönüşte
-  başlık kartın yerine küçülür. Kapak ve başlık (`detailSharedElement`, `detailSharedBounds`) kartın üstünde uçar.
+  alırsa kart başlığa büyür (köşeleri düzleşir, yüzeyi sayfaya döner, uçarken saydam olmaz), ayrıntının gerisi liste
+  tamamen solduktan sonra belirir; geri dönüşte başlık kartın yerine küçülür. Kapak ve başlık (`detailSharedElement`,
+  `detailSharedBounds`) kartın üstünde uçar.
 - Android 14+ öngörülü geri hareketinde ayrıntı parmakla küçülür ve köşeleri yuvarlanır; telefonda liste arkasında
-  parmakla yükselir, bırakınca kalan yol parmağın bıraktığı yerden biter, vazgeçince her şey geri yaylanır, yolun
-  ortasındaki fikir değişikliği (dokunuştan hemen sonra Geri) geçişi olduğu yerden geri oynatır. Tablet genişliğinden
+  perdenin altında koyu, parmakla yükselir, ayrıntı hep saydamsız kalır; bırakınca perde açılır ve kalan yol
+  parmağın bıraktığı yerden biter, vazgeçince her şey geri yaylanır, yolun ortasındaki fikir değişikliği (dokunuştan
+  hemen sonra Geri) geçişi olduğu yerden geri oynatır. Tablet genişliğinden
   yukarı ayrıntı gölge üstünde küçülür ve bırakınca paylaşılan eksenle kapanır (2.2.0'daki gibi).
   Manifestte `<application android:enableOnBackInvokedCallback="true">` gerekir. Eski sürümlerde Geri yine kapatır.
 - Geri hareketini `DetailTransition` üstlenir (`CompactTopBar` içindeyken de); ayrıca `BackHandler` gerekmez.
@@ -659,9 +663,9 @@ uçarken de yuvarlak kalsın diye biçimini ver: `detailSharedElement("kapak-$id
 ## Sürüm yayınlamak
 
 1. `CHANGELOG.md` dosyasına ne değiştiğini yaz, `gradle.properties` içindeki `VERSION_NAME`'i güncelle.
-2. Önce PR'ı birleştir, sonra GitHub'da **Releases → Draft a new release** ile etiketi (`2.3.0`) `main` üzerinde
-   oluştur; ya da `git tag 2.3.0 && git push origin 2.3.0`. Etiket birleştirmeden önce açılırsa eski kodu gösterir.
-3. JitPack ilk istekte derler (`jitpack.yml`, Java 17). Uygulamada sürümü `2.3.0` yapman yeterli.
+2. Önce PR'ı birleştir, sonra GitHub'da **Releases → Draft a new release** ile etiketi (`2.4.0`) `main` üzerinde
+   oluştur; ya da `git tag 2.4.0 && git push origin 2.4.0`. Etiket birleştirmeden önce açılırsa eski kodu gösterir.
+3. JitPack ilk istekte derler (`jitpack.yml`, Java 17). Uygulamada sürümü `2.4.0` yapman yeterli.
 
 Sürüm numaraları [SemVer](https://semver.org/lang/tr/) kuralına uyar: uyumu bozan değişiklik
 ana sürümü, yeni özellik ikinci sayıyı, düzeltme üçüncüyü artırır.
