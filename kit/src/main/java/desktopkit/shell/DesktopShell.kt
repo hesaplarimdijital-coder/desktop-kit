@@ -2,9 +2,11 @@ package desktopkit.shell
 
 import androidx.activity.BackEventCompat
 import androidx.compose.animation.core.Easing
+import androidx.compose.animation.core.Transition
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.spring
@@ -473,12 +475,16 @@ private fun ShellContent(
                         ) {
                             spec.items.forEach { item ->
                                 composable(item.route) {
-                                    ShellScreenFrame(metrics, scroll) { currentContent(item.route, navigator) }
+                                    TabPage(transition) {
+                                        ShellScreenFrame(metrics, scroll) { currentContent(item.route, navigator) }
+                                    }
                                 }
                             }
                             composable(ShellSpec.MORE_ROUTE) {
-                                ShellScreenFrame(metrics, scroll) {
-                                    OverflowScreen(currentSpec.overflow(currentKind), onSelect = navigator::navigate)
+                                TabPage(transition) {
+                                    ShellScreenFrame(metrics, scroll) {
+                                        OverflowScreen(currentSpec.overflow(currentKind), onSelect = navigator::navigate)
+                                    }
                                 }
                             }
                         }
@@ -520,6 +526,44 @@ private fun ShellContent(
             }
         }
         CompositionLocalProvider(LocalNavKind provides navKind) { overlays() }
+    }
+}
+
+/** How far the corners of a tab round on its way out with the Back gesture: the detail's. */
+private val TAB_CORNER = 28.dp
+
+/**
+ * A tab's page on the phone, on its own page-coloured surface. The screens used to lie on the shell's
+ * background: in the predictive Back gesture the tab being left shrank in front of the start tab, and
+ * the start tab showed through its text. On the surface the tab is whole, and its corners round with
+ * the gesture to [TAB_CORNER], as the detail's do. The rounding is read off the scale the gesture's exit
+ * animates on this content ([shellPredictiveExit], toward 90 %): a fade-through, which scales nothing on
+ * its way out, keeps the corners square. At rest the surface is the shell's colour and nothing looks
+ * different; wider up the content is as it was.
+ */
+@Composable
+private fun TabPage(transition: Transition<EnterExitState>, content: @Composable () -> Unit) {
+    if (LocalNavKind.current == NavKind.BottomBar) {
+        val page = DeskTheme.colors.background
+        Box(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    val scale = if (transition.targetState == EnterExitState.PostExit) {
+                        transition.animations.firstOrNull { it.label.endsWith(" scale") }?.value as? Float
+                    } else {
+                        null
+                    }
+                    val p = if (scale == null) 0f else ((1f - scale) / 0.1f).coerceIn(0f, 1f)
+                    if (p > 0f) {
+                        shape = RoundedCornerShape(TAB_CORNER * p)
+                        clip = true
+                    }
+                }
+                .background(page),
+        ) { content() }
+    } else {
+        content()
     }
 }
 

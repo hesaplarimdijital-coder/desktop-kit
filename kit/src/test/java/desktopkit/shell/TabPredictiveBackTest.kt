@@ -1,11 +1,17 @@
 package desktopkit.shell
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import androidx.activity.BackEventCompat
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -21,10 +27,12 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import kotlin.math.abs
 
 /** With gesture navigation the Back between a phone's tabs follows the finger: the tab shrinks, the start tab is behind it. */
 @RunWith(AndroidJUnit4::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = "tr-w411dp-h891dp-hdpi")
 class TabPredictiveBackTest {
 
@@ -120,5 +128,66 @@ class TabPredictiveBackTest {
         compose.waitForIdle()
         compose.onNodeWithTag("screen-documents").assertDoesNotExist()
         compose.onNodeWithTag("screen-home").assertExists()
+    }
+
+    /**
+     * The share of reddish pixels in the middle of the window (a quarter in from each side, a third from top and
+     * bottom): red, or red seen through a half transparent screen over the page.
+     */
+    private fun redInTheMiddle(): Float {
+        val window = compose.activity.window.decorView
+        val bitmap = Bitmap.createBitmap(window.width, window.height, Bitmap.Config.ARGB_8888)
+        compose.runOnIdle { window.draw(Canvas(bitmap)) }
+        val left = bitmap.width / 4
+        val top = bitmap.height / 3
+        val width = bitmap.width / 2
+        val height = bitmap.height / 3
+        val pixels = IntArray(width * height)
+        bitmap.getPixels(pixels, 0, width, left, top, width, height)
+        val red = pixels.count { p ->
+            val r = p shr 16 and 0xff
+            r > 100 && r - (p shr 8 and 0xff) > 60 && r - (p and 0xff) > 60
+        }
+        return red.toFloat() / pixels.size
+    }
+
+    /**
+     * The tab being left is whole in front of the start tab: on its own page-coloured surface, not lying on
+     * the shell's background with the start tab showing through its text. The start tab is pure red, the
+     * documents tab is text-like, a small blue square on no background of its own: half way through the
+     * gesture the middle of the window (under the shrunk tab) must show no red, and all red once it has gone.
+     */
+    @Test
+    fun theTabIsWholeInFrontOfTheStartTab() {
+        compose.setContent {
+            DesktopKitTheme(inputMode = InputMode.Touch) {
+                TestShell(WidthClass.Compact, transitions = ShellTransitions.Default) { route, _ ->
+                    if (route == "home") {
+                        Box(Modifier.fillMaxSize().background(Color.Red).testTag("screen-$route"))
+                    } else {
+                        Box(Modifier.fillMaxSize().testTag("screen-$route")) { Box(Modifier.size(80.dp).background(Color.Blue)) }
+                    }
+                }
+            }
+        }
+        compose.waitForIdle()
+        compose.onNodeWithText("Belgeler").performClick()
+        compose.waitForIdle()
+        assertEquals("the documents tab covers the start tab", 0f, redInTheMiddle(), 0.01f)
+        val dispatcher = compose.activity.onBackPressedDispatcher
+        compose.runOnUiThread {
+            dispatcher.dispatchOnBackStarted(back(0f))
+            dispatcher.dispatchOnBackProgressed(back(0.25f))
+        }
+        compose.waitForIdle()
+        // the finger holds half way: the transition is seeked there and rests, the start tab composed behind
+        compose.runOnUiThread { dispatcher.dispatchOnBackProgressed(back(0.5f)) }
+        compose.waitForIdle()
+        compose.onNodeWithTag("screen-home").assertExists()
+        assertEquals("the start tab shows through the shrunk tab", 0f, redInTheMiddle(), 0.01f)
+        compose.runOnUiThread { dispatcher.onBackPressed() }
+        compose.waitForIdle()
+        compose.onNodeWithTag("screen-documents").assertDoesNotExist()
+        assertEquals("the start tab is back", 1f, redInTheMiddle(), 0.01f)
     }
 }

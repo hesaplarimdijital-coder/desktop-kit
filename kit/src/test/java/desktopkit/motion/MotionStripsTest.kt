@@ -171,8 +171,36 @@ class MotionStripsTest {
     }
 
     /**
+     * The Back gesture between tabs: the podcasts tab shrinks on its own surface, whole in front of the music
+     * tab rising behind it, and slides out once let go.
+     */
+    @Test
+    fun tabBack() {
+        onThePodcastsTab()
+        val dispatcher = compose.activity.onBackPressedDispatcher
+        fun back(progress: Float) = BackEventCompat(40f, 600f, progress, BackEventCompat.EDGE_LEFT)
+        compose.mainClock.autoAdvance = false
+        val frames = mutableListOf("önce" to shot())
+        compose.runOnUiThread { dispatcher.dispatchOnBackStarted(back(0f)) }
+        for (p in listOf(0.25f, 0.5f, 0.8f)) {
+            compose.runOnUiThread { dispatcher.dispatchOnBackProgressed(back(p)) }
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+            frames += "parmak $p" to shot()
+        }
+        compose.runOnUiThread { dispatcher.onBackPressed() }
+        var now = 0L
+        for (t in listOf(16L, 64L, 144L, 304L)) {
+            now = advanceTo(t, now)
+            frames += "bırakınca +$now ms" to shot()
+        }
+        compose.mainClock.autoAdvance = true
+        saveStrip("tab-back", frames)
+    }
+
+    /**
      * The three-button Back between tabs (Android 16 starts a predictive Back for the button too, with no edge):
-     * the fade-through of a Back without the gesture, the press a frame before the release as a tap is.
+     * the fade-through of a Back without the gesture, the press 48 ms before the release as a tap is.
      */
     @Test
     fun tabBackButton() {
@@ -181,9 +209,8 @@ class MotionStripsTest {
         compose.mainClock.autoAdvance = false
         val frames = mutableListOf("önce" to shot())
         compose.runOnUiThread { dispatcher.dispatchOnBackStarted(BackEventCompat(0f, 0f, 0f, BackEventCompat.EDGE_NONE)) }
-        compose.mainClock.advanceTimeByFrame()
-        compose.waitForIdle()
-        frames += "basılı" to shot()
+        advanceTo(48, 0)
+        frames += "basılı 48 ms" to shot()
         compose.runOnUiThread { dispatcher.onBackPressed() }
         var now = 0L
         for (t in listOf(16L, 48L, 96L, 144L, 208L, 304L)) {
