@@ -1,10 +1,10 @@
-# 2.3.0'a geçiş
+# 2.4.0'a geçiş
 
-Bu rehber kiti kullanan uygulamaları en güncel sürüme, 2.3.0'a taşımak için. 0.1.3'ten gelenler baştan
+Bu rehber kiti kullanan uygulamaları en güncel sürüme, 2.4.0'a taşımak için. 0.1.3'ten gelenler baştan
 başlar; adımlardan sonra [görünümde fark edecekleri](#013ten-gelince-görünümde-fark-edecekleriniz) ayrıca
 yazılı. 1.0.0'dan geçenler 1. adımdan sonra doğrudan [1.0'dan 2.0'a](#10dan-20a) bölümüne atlayabilir. 2.0.0,
-2.1.0 ya da 2.2.0 kullananlar yalnızca [2.0.0'dan 2.1.0'a](#200dan-210a), [2.1.0'dan 2.2.0'a](#210dan-220a) ve
-[2.2.0'dan 2.3.0'a](#220dan-230a) bölümlerine bakar.
+2.1.0, 2.2.0 ya da 2.3.0 kullananlar yalnızca [2.0.0'dan 2.1.0'a](#200dan-210a), [2.1.0'dan 2.2.0'a](#210dan-220a),
+[2.2.0'dan 2.3.0'a](#220dan-230a) ve [2.3.0'dan 2.4.0'a](#230dan-240a) bölümlerine bakar.
 
 Sıra şöyle: önce derleme ortamı (kitin kendisi aynı adımları `7845eb5` gönderisinde attı, örnek olarak
 oraya bakılabilir), sonra uygulamanın kendi yazdığı bileşenler kitinkilerle değiştirilir, en son yeni
@@ -12,7 +12,7 @@ oraya bakılabilir), sonra uygulamanın kendi yazdığı bileşenler kitinkilerl
 
 ## 1. Derleme ortamı
 
-| | 0.1.3 uygulamaları | 2.3.0 |
+| | 0.1.3 uygulamaları | 2.4.0 |
 | --- | --- | --- |
 | Android Gradle eklentisi (AGP) | 8.7.3 | 9.4.1 (en az 9.1.1) |
 | Gradle | 8.11.1 | 9.8.2 |
@@ -31,7 +31,7 @@ cihazlar uygulamayı kuramaz. Uygulamalar Play'de olmadığı için başka bir e
 Adımlar:
 
 1. `gradle/wrapper/gradle-wrapper.properties`: `distributionUrl=https\://services.gradle.org/distributions/gradle-9.8.2-bin.zip`
-2. `gradle/libs.versions.toml`: yukarıdaki sürümler ve `desktopKit = "2.3.0"`. En kolayı kitin kendi
+2. `gradle/libs.versions.toml`: yukarıdaki sürümler ve `desktopKit = "2.4.0"`. En kolayı kitin kendi
    `gradle/libs.versions.toml` dosyasındaki sürümleri almak.
 3. AGP 9 Kotlin'i kendisi derler (yerleşik Kotlin). Modüllerden `alias(libs.plugins.kotlin.android)`
    satırını sil, `kotlin.compose` kalsın. Kökteki `build.gradle.kts` dosyasında eklentiyi uygulamadan
@@ -304,3 +304,17 @@ CHANGELOG'un "Tablet ve DeX" bölümünde. Ayrıntılar [CHANGELOG](CHANGELOG.md
 - **Yeni:** `Modifier.detailSharedCard`, `Modifier.playerSharedElement`, `rememberListAppear`/`Modifier.listAppear`
   (`ListAppear.ROWS`, `STAGGER_MS`, `DURATION_MS`), `DeskMotion.open`, `DeskMotion.PIXEL`,
   `DeskMotion.gesture(visibilityThreshold)`, `DeskMotion.spatial(tier, timed, visibilityThreshold)`.
+
+## 2.3.0'dan 2.4.0'a
+
+Kod değişmeden derlenir (2.3.0'a karşı derlenmiş kod da bağlanır, API aynı); sürümü `2.4.0` yapmak yeter.
+Uygulamanın yapacağı bir şey yok. Değişen yalnızca `DetailTransition`'ın görünümü
+([CHANGELOG](CHANGELOG.md#240-2026-11-05)):
+
+- **Telefonda:** açılan ayrıntı ilk karesinden saydamsızdır ve listenin üstüne bitiş kenarından kayarak gelir; liste
+  solmaz, perdenin altında kararır. Ayrıntının kendi içeriğinin arka planı yoksa da sorun değil: kit ayrıntının
+  altına sayfa rengini zaten çizer. Ayrıntının içinde kendi giriş solması (`AnimatedVisibility`, `alpha`) olan bir
+  uygulama, listeyi o kısımda ayrıntının içinden görmez; yalnızca sayfa rengini görür.
+- **Kartla:** `detailSharedCard` aynı; kart uçarken saydam olmaz, sayfaların gerisi üst üste değil sırayla solar.
+- **Tablet ve DeX:** paylaşılan eksenin solmaları sıralı (önce liste gider, sonra ayrıntı gelir); kaymalar ve toplam
+  süre aynı.
