@@ -83,8 +83,9 @@ class TabPredictiveBackTest {
     /**
      * The three-button Back: since Android 16 a press starts a predictive Back with no edge ([BackEventCompat.EDGE_NONE])
      * and completes it on the release, so Navigation seeks the predictive transitions and plays them through. The
-     * button is no swipe: the tab fades through as a Back without the gesture does, instead of shrinking and
-     * leaning for 300 ms. The fade-out takes 90 ms; after that the tab is gone and the start tab is fading in.
+     * button is no swipe: the tab fades through as a Back without the gesture does, which leaves it its full size
+     * and place on the way out, instead of shrinking and leaning for 300 ms. (The tab stays composed until the
+     * whole transition is over, invisible once its 90 ms fade is done.)
      */
     @Test
     fun theBackButtonFadesThroughInsteadOfShrinking() {
@@ -96,27 +97,25 @@ class TabPredictiveBackTest {
         compose.runOnUiThread { dispatcher.dispatchOnBackStarted(BackEventCompat(0f, 0f, 0f, BackEventCompat.EDGE_NONE)) }
         compose.mainClock.advanceTimeByFrame()
         compose.waitForIdle()
+        compose.onNodeWithTag("screen-home").assertExists()
         val pressed = compose.onNodeWithTag("screen-documents").getBoundsInRoot()
         assertEquals("width while pressed", (full.right - full.left).value, (pressed.right - pressed.left).value, 0.5f)
         // the release, a frame later as a tap is: the rest of the transition plays
         compose.runOnUiThread { dispatcher.onBackPressed() }
-        // three frames in: still there, full size (the gesture's exit would have it at 98.4 % and leaning)
-        repeat(3) {
-            compose.mainClock.advanceTimeByFrame()
-            compose.waitForIdle()
+        // on the way out the tab keeps its size and place (the gesture's exit has it at 98.4 % three frames in,
+        // 95 % nine frames in, leaning to the right)
+        for (frames in listOf(3, 6)) {
+            repeat(frames) {
+                compose.mainClock.advanceTimeByFrame()
+                compose.waitForIdle()
+            }
+            val fading = compose.onNodeWithTag("screen-documents").getBoundsInRoot()
+            assertEquals("width on the way out", (full.right - full.left).value, (fading.right - fading.left).value, 0.5f)
+            assertEquals("left edge on the way out", full.left.value, fading.left.value, 0.5f)
         }
-        val fading = compose.onNodeWithTag("screen-documents").getBoundsInRoot()
-        assertEquals("width while fading out", (full.right - full.left).value, (fading.right - fading.left).value, 0.5f)
-        assertEquals("left edge while fading out", full.left.value, fading.left.value, 0.5f)
-        // past the fade-out: gone, where the gesture's exit would keep it until 300 ms
-        repeat(7) {
-            compose.mainClock.advanceTimeByFrame()
-            compose.waitForIdle()
-        }
-        compose.onNodeWithTag("screen-documents").assertDoesNotExist()
-        compose.onNodeWithTag("screen-home").assertExists()
         compose.mainClock.autoAdvance = true
         compose.waitForIdle()
+        compose.onNodeWithTag("screen-documents").assertDoesNotExist()
         compose.onNodeWithTag("screen-home").assertExists()
     }
 }
