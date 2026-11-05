@@ -93,14 +93,17 @@ class TabPredictiveBackTest {
         val full = compose.onNodeWithTag("screen-documents").getBoundsInRoot()
         val dispatcher = compose.activity.onBackPressedDispatcher
         compose.mainClock.autoAdvance = false
-        // the press: Navigation seeks the transition to its start and the transitions are chosen now
+        // the press: Navigation seeks the transition to its start (a frame to see the Back, one to compose the
+        // start tab as the target, the transitions chosen with it) and holds it there while the button is down
         compose.runOnUiThread { dispatcher.dispatchOnBackStarted(BackEventCompat(0f, 0f, 0f, BackEventCompat.EDGE_NONE)) }
-        compose.mainClock.advanceTimeByFrame()
-        compose.waitForIdle()
+        repeat(3) {
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+        }
         compose.onNodeWithTag("screen-home").assertExists()
         val pressed = compose.onNodeWithTag("screen-documents").getBoundsInRoot()
         assertEquals("width while pressed", (full.right - full.left).value, (pressed.right - pressed.left).value, 0.5f)
-        // the release, a frame later as a tap is: the rest of the transition plays
+        // the release, 48 ms later as a tap is: the rest of the transition plays
         compose.runOnUiThread { dispatcher.onBackPressed() }
         // on the way out the tab keeps its size and place (the gesture's exit has it at 98.4 % three frames in,
         // 95 % nine frames in, leaning to the right)
