@@ -429,8 +429,9 @@ DetailTransition(
   tamamen solduktan sonra belirir; geri dönüşte başlık kartın yerine küçülür. Kapak ve başlık (`detailSharedElement`,
   `detailSharedBounds`) kartın üstünde uçar.
 - Android 14+ öngörülü geri hareketinde ayrıntı parmakla küçülür ve köşeleri yuvarlanır; telefonda liste arkasında
-  parmakla yükselir ve perdesi açılır, ayrıntı hep saydamsız kalır, bırakınca kalan yol parmağın bıraktığı yerden biter, vazgeçince her şey geri yaylanır, yolun
-  ortasındaki fikir değişikliği (dokunuştan hemen sonra Geri) geçişi olduğu yerden geri oynatır. Tablet genişliğinden
+  perdenin altında koyu, parmakla yükselir, ayrıntı hep saydamsız kalır; bırakınca perde açılır ve kalan yol
+  parmağın bıraktığı yerden biter, vazgeçince her şey geri yaylanır, yolun ortasındaki fikir değişikliği (dokunuştan
+  hemen sonra Geri) geçişi olduğu yerden geri oynatır. Tablet genişliğinden
   yukarı ayrıntı gölge üstünde küçülür ve bırakınca paylaşılan eksenle kapanır (2.2.0'daki gibi).
   Manifestte `<application android:enableOnBackInvokedCallback="true">` gerekir. Eski sürümlerde Geri yine kapatır.
 - Geri hareketini `DetailTransition` üstlenir (`CompactTopBar` içindeyken de); ayrıca `BackHandler` gerekmez.

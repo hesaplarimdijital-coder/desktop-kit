@@ -94,10 +94,10 @@ import kotlinx.coroutines.launch
  * - closing ([detail] becomes null): the same, reversed;
  * - Back gesture (Android 14 and later with `android:enableOnBackInvokedCallback="true"`): while the
  *   finger moves, the detail shrinks toward 90 %, rounds its corners and leans away from the edge
- *   the swipe came from, with the finger. On a phone the list is really there behind it, rising
- *   and its scrim lightening with the finger; letting go closes it with [onBack] and the detail
- *   slides out the way it was leaning from wherever the finger left it, swiping back cancels and
- *   everything springs back. The detail stays opaque all the way. With a three-button Back only
+ *   the swipe came from, with the finger. On a phone the list is really there behind it, dimmed,
+ *   rising with the finger; letting go closes it with [onBack]: the detail slides out the way it
+ *   was leaning from wherever the finger left it and the list's scrim lightens; swiping back
+ *   cancels and everything springs back. The detail stays opaque all the way. With a three-button Back only
  *   the way out plays. From tablet width up the 2.2.0 gesture stays: the detail shrinks over a
  *   shade and, let go of, closes with the shared axis.
  *
@@ -184,15 +184,19 @@ fun <T : Any> DetailTransition(
             ) {
                 if (target == null) {
                     // on the phone the list behind a detail is not faded: it sinks a little and darkens under a scrim
-                    // (0 at rest, 1 all the way behind the detail), with the finger during the Back gesture. The
+                    // (each 0 at rest, 1 all the way behind the detail), on the detail's own spring so the scrim
+                    // follows its edge. During the Back gesture the list rises with the finger and stays dimmed, so
+                    // the shrunk detail stands out against it; the scrim lightens on the way out, once let go. The
                     // scrim is drawn over the whole window, the margins left by the sinking list included.
+                    val behindDetail: (EnterExitState) -> Float = { state -> if (state == EnterExitState.Visible || !(phone && animated)) 0f else 1f }
                     val depth = this.transition.animateFloat(
-                        transitionSpec = {
-                            if (gestureClose) tween(GESTURE_MS, easing = DeskMotion.Standard)
-                            else tween(DeskMotion.LONG_MS, easing = DeskMotion.Emphasized)
-                        },
+                        transitionSpec = { if (gestureClose) tween(GESTURE_MS, easing = DeskMotion.Standard) else DeskMotion.open(FRACTION) },
                         label = "listDepth",
-                    ) { state -> if (state == EnterExitState.Visible || !(phone && animated)) 0f else 1f }
+                    ) { behindDetail(it) }
+                    val dim = this.transition.animateFloat(
+                        transitionSpec = { if (gestureClose) tween(GESTURE_MS, easing = AfterTheFinger) else DeskMotion.open(FRACTION) },
+                        label = "listScrim",
+                    ) { behindDetail(it) }
                     // opaque, so the shade left behind a closed detail never shows through the list
                     Box(
                         Modifier
@@ -200,7 +204,7 @@ fun <T : Any> DetailTransition(
                             .background(page)
                             .drawWithContent {
                                 drawContent()
-                                val d = depth.value
+                                val d = dim.value
                                 if (d > 0f) drawRect(scrim, alpha = SCRIM * d)
                             },
                     ) {
@@ -294,7 +298,7 @@ fun <T : Any> DetailTransition(
                 gestureClose && target == null -> {
                     // let go early, the finger's part of the way is finished first, quickly, then the way out
                     seekable.seekOn(GESTURE_END, (COMMIT_MS * (GESTURE_END - seekable.fraction) / GESTURE_END).toInt())
-                    seekable.animateTo(null, tween(COMMIT_MS, easing = DeskMotion.EmphasizedAccelerate))
+                    seekable.animateTo(null, tween(COMMIT_MS, easing = DeskMotion.Standard))
                     gestureClose = false
                 }
                 // a change of mind on the way (Back right after the tap, the tap again right after Back): the way is
@@ -368,6 +372,9 @@ fun <T : Any> DetailTransition(
 /** How far the finger seeks the closing; the rest ([1 - GESTURE_END]) is the detail's way out once let go. */
 private const val GESTURE_END = 0.85f
 
+/** Over the Back gesture's closing: nothing while the finger seeks it, then the way out, evenly. */
+private val AfterTheFinger = Easing { fraction -> ((fraction - GESTURE_END) / (1f - GESTURE_END)).coerceIn(0f, 1f) }
+
 /**
  * A transition turned around on its way: its fraction runs back to 0 on [spec], the target held.
  * Retargeted at its own current state instead, a seekable transition drops the shared elements'
@@ -413,7 +420,7 @@ private const val FRACTION = 0.001f
 private const val GESTURE_MS = 300
 
 /** How much of the theme's scrim darkens the list all the way behind a detail on a phone. */
-private const val SCRIM = 0.5f
+private const val SCRIM = 0.7f
 
 /**
  * Fade-through timing on a phone (with a [detailSharedCard]) and between two details: the screen going
@@ -439,13 +446,13 @@ private fun <T> AnimatedContentTransitionScope<T?>.detailTransform(
     // sinking and a scrim, is its own animation, see DetailTransition; it is held until the detail
     // has arrived or gone)
     if (closing && gesture) {
-        // the Back gesture seeks this: the list rises and its scrim lightens behind the shrinking
-        // detail from the first frame, the detail stays whole and opaque until GESTURE_END and only
-        // then (once the finger has let go) slides out away from the edge the swipe came from, with
-        // the finger, all the way out of the window
-        val wayOut = Easing { fraction -> DeskMotion.EmphasizedAccelerate.transform(((fraction - GESTURE_END) / (1f - GESTURE_END)).coerceIn(0f, 1f)) }
+        // the Back gesture seeks this: the list rises behind the shrinking detail from the first
+        // frame, dimmed; the detail stays whole and opaque until GESTURE_END and only then (once the
+        // finger has let go) slides out away from the edge the swipe came from, with the finger, all
+        // the way out of the window, while the list's scrim lightens (the way out's curve is the
+        // commit's, see DetailTransition: a slide this long on an accelerating curve jumped at its end)
         val direction = if (swipeEdge == BackEventCompat.EDGE_RIGHT) -1 else 1
-        val exit = slideOutHorizontally(tween(GESTURE_MS, easing = wayOut)) { direction * it }
+        val exit = slideOutHorizontally(tween(GESTURE_MS, easing = AfterTheFinger)) { direction * it }
         return (EnterTransition.None togetherWith exit).apply { targetContentZIndex = -1f }
     }
     if (tier == MotionTier.Gesture && (opening || closing)) {

@@ -167,10 +167,13 @@ class MotionStripsTest {
         strip("detail-open") { detail = albums[2] }
     }
 
+    /** Opened from the card first (a detail shown from the start was not opened with a card, and closes plain). */
     @Test
     fun detailClose() {
-        var detail by mutableStateOf<Album?>(albums[2])
+        var detail by mutableStateOf<Album?>(null)
         phoneContent { Albums(detail) { detail = it } }
+        compose.runOnIdle { detail = albums[2] }
+        compose.waitForIdle()
         strip("detail-close") { detail = null }
     }
 

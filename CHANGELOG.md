@@ -17,13 +17,16 @@ gereği ikinci sayıyı artırır. Uygulamanın yapacağı bir şey yok ([MIGRAT
 
 - **Ayrıntı Android'in kendi liste → ayrıntı geçişiyle açılır** (Ayarlar uygulaması, Android 14'ün etkinlik geçişi):
   ayrıntı ilk karesinden saydamsızdır (sayfa rengi kayan katmanın içinde, içeriğin altında), bitiş kenarından
-  pencerenin tamamı kadar kayarak `DeskMotion.open` yayıyla listenin üstüne gelir. Liste solmaz: yüzde 95'e küçülür
-  ve temanın perdesinin yarısı kadar kararır; perde listenin küçülmesiyle açılan kenarları da örter. Kapanış tersi:
+  pencerenin tamamı kadar kayarak `DeskMotion.open` yayıyla listenin üstüne gelir. Liste solmaz: aynı yayla yüzde
+  95'e küçülür ve temanın perdesinin yüzde 70'i kadar kararır (perde ayrıntının kenarıyla birlikte ilerler, listenin
+  küçülmesiyle açılan kenarları da örter). Kapanış tersi:
   ayrıntı bitiş kenarına kayıp çıkar, perde açılır. Ayrıntı saydamsız olduğu için listenin yazısı onun içinden hiç
   görünmez; liste yalnızca ayrıntının henüz örtmediği yerde görünür.
 - **Öngörülü geri:** davranış aynı (ayrıntı parmakla yüzde 90'a küçülür, köşeleri yuvarlanır, kaydırmanın geldiği
-  kenardan uzağa yaslanır; liste arkasında yüzde 94'ten yükselir), yalnızca liste solarak değil perdesi açılarak
-  gelir ve ayrıntı bırakınca solmadan, pencereden tamamen çıkana kadar kayar (önce beşte iki kayıp soluyordu).
+  kenardan uzağa yaslanır; liste arkasında yüzde 94'ten yükselir). Liste solarak gelmez: parmak hareket ederken
+  perdenin altında koyu kalır (küçülen ayrıntı onun üstünde belirgin durur), bırakınca perde açılır. Ayrıntı
+  bırakınca solmadan, pencereden tamamen çıkana kadar kayar (önce beşte iki kayıp soluyordu); kalan yol yine 220 ms,
+  eğrisi hızlanan yerine standart (uzun bir kayma hızlanan eğride sonunda sıçrıyordu).
   Vazgeçince ve yolun ortasında fikir değiştirince her şey eskisi gibi geldiği yoldan döner, iki sayfa da saydamsız.
 - **Kartla (`detailSharedCard`):** kart başlığa büyürken sayfaların gerisi sırayla solar: liste ilk 90 ms'de tamamen
   gider, ayrıntı ancak ondan sonra 210 ms'de belirir; dönüşte tersi (önceden 60–160 ms arası ikisi birden yarı
