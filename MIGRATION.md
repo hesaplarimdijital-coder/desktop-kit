@@ -308,7 +308,7 @@ CHANGELOG'un "Tablet ve DeX" bölümünde. Ayrıntılar [CHANGELOG](CHANGELOG.md
 ## 2.3.0'dan 2.4.0'a
 
 Kod değişmeden derlenir (2.3.0'a karşı derlenmiş kod da bağlanır, API aynı); sürümü `2.4.0` yapmak yeter.
-Uygulamanın yapacağı bir şey yok. Değişen yalnızca `DetailTransition`'ın görünümü
+Uygulamanın yapacağı bir şey yok. Değişen `DetailTransition`'ın görünümü ve kabuğun sekmeleri arasında Geri
 ([CHANGELOG](CHANGELOG.md#240-2026-11-05)):
 
 - **Telefonda:** açılan ayrıntı ilk karesinden saydamsızdır ve listenin üstüne bitiş kenarından kayarak gelir; liste
@@ -318,3 +318,10 @@ Uygulamanın yapacağı bir şey yok. Değişen yalnızca `DetailTransition`'ın
 - **Kartla:** `detailSharedCard` aynı; kart uçarken saydam olmaz, sayfaların gerisi üst üste değil sırayla solar.
 - **Tablet ve DeX:** paylaşılan eksenin solmaları sıralı (önce liste gider, sonra ayrıntı gelir); kaymalar ve toplam
   süre aynı.
+- **Sekmeler arası Geri (telefon):** üç düğmeli Geri ve donanım Geri tuşu sekmeyi 2.3.0'daki gibi küçülterek değil
+  fade-through'la döndürür (Android 16 düğme için de öngörülü Geri başlatıyor, kit onu artık kaydırma saymıyor).
+  Kaydırma hareketinde giden sekme kendi sayfa renkli yüzeyinde küçülür, köşeleri yuvarlanır: ekranı kendi arka
+  planını çizmeyen uygulamada başlangıç sekmesi artık onun içinden görünmez. Kabuğun `NavHost`'u için; kendi
+  `NavHost`'unu kuran uygulama bunları kitten almaz.
+- **Sekmeler arası Geri (tablet ve DeX):** Geri düğmesi Navigation'ın öngörülü geçişini (yüzde 70'e küçülme) değil
+  hareketsiz Geri'nin geçişini oynatır; hareketle gezinme 2.2.0'daki gibi.

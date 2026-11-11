@@ -13,6 +13,12 @@ gereği ikinci sayıyı artırır. Uygulamanın yapacağı bir şey yok ([MIGRAT
 şeritleri CI'ın `ci/screenshots-pr-7` dalında, `motion/` altında (`detail-open-plain`, `detail-close-plain`,
 `detail-back-plain`, `detail-open-timed`, `detail-close-timed`, `detail-close` yeni).
 
+Aynı aileden bir de sekmeler: Soulseek+'ta (Galaxy S24, üç düğmeli gezinme, Android 16) Ayarlar'dan, Sohbet'ten ve
+Kullanıcılar'dan Geri tuşuyla Arama'ya dönerken sekme 300 ms küçülüp yana yaslanıyor ve giden sekmenin yazılarının
+arasından Arama görünüyordu. İki neden: Geri *düğmesi* kaydırma hareketinin geçişini oynatıyordu, kaydırmada da giden
+sekmenin kendi yüzeyi yoktu. İkisi de bu sürümde; kare şeritleri `ci/screenshots-pr-8` dalında (`tab-back`,
+`tab-back-button`).
+
 ### Telefon
 
 - **Ayrıntı Android'in kendi liste → ayrıntı geçişiyle açılır** (Ayarlar uygulaması, Android 14'ün etkinlik geçişi):
@@ -34,6 +40,21 @@ gereği ikinci sayıyı artırır. Uygulamanın yapacağı bir şey yok ([MIGRAT
   yüzeyi altta hep saydamsız, içerikler aynı sırayla solar (kartınki önce gider, başlığınki sonra gelir). Önceden iki
   kopya birlikte solduğu için kart 90 ms civarında yarı saydam oluyordu.
 - **Bir ayrıntıdan ötekine** (anahtar değişince) geçiş de sıralı solar: eski 100 ms'de gider, yeni sonra gelir.
+- **Üç düğmeli Geri sekmeyi fade-through'la döndürür:** Android 16'dan beri üç düğmeli Geri'ye (ve donanım Geri
+  tuşuna) basmak da öngörülü bir Geri başlatır, kenarı yok (`EDGE_NONE`), bırakınca tamamlanır. Navigation bunu
+  kaydırma sayıp `NavHost`'un öngörülü geçişlerini seçiyor ve düğme bırakılınca sonuna kadar oynatıyordu: 2.3.0'ın
+  sekme hareketi bir dokunuşla 300 ms oynuyordu, sekme yüzde 90'a küçülüp sağa yaslanıyor, son onda birde soluyordu.
+  Düğme kaydırma değildir: `EDGE_NONE` gelince kabuk Navigation'a hareketsiz bir Geri'nin fade-through'unu verir
+  (eski sekme 90 ms'de solar, yenisi 210 ms'de belirir), Android 15'teki gibi.
+- **Harekette giden sekmenin yüzeyi:** kabuğun `NavHost`'undaki ekranlar kabuğun arka planında duruyordu, kendi
+  yüzeyleri yoktu; yazıdan ibaret bir ekran saydamdı. Öngörülü geri hareketinde küçülen sekmenin yazılarının
+  arasından arkadaki başlangıç sekmesi görünüyordu: ayrıntıdaki çift görüntünün sekmedeki eşi. Telefonda her sekme
+  sayfası ("⋯" ekranı da) artık kendi sayfa renkli yüzeyinde: hareket boyunca bütün, başlangıç sekmesi yalnızca
+  çevresinde görünür; köşeleri ayrıntınınki gibi parmakla 28 dp'ye doğru yuvarlanır. Yuvarlanma çıkış geçişinin
+  o içerikte oynattığı ölçekten okunur (yüzde 90'a doğru; Compose'un yerleşik ölçek animasyonu adıyla bulunur, ad
+  değişirse köşeler düz kalır, başka bir şey kaybolmaz); hiçbir şeyi küçültmeyen fade-through'da köşeler düz kalır.
+  Yüzey yalnızca bir geçiş sürerken var ve kabuğun rengindedir: durağanken ve sekme geçişlerinde görünüm aynı,
+  durağan sayfaya katman eklenmez; 50 ekran görüntüsü aynı.
 
 ### Tablet ve DeX
 
@@ -41,6 +62,10 @@ gereği ikinci sayıyı artırır. Uygulamanın yapacağı bir şey yok ([MIGRAT
   gelen ancak ondan sonra 200 ms'de belirir. Önceden açılışta 50–100 ms, kapanışta 50–150 ms ikisi birden yarı
   saydamdı. Kaymalar (yüzde 10, 300 ve 350 ms) ve toplam süreler aynı; geri
   hareketi 2.2.0'daki gibi (gölge üstünde küçülme). Ekran görüntüleri aynı.
+- **Üç düğmeli Geri sekmeler arasında:** Geri düğmesi tablette de öngörülü bir Geri başlattığı için Navigation'ın
+  kendi öngörülü geçişi oynuyordu, sekme yüzde 70'e küçülüyordu; artık hareketsiz Geri'nin geçişi (ray düzeninde
+  fade-through, kenar çubuklu düzende 150 ms'lik geçiş). Hareketle gezinmede sekmeler arası öngörülü geri
+  Navigation'ınki, 2.2.0'daki gibi; sekmelerin kendi yüzeyi yalnızca telefonda. Ekran görüntüleri aynı.
 
 ### Testler
 
@@ -51,6 +76,13 @@ gereği ikinci sayıyı artırır. Uygulamanın yapacağı bir şey yok ([MIGRAT
   biri pay var; 2.3.0'ın çift görüntüsü yüz binlerce pikseldi.
 - Kare şeritleri: yazılı bir liste ve ayrıntıyla (raflar → bir rafın kitapları; uydurma adlar) açılış, kapanış ve
   geri hareketi; aynısı tablet katmanında; kartlı kapanış.
+- `TabPredictiveBackTest`: Geri düğmesi (başlangıç `EDGE_NONE`; Navigation başlangıç sekmesini birkaç kare içinde
+  hedef olarak kompoze eder, bırakma 48 ms sonra): sekme yolda tam boyutunda ve yerinde kalır, hareketin çıkışı onu
+  üç karede yüzde 98,4'e, dokuz karede yüzde 95'e küçültüp sağa yaslardı. Hareket:
+  başlangıç sekmesi kırmızı, giden sekme arka planı olmayan bir mavi kare; yolun yarısında pencerenin ortasında
+  kırmızımsı piksel yok (yarı saydam bir ekranın içinden görünen kırmızı da sayılır), sekme gidince hepsi kırmızı.
+- Kare şeritleri: `tab-back` (hareket: giden sekme kendi yüzeyinde küçülür, başlangıç sekmesi çevresinde yükselir)
+  ve `tab-back-button` (düğme: basış 48 ms önce, sonra fade-through).
 
 ## 2.3.0 (2026-10-31)
 

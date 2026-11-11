@@ -493,16 +493,18 @@ Fare tıklamasını Compose kendisi yönetir: varsayılan olarak odaktaki öğen
 
 `DesktopShell(transitions = ShellTransitions.Default)` (varsayılan): telefonda (alt çubuklu düzen)
 ekranlar arasında fade-through: eski ekran 90 ms'de solar, yenisi 210 ms'de belirirken %96'dan tam
-boyuta büyür; büyüme solmayla birlikte başlar. Ray ve kenar çubuklu düzende (tablet, DeX) hareketsiz, 150 ms'lik kısa bir geçiş.
-Geri dönüş aynı biçimde. Süreler sistemin animasyon ölçeğine uyar ("Animasyonları kaldır" açıksa
+boyuta büyür; büyüme solmayla birlikte başlar. Ray düzeninde (tablet) aynı fade-through, %98'den; kenar çubuklu
+düzende (DeX) hareketsiz, 150 ms'lik kısa bir geçiş. Geri dönüş aynı biçimde. Süreler sistemin animasyon ölçeğine uyar ("Animasyonları kaldır" açıksa
 geçiş olmaz). Alt çubuk, ray ve kenar çubuğundaki seçim rengi 150 ms'de yumuşakça değişir.
 `ShellTransitions.None` geçişi kapatır (ekran görüntüsü testleri için).
 
 0.2.0 ile telefon ve tablette (alt çubuk, ray) Android'in fade-through geçişi kullanılır: eski ekran 90 ms'de
 solar, yenisi 210 ms'de %96 (telefon) ya da %98'den (tablet) büyüyerek belirir. Kenar çubuklu düzende (DeX)
 150 ms'lik sade geçiş kalır. Manifestte `android:enableOnBackInvokedCallback="true"` varsa hareketle gezinmede
-sekmeler arası öngörülü geri parmakla oynar: telefonda sekme yüzde 90'a doğru küçülüp yaslanır, başlangıç sekmesi
-arkasında yükselir; genişte Navigation'ın kendi geçişi.
+sekmeler arası öngörülü geri parmakla oynar: telefonda sekme kendi sayfa renkli yüzeyinde yüzde 90'a doğru küçülüp
+yaslanır ve köşeleri yuvarlanır, başlangıç sekmesi yalnızca çevresinde, arkasında yükselir (yüzey yalnızca geçiş
+sürerken var); genişte Navigation'ın kendi geçişi. Üç düğmeli Geri ve donanım Geri tuşu (Android 16'da onlar da öngörülü Geri başlatır) her genişlikte
+hareketsiz Geri'nin geçişiyle döner: telefonda fade-through.
 
 ### Telefonda kaydırma ve boyutlar
 
