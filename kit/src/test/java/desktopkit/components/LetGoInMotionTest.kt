@@ -33,13 +33,11 @@ import desktopkit.theme.ThemeMode
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import kotlin.math.abs
 
 /**
  * A toast or a sheet let go while the finger is still moving. A phone then gives the window the last
@@ -51,12 +49,11 @@ import kotlin.math.abs
  * launched, an order no device has: that is why [ToastSwipeTest] and [SheetGestureTest] never showed
  * what happens here.
  *
- * In 2.4.0 the toast and the sheet stayed where the finger left them. Each move was applied in a
- * coroutine of its own (`launch { snapTo() }`); Compose's draggable starts `onDragStopped` before
- * anything that waits in the queue has run, so the last move's coroutine ran after the release had
- * begun to carry the thing out (or back) and stopped that ("Mutation interrupted"). The toast no
- * longer does: the finger moves it at once ([FingerOffset]). The sheet's tests below still say what
- * 2.4.0 does.
+ * In 2.4.0 the toast, and the sheet held by its handle or its title, stayed where the finger left
+ * them. Each move was applied in a coroutine of its own (`launch { snapTo() }`); Compose's draggable
+ * starts `onDragStopped` before anything that waits in the queue has run, so the last move's
+ * coroutine ran after the release had begun to carry the thing out (or back) and stopped that
+ * ("Mutation interrupted"). Now the finger moves both at once ([FingerOffset]).
  *
  * Every gesture is made with one count of moves and with one move more. Under these tests (not on a
  * device: there the thing follows every move) what moves under the finger may take only every other
@@ -209,14 +206,16 @@ class LetGoInMotionTest {
     private fun rowTop(): Float = compose.onNodeWithTag("row0").getBoundsInRoot().top.value
 
     /**
-     * The sheet flung down by its title in [moves] moves (on the title the sheet's own drag moves it;
-     * on the list it comes as nested scrolling). Null when it was dismissed; else how far below its
-     * place it still is 90 frames later, in dp.
+     * The sheet flung down in [moves] moves (60 px a frame: 3750 px/s, three times what a fling asks
+     * for), held by its title or, with [byRow], by a row of its list: on the title the sheet's own
+     * drag moves it, on the list it comes as nested scrolling. Null when it was dismissed; else how
+     * far below its place it still is 90 frames later, in dp.
      */
-    private fun sheetFlung(moves: Int): Float? {
+    private fun sheetFlung(moves: Int, byRow: Boolean = false): Float? {
         val rest = rowTop()
         val before = dismissed
-        compose.onNodeWithText("Paylaş").performTouchInput { letGoInMotion(Offset(0f, 60f), moves) }
+        val held = if (byRow) compose.onNodeWithTag("row1") else compose.onNodeWithText("Paylaş")
+        held.performTouchInput { letGoInMotion(Offset(0f, 60f), moves) }
         framesUntil(90) { dismissed > before }
         return if (dismissed > before) null else rowTop() - rest
     }
@@ -229,30 +228,44 @@ class LetGoInMotionTest {
         return rowTop() - rest
     }
 
-    @Test
-    fun in240ASheetFlungDownByItsTitleStaysWhereItWasLetGo() {
+    /** Flung down twice, the second time with one move more and after it was opened again: what each fling left. */
+    private fun flungTwice(byRow: Boolean): List<Float?> {
         sheet()
-        var stays = sheetFlung(moves = 5)
-        if (stays == null) {
-            // it closed: opened again, flung with one move more
-            frames(30)
-            compose.runOnUiThread { shown = true }
-            frames(90)
-            stays = sheetFlung(moves = 6)
-        }
-        assertNotNull("2.4.0: flung in five moves or in six, the sheet is not dismissed", stays)
-        assertTrue("2.4.0: it is where the finger left it ($stays dp below its place)", stays!! > 50f)
-        val at = rowTop()
+        val first = sheetFlung(moves = 5, byRow = byRow)
         frames(30)
-        assertEquals("2.4.0: and it does not move from there", at, rowTop(), 0.01f)
+        compose.runOnUiThread { shown = true }
+        frames(90)
+        val second = sheetFlung(moves = 6, byRow = byRow)
+        return listOf(first, second)
     }
 
     @Test
-    fun in240ASheetLetGoShortOfTheWayDoesNotComeBack() {
+    fun aSheetFlungDownByItsTitleCloses() {
+        assertEquals(
+            "a sheet flung down by its title closes, whichever move the lift comes with (else: the dp below its place it stayed at)",
+            listOf<Float?>(null, null),
+            flungTwice(byRow = false),
+        )
+        assertEquals("each fling dismissed it once", 2, dismissed)
+    }
+
+    @Test
+    fun aSheetFlungDownOnItsListCloses() {
+        assertEquals(
+            "a sheet flung down on its list closes, whichever move the lift comes with (else: the dp below its place it stayed at)",
+            listOf<Float?>(null, null),
+            flungTwice(byRow = true),
+        )
+        assertEquals("each fling dismissed it once", 2, dismissed)
+    }
+
+    @Test
+    fun aSheetLetGoShortOfTheWayComesBack() {
         sheet()
-        var below = sheetNudged(moves = 8)
-        if (abs(below) < 0.5f) below = sheetNudged(moves = 7)
-        assertEquals(0, dismissed)
-        assertTrue("2.4.0: nudged in eight moves or in seven, it stays pulled down ($below dp below its place)", below > 5f)
+        for (moves in intArrayOf(8, 7)) {
+            val below = sheetNudged(moves)
+            assertEquals("a short pull does not close the sheet", 0, dismissed)
+            assertEquals("the sheet is back at its place ($moves moves)", 0f, below, 0.5f)
+        }
     }
 }
