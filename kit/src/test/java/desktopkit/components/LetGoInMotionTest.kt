@@ -51,16 +51,17 @@ import kotlin.math.abs
  * launched, an order no device has: that is why [ToastSwipeTest] and [SheetGestureTest] never showed
  * what happens here.
  *
- * As it stands this file says what 2.4.0 does: the toast and the sheet stay where the finger left
- * them. Each move was applied in a coroutine of its own (`launch { snapTo() }`); Compose's draggable
- * starts `onDragStopped` before anything that waits in the queue has run, so the last move's
- * coroutine ran after the release had begun to carry the thing out (or back) and stopped that
- * ("Mutation interrupted").
+ * In 2.4.0 the toast and the sheet stayed where the finger left them. Each move was applied in a
+ * coroutine of its own (`launch { snapTo() }`); Compose's draggable starts `onDragStopped` before
+ * anything that waits in the queue has run, so the last move's coroutine ran after the release had
+ * begun to carry the thing out (or back) and stopped that ("Mutation interrupted"). The toast no
+ * longer does: the finger moves it at once ([FingerOffset]). The sheet's tests below still say what
+ * 2.4.0 does.
  *
- * Every gesture is made with one count of moves and, when that one went well, with one move more.
- * Under these tests (not on a device: there the thing follows every move) what moves under the
- * finger may take only every other move of it, and 2.4.0 went wrong only when the last move was one
- * that it took: with one count or the other it is.
+ * Every gesture is made with one count of moves and with one move more. Under these tests (not on a
+ * device: there the thing follows every move) what moves under the finger may take only every other
+ * move of it, and 2.4.0 went wrong only when the last move was one that it took: with one count or
+ * the other it is.
  */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
@@ -151,29 +152,37 @@ class LetGoInMotionTest {
     }
 
     @Test
-    fun in240AToastFlungAwayOnAPhoneStaysWhereItWasLetGo() {
+    fun onAPhoneAToastFlungAwayLeaves() {
         toast(MotionTier.Gesture)
-        var stays = toastFlung(moves = 5)
-        if (stays == null) {
-            // it left: the next toast, flung with one move more
-            compose.runOnUiThread { round = 1 }
-            frames(90)
-            stays = toastFlung(moves = 6)
-        }
-        assertNotNull("2.4.0: flung in five moves or in six, the toast is not dismissed", stays)
-        assertTrue("2.4.0: it is where the finger left it ($stays dp from its place)", stays!! < -50f)
-        val at = cardLeft()
-        frames(30)
-        assertEquals("2.4.0: and it does not move from there", at, cardLeft(), 0.01f)
+        val first = toastFlung(moves = 5)
+        // the next toast, flung with one move more
+        compose.runOnUiThread { round = 1 }
+        frames(90)
+        val second = toastFlung(moves = 6)
+        assertEquals(
+            "a flung toast leaves, whichever move the lift comes with (else: the dp from its place it stayed at)",
+            listOf<Float?>(null, null),
+            listOf(first, second),
+        )
     }
 
     @Test
-    fun in240AToastLetGoShortOfTheWayDoesNotComeBack() {
-        toast(MotionTier.Gesture)
-        var aside = toastNudged(moves = 8)
-        if (abs(aside) < 0.5f) aside = toastNudged(moves = 7)
-        assertNotNull(toasts.current)
-        assertTrue("2.4.0: nudged in eight moves or in seven, it stays aside ($aside dp from its place)", aside < -5f)
+    fun onAPhoneAToastLetGoShortOfTheWayComesBack() {
+        toastComesBack(MotionTier.Gesture)
+    }
+
+    @Test
+    fun widerUpAToastLetGoShortOfTheWayComesBack() {
+        toastComesBack(MotionTier.Timed)
+    }
+
+    private fun toastComesBack(tier: MotionTier) {
+        toast(tier)
+        for (moves in intArrayOf(8, 7)) {
+            val aside = toastNudged(moves)
+            assertNotNull("a short swipe leaves the toast on screen", toasts.current)
+            assertEquals("the toast is back at its place ($tier, $moves moves)", 0f, aside, 0.5f)
+        }
     }
 
     // ------------------------------------------------------------------ the sheet

@@ -3,7 +3,6 @@ package desktopkit.components
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -44,7 +43,6 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -87,7 +85,6 @@ import kotlin.coroutines.resume
 import kotlin.math.abs
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -398,9 +395,8 @@ private fun ToastCard(toast: DeskToast) {
     val dimens = DeskTheme.dimens
     val touch = DeskTheme.inputMode == InputMode.Touch
     val shape = RoundedCornerShape(dimens.radiusCard)
-    val scope = rememberCoroutineScope()
     val tier = LocalMotionTier.current
-    val swipe = remember(toast) { Animatable(0f) }
+    val swipe = remember(toast) { FingerOffset() }
     var width by remember { mutableStateOf(1) }
     val glassy = DeskGlass.source != null && DeskGlass.mode != GlassMode.Solid
     val label = stringResource(R.string.dk_notification)
@@ -424,7 +420,9 @@ private fun ToastCard(toast: DeskToast) {
             .then(
                 if (!touch) Modifier else Modifier.draggable(
                     orientation = Orientation.Horizontal,
-                    state = rememberDraggableState { delta -> scope.launch { swipe.snapTo(swipe.value + delta) } },
+                    // the finger moves the card at once, not in a coroutine of its own: let go in motion, the
+                    // last move would otherwise land after the release and stop it (FingerOffset)
+                    state = rememberDraggableState { delta -> swipe.moveBy(delta) },
                     onDragStopped = { velocity ->
                         if (abs(swipe.value) > width * 0.3f || abs(velocity) > 1200f) {
                             // on a phone the card carries on the way it was going, at the finger's speed, and is
@@ -432,9 +430,9 @@ private fun ToastCard(toast: DeskToast) {
                             var gone = false
                             if (tier == MotionTier.Gesture) {
                                 val out = if (swipe.value < 0f || (swipe.value == 0f && velocity < 0f)) -width.toFloat() else width.toFloat()
-                                swipe.animateTo(out, DeskMotion.gesture(0.5f), initialVelocity = velocity) {
+                                swipe.settle(out, DeskMotion.gesture(0.5f), velocity) { at ->
                                     // faded out entirely at its own width: dismissed there, whatever the spring still does
-                                    if (!gone && abs(value) >= width - 0.5f) {
+                                    if (!gone && abs(at) >= width - 0.5f) {
                                         gone = true
                                         toast.dismiss()
                                     }
@@ -442,10 +440,10 @@ private fun ToastCard(toast: DeskToast) {
                             }
                             if (!gone) toast.dismiss()
                         } else if (tier == MotionTier.Gesture) {
-                            swipe.animateTo(0f, DeskMotion.gesture(0.5f), initialVelocity = velocity)
+                            swipe.settle(0f, DeskMotion.gesture(0.5f), velocity)
                         } else {
                             // the 2.2.0 spring back wider up (a jump with reduced motion)
-                            swipe.animateTo(0f, DeskMotion.fade(tier, spring(dampingRatio = 1f, stiffness = 400f)))
+                            swipe.settle(0f, DeskMotion.fade(tier, spring(dampingRatio = 1f, stiffness = 400f)))
                         }
                     },
                 ),
