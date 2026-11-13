@@ -140,22 +140,43 @@ fun Modifier.dragSource(
     acrossWindows: Boolean = true,
     touch: Boolean = false,
     payload: () -> DeskDragPayload?,
+): Modifier = dragSource(enabled, acrossWindows, touch, pointerHold = true, canStart = null, payload = payload)
+
+/**
+ * [dragSource] with the mouse's rules set: [pointerHold] false starts a mouse's or a pen's drag as
+ * soon as it moves past the touch slop, without the rest first (a finger keeps it), and [canStart]
+ * says at the press whether this press may drag at all (a table drags a selected row, and a press
+ * on another row draws a selection frame instead).
+ */
+@Composable
+internal fun Modifier.dragSource(
+    enabled: Boolean,
+    acrossWindows: Boolean,
+    touch: Boolean,
+    pointerHold: Boolean,
+    canStart: (() -> Boolean)?,
+    payload: () -> DeskDragPayload?,
 ): Modifier {
     val latest = rememberUpdatedState(payload)
+    val latestCanStart = rememberUpdatedState(canStart)
     if (!enabled) return this
-    return this then DragSourceElement(acrossWindows, touch, latest)
+    return this then DragSourceElement(acrossWindows, touch, pointerHold, latestCanStart, latest)
 }
 
 private data class DragSourceElement(
     val acrossWindows: Boolean,
     val touch: Boolean,
+    val pointerHold: Boolean,
+    val canStart: State<(() -> Boolean)?>,
     val payload: State<() -> DeskDragPayload?>,
 ) : ModifierNodeElement<DragSourceNode>() {
-    override fun create() = DragSourceNode(acrossWindows, touch, payload)
+    override fun create() = DragSourceNode(acrossWindows, touch, pointerHold, canStart, payload)
 
     override fun update(node: DragSourceNode) {
         node.acrossWindows = acrossWindows
         node.touch = touch
+        node.pointerHold = pointerHold
+        node.canStart = canStart
         node.payload = payload
     }
 
@@ -174,6 +195,8 @@ private data class DragSourceElement(
 private class DragSourceNode(
     var acrossWindows: Boolean,
     var touch: Boolean,
+    var pointerHold: Boolean,
+    var canStart: State<(() -> Boolean)?>,
     var payload: State<() -> DeskDragPayload?>,
 ) : DelegatingNode(), CompositionLocalConsumerModifierNode {
 
@@ -192,7 +215,19 @@ private class DragSourceNode(
             if (!precise && !touch) return@awaitEachGesture
             if (down.type == PointerType.Mouse && !currentEvent.buttons.isPrimaryPressed) return@awaitEachGesture
             if (currentEvent.buttons.isSecondaryPressed) return@awaitEachGesture
+            if (canStart.value?.invoke() == false) return@awaitEachGesture
             val slop = viewConfiguration.touchSlop
+            if (precise && !pointerHold) {
+                // a mouse or a pen without the rest: the drag starts as soon as it moves; let go first and it was a click
+                while (true) {
+                    val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id }
+                    if (change == null || !change.pressed) return@awaitEachGesture
+                    if ((change.position - down.position).getDistance() > slop) {
+                        source.requestDragAndDropTransfer(change.position)
+                        return@awaitEachGesture
+                    }
+                }
+            }
             val ledEarly = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
                 // lifted or moved away before the delay: no drag this time
                 while (true) {
