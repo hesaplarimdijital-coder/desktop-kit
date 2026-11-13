@@ -10,11 +10,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import desktopkit.TestShell
 import desktopkit.theme.DesktopKitTheme
@@ -60,7 +62,9 @@ class ShellStateTest {
             }
         }
         compose.onNodeWithText("More").performClick()
-        compose.onNodeWithText("İndirilenler").performClick()
+        // on this small screen the entry may lie under the glass bottom bar (the list goes on beneath it, now with
+        // its sections' titles): its own click, not a tap at its middle
+        compose.onNodeWithText("İndirilenler").performSemanticsAction(SemanticsActions.OnClick)
         compose.onNodeWithText("screen-downloads").assertExists()
     }
 }
