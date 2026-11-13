@@ -70,6 +70,7 @@ import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -131,9 +132,61 @@ fun DeskTextField(
     onImeAction: (() -> Unit)? = null,
     interactionSource: MutableInteractionSource? = null,
 ) = TextFieldImpl(
-    value, onValueChange, modifier, hint, label, leading, trailingContent, suffix, clearable, singleLine, minLines, maxLines, password,
-    error, supportingText, supportingText, enabled, readOnly, mono, keyboardType, imeAction, onImeAction, interactionSource,
+    FieldInput.Plain(value, onValueChange), modifier, hint, label, leading, trailingContent, suffix, clearable, singleLine, minLines, maxLines,
+    password, error, supportingText, supportingText, enabled, readOnly, mono, keyboardType, imeAction, onImeAction, interactionSource,
 )
+
+/**
+ * [DeskTextField] with the cursor and the selection: [value] is a [TextFieldValue], so the app knows
+ * where the cursor is and what is selected, and can put the cursor somewhere or select a part (a
+ * template put in at the cursor, bold applied to the selection, a suggestion that replaces the last
+ * word and leaves the cursor after it). It looks and behaves as the [String] field does.
+ */
+@Composable
+fun DeskTextField(
+    value: TextFieldValue,
+    onValueChange: (TextFieldValue) -> Unit,
+    modifier: Modifier = Modifier,
+    hint: String = "",
+    label: String? = null,
+    leading: ImageVector? = null,
+    trailingContent: (@Composable () -> Unit)? = null,
+    suffix: String? = null,
+    clearable: Boolean = false,
+    singleLine: Boolean = true,
+    minLines: Int = 1,
+    maxLines: Int = if (singleLine) 1 else 6,
+    password: Boolean = false,
+    error: Boolean = false,
+    supportingText: String? = null,
+    enabled: Boolean = true,
+    readOnly: Boolean = false,
+    mono: Boolean = false,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    imeAction: ImeAction = ImeAction.Default,
+    onImeAction: (() -> Unit)? = null,
+    interactionSource: MutableInteractionSource? = null,
+) = TextFieldImpl(
+    FieldInput.Rich(value, onValueChange), modifier, hint, label, leading, trailingContent, suffix, clearable, singleLine, minLines, maxLines,
+    password, error, supportingText, supportingText, enabled, readOnly, mono, keyboardType, imeAction, onImeAction, interactionSource,
+)
+
+/** What a field edits: plain text, or text with its cursor and selection. */
+internal sealed interface FieldInput {
+    val text: String
+
+    /** Empties the field. */
+    fun clear()
+
+    class Plain(override val text: String, val onChange: (String) -> Unit) : FieldInput {
+        override fun clear() = onChange("")
+    }
+
+    class Rich(val value: TextFieldValue, val onChange: (TextFieldValue) -> Unit) : FieldInput {
+        override val text: String get() = value.text
+        override fun clear() = onChange(TextFieldValue(""))
+    }
+}
 
 /**
  * [DeskTextField] with [errorDescription], what TalkBack says about an error, and [endMessage], one
@@ -142,8 +195,7 @@ fun DeskTextField(
  */
 @Composable
 internal fun TextFieldImpl(
-    value: String,
-    onValueChange: (String) -> Unit,
+    input: FieldInput,
     modifier: Modifier,
     hint: String,
     label: String?,
@@ -189,6 +241,7 @@ internal fun TextFieldImpl(
     val textStyle = (if (mono) base.copy(fontFamily = DeskTheme.type.mono.fontFamily) else base)
         .copy(color = if (enabled) colors.text else colors.textTertiary)
     val clearLabel = stringResource(R.string.dk_clear)
+    val value = input.text
     val hasEnd = suffix != null || (clearable && value.isNotEmpty() && enabled && !readOnly) || password || trailing != null
     // known to the shell, which closes the keyboard on a tap elsewhere or a scroll (touch)
     val host = LocalShellOverlayHost.current
@@ -200,37 +253,7 @@ internal fun TextFieldImpl(
         }
     }
     SideEffect { field.focused = focused }
-    BasicTextField(
-        value = value,
-        onValueChange = onValueChange,
-        modifier = modifier
-            .onGloballyPositioned { field.coordinates = it }
-            .focusMemory()
-            .hoverable(interaction, enabled)
-            .then(
-                // a hardware Enter in one line runs the action itself: the field would run its
-                // imeAction, which is often Default and so nothing
-                if (!singleLine || onImeAction == null) Modifier else Modifier.onPreviewKeyEvent { event ->
-                    val enter = (event.key == Key.Enter || event.key == Key.NumPadEnter) &&
-                        !event.isCtrlPressed && !event.isAltPressed && !event.isMetaPressed
-                    if (enter && event.type == KeyEventType.KeyDown) onImeAction()
-                    enter
-                },
-            )
-            .semantics { if (error) this.error(errorDescription ?: "") },
-        enabled = enabled,
-        readOnly = readOnly,
-        textStyle = textStyle,
-        keyboardOptions = KeyboardOptions(keyboardType = if (password) KeyboardType.Password else keyboardType, imeAction = imeAction),
-        // only a given action replaces the key's own: Done closes the keyboard, Next moves on
-        keyboardActions = if (onImeAction == null) KeyboardActions.Default else KeyboardActions(onAny = { onImeAction() }),
-        singleLine = singleLine,
-        maxLines = maxLines,
-        minLines = minLines,
-        visualTransformation = if (password && !revealed) PasswordVisualTransformation() else VisualTransformation.None,
-        interactionSource = interaction,
-        cursorBrush = SolidColor(colors.accent),
-        decorationBox = { field ->
+    val decoration: @Composable (@Composable () -> Unit) -> Unit = { field ->
             Column(Modifier.alpha(if (enabled) 1f else 0.6f)) {
                 if (label != null) {
                     Text(label, style = DeskTheme.type.label, color = colors.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -264,7 +287,7 @@ internal fun TextFieldImpl(
                     }
                     if (suffix != null) Text(suffix, style = DeskTheme.type.label, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (clearable && value.isNotEmpty() && enabled && !readOnly) {
-                        FieldButton(DeskIcons.Close, clearLabel) { onValueChange("") }
+                        FieldButton(DeskIcons.Close, clearLabel) { input.clear() }
                     }
                     if (password) {
                         FieldButton(
@@ -286,8 +309,40 @@ internal fun TextFieldImpl(
                     }
                 }
             }
-        },
-    )
+        }
+    val fieldModifier = modifier
+            .onGloballyPositioned { field.coordinates = it }
+            .focusMemory()
+            .hoverable(interaction, enabled)
+            .then(
+                // a hardware Enter in one line runs the action itself: the field would run its
+                // imeAction, which is often Default and so nothing
+                if (!singleLine || onImeAction == null) Modifier else Modifier.onPreviewKeyEvent { event ->
+                    val enter = (event.key == Key.Enter || event.key == Key.NumPadEnter) &&
+                        !event.isCtrlPressed && !event.isAltPressed && !event.isMetaPressed
+                    if (enter && event.type == KeyEventType.KeyDown) onImeAction()
+                    enter
+                },
+            )
+            .semantics { if (error) this.error(errorDescription ?: "") }
+    val keyboardOptions = KeyboardOptions(keyboardType = if (password) KeyboardType.Password else keyboardType, imeAction = imeAction)
+    // only a given action replaces the key's own: Done closes the keyboard, Next moves on
+    val keyboardActions = if (onImeAction == null) KeyboardActions.Default else KeyboardActions(onAny = { onImeAction() })
+    val transformation = if (password && !revealed) PasswordVisualTransformation() else VisualTransformation.None
+    when (input) {
+        is FieldInput.Plain -> BasicTextField(
+            value = input.text, onValueChange = input.onChange, modifier = fieldModifier, enabled = enabled, readOnly = readOnly,
+            textStyle = textStyle, keyboardOptions = keyboardOptions, keyboardActions = keyboardActions, singleLine = singleLine,
+            maxLines = maxLines, minLines = minLines, visualTransformation = transformation, interactionSource = interaction,
+            cursorBrush = SolidColor(colors.accent), decorationBox = decoration,
+        )
+        is FieldInput.Rich -> BasicTextField(
+            value = input.value, onValueChange = input.onChange, modifier = fieldModifier, enabled = enabled, readOnly = readOnly,
+            textStyle = textStyle, keyboardOptions = keyboardOptions, keyboardActions = keyboardActions, singleLine = singleLine,
+            maxLines = maxLines, minLines = minLines, visualTransformation = transformation, interactionSource = interaction,
+            cursorBrush = SolidColor(colors.accent), decorationBox = decoration,
+        )
+    }
 }
 
 /**
@@ -419,9 +474,8 @@ fun NumberField(
     }
     val touch = isTouchDensity()
     TextFieldImpl(
-        value = text,
-        onValueChange = { input ->
-            val filtered = input.filterIndexed { i, c -> c.isDigit() || (c == '-' && i == 0 && min < 0) }.take(11)
+        input = FieldInput.Plain(text) { typed ->
+            val filtered = typed.filterIndexed { i, c -> c.isDigit() || (c == '-' && i == 0 && min < 0) }.take(11)
             field.text = filtered
             filtered.toIntOrNull()?.takeIf { it in min..max }?.let { field.report(it, onValueChange) }
         },
