@@ -187,7 +187,8 @@ class ShellNavigator(private val navController: NavHostController) {
  *   on top of what the theme's `type` hook built; 0 keeps the theme's sizes everywhere.
  * @param compactSizes on phones, a 64 dp bottom bar and 52 dp touch rows instead of 72 and 56 dp;
  *   targets stay at least 48 dp. False keeps the touch sizes as they are.
- * @param menus menu bar menus, shown in the sidebar layout; [desktopkit.input.ShortcutRegistry.menus] builds them.
+ * @param menus menu bar menus, shown in the sidebar layout, and behind a "≡" button in the rail layout's top bar;
+ *   [desktopkit.input.ShortcutRegistry.menus] builds them.
  *   In a desktop window (DeX, Android 15+ desktop windowing) the menu bar fills the window's caption bar
  *   inside a [desktopkit.DesktopKitRoot]: the menus and the search field sit between the system's app chip
  *   and window buttons, and the rest of the bar still moves the window.
@@ -522,6 +523,8 @@ private fun ShellContent(
                         actions = screen?.actions.orEmpty(),
                         scrolled = navKind == NavKind.BottomBar && scroll.scrolled,
                         glass = navKind == NavKind.BottomBar,
+                        // the menu bar's menus behind a "≡" where there is no menu bar (the rail: a tablet, a DeX window)
+                        menus = if (navKind == NavKind.Rail) menus else emptyList(),
                         modifier = Modifier.onSizeChanged { metrics.topPx = it.height },
                     )
                 }

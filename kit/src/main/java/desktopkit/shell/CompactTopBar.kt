@@ -44,6 +44,7 @@ import desktopkit.components.BelowAnchorPositionProvider
 import desktopkit.components.DeskIcons
 import desktopkit.components.MenuEntry
 import desktopkit.components.MenuPopup
+import desktopkit.components.MenuSpec
 import desktopkit.components.TooltipArea
 import desktopkit.components.TooltipBubble
 import desktopkit.components.collectState
@@ -263,6 +264,38 @@ internal fun TopBarOverflow(actions: List<TopBarAction>) {
             visible = open,
             onDismiss = { open = false },
             entries = actions.map { MenuEntry.Item(it.label, it.onClick, icon = it.icon, enabled = it.enabled) },
+            offset = IntOffset(0, height),
+        )
+    }
+}
+
+/**
+ * The menu bar's menus in a window too narrow for the bar (the rail's top bar, an Expanded DeX window): a "≡"
+ * button lists their titles, and a title opens its menu there.
+ */
+@Composable
+internal fun TopBarMenus(menus: List<MenuSpec>) {
+    var open by remember { mutableStateOf(false) }
+    var chosen by remember { mutableStateOf<MenuSpec?>(null) }
+    var height by remember { mutableIntStateOf(0) }
+    Box(Modifier.onSizeChanged { height = it.height }) {
+        TopBarIconButton(DeskIcons.Menu, stringResource(R.string.dk_menus), onClick = { open = true })
+        MenuPopup(
+            visible = open,
+            onDismiss = { open = false },
+            entries = menus.map { menu ->
+                MenuEntry.Item(menu.title, {
+                    open = false
+                    chosen = menu
+                })
+            },
+            offset = IntOffset(0, height),
+        )
+        val menu = chosen
+        MenuPopup(
+            visible = menu != null,
+            onDismiss = { chosen = null },
+            entries = menu?.entries?.invoke().orEmpty(),
             offset = IntOffset(0, height),
         )
     }
