@@ -35,6 +35,8 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.requestFocus
@@ -232,7 +234,8 @@ class ComponentStatesTest {
     }
 
     private fun parkMouse() {
-        compose.onRoot().performMouseInput { moveTo(Offset(2f, 2f)) }
+        // the window's own root: a tooltip that is up has a root of its own
+        compose.onAllNodes(isRoot()).onFirst().performMouseInput { moveTo(Offset(2f, 2f)) }
     }
 
     private fun captureStates(sample: Sample): List<Bitmap> {
@@ -265,7 +268,7 @@ class ComponentStatesTest {
         compose.waitForIdle()
         // a tap on the empty margin first puts the window in touch mode, as any real touch would: in keyboard
         // mode the first press would also focus its button
-        compose.onRoot().performTouchInput { click(Offset(2f, 2f)) }
+        compose.onAllNodes(isRoot()).onFirst().performTouchInput { click(Offset(2f, 2f)) }
         val rows = samples.map { it to captureStates(it) }
         val colors = if (theme == ThemeMode.Light) DeskPalette.light(Accent.Blue) else DeskPalette.dark(Accent.Blue)
         ShellScreenshotTest.save(file, sheet(rows, colors.background, colors.text, colors.textTertiary))

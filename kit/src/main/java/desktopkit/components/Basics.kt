@@ -32,7 +32,12 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import desktopkit.theme.DeskTheme
 
-/** Square icon button with hover, press and focus states. Its size never drops below the touch or pointer target. */
+/**
+ * Square icon button with hover, press and focus states. Its size never drops below the touch or
+ * pointer target. Its [contentDescription] is also its tooltip, shown when a mouse rests on it or
+ * the keyboard focus reaches it, with [shortcut] when there is one ([tooltip] false leaves it out:
+ * a button whose name is written next to it).
+ */
 @Composable
 fun DeskIconButton(
     icon: ImageVector,
@@ -44,13 +49,36 @@ fun DeskIconButton(
     size: Dp = DeskTheme.dimens.minTarget.coerceAtLeast(DeskTheme.dimens.controlHeight),
     iconSize: Dp = DeskTheme.dimens.icon,
     tint: Color = if (selected) DeskTheme.colors.onSelection else DeskTheme.colors.textSecondary,
+    tooltip: Boolean = true,
+    shortcut: String? = null,
+) {
+    // the tooltip lives on the button itself: what the caller puts on it (a tag, an alignment, a focus requester)
+    // stays on the button
+    IconButtonBody(icon, contentDescription, onClick, modifier, enabled, selected, size, iconSize, tint, tooltip, shortcut)
+}
+
+@Composable
+private fun IconButtonBody(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier,
+    enabled: Boolean,
+    selected: Boolean,
+    size: Dp,
+    iconSize: Dp,
+    tint: Color,
+    tooltip: Boolean,
+    shortcut: String?,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val state = interaction.collectState()
     val shape = RoundedCornerShape(DeskTheme.dimens.radiusControl)
     val background by animatedStateBackground(state, selected)
+    val tip = if (tooltip) rememberTooltipState() else null
     Box(
         modifier = modifier
+            .then(if (tip != null) Modifier.tooltipTrigger(tip) else Modifier)
             .size(size)
             .pressScale(state.pressed, 0.92f)
             .focusRing(state, shape)
@@ -64,6 +92,7 @@ fun DeskIconButton(
             tint = if (enabled) tint else tint.copy(alpha = 0.4f),
             modifier = Modifier.size(iconSize),
         )
+        if (tip != null) TooltipPopup(tip, contentDescription, shortcut)
     }
 }
 
