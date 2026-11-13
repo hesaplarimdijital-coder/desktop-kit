@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import desktopkit.components.DeskButton
+import desktopkit.components.SectionCaption
 import desktopkit.components.collectState
 import desktopkit.components.deskClickable
 import desktopkit.components.focusRing
@@ -44,6 +45,7 @@ import desktopkit.components.verticalScrollbar
 import desktopkit.shell.LocalNavKind
 import desktopkit.shell.NavItem
 import desktopkit.shell.NavKind
+import desktopkit.shell.NavSection
 import desktopkit.shell.plus
 import desktopkit.shell.rememberShellContentPadding
 import desktopkit.theme.DeskTheme
@@ -155,6 +157,29 @@ fun OverflowScreen(entries: List<NavItem>, onSelect: (String) -> Unit, modifier:
     val list = rememberLazyListState()
     LazyColumn(modifier.fillMaxSize().verticalScrollbar(list), state = list, contentPadding = rememberShellContentPadding() + PaddingValues(vertical = dimens.gapS)) {
         items(entries, key = { it.route }) { item -> ItemRow(item) { onSelect(item.route) } }
+    }
+}
+
+/**
+ * The "More" screen of the shell: the screens the chrome leaves out under their sidebar sections' titles, so
+ * two accounts' "Inbox" entries stay apart.
+ */
+@Composable
+internal fun OverflowSections(sections: List<NavSection>, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
+    val dimens = DeskTheme.dimens
+    val list = rememberLazyListState()
+    LazyColumn(modifier.fillMaxSize().verticalScrollbar(list), state = list, contentPadding = rememberShellContentPadding() + PaddingValues(vertical = dimens.gapS)) {
+        sections.forEachIndexed { index, section ->
+            val title = section.title
+            if (title != null) {
+                item(key = "desktopkit.section.$index", contentType = "caption") {
+                    SectionCaption(title, Modifier.padding(start = dimens.gapL + dimens.gapS, end = dimens.gapL, top = dimens.gapM, bottom = dimens.gapXs).semantics { heading() })
+                }
+            } else if (index > 0) {
+                item(key = "desktopkit.section.$index", contentType = "gap") { Spacer(Modifier.height(dimens.gapM)) }
+            }
+            items(section.items, key = { it.route }, contentType = { "item" }) { item -> ItemRow(item) { onSelect(item.route) } }
+        }
     }
 }
 

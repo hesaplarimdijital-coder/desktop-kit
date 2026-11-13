@@ -5,6 +5,7 @@ import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.Transition
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.AnimatedContentScope
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.EnterTransition
@@ -53,10 +54,13 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
+import androidx.navigation.compose.ComposeNavigator
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.createGraph
+import androidx.navigation.get
 import desktopkit.LocalRootInsets
 import desktopkit.components.ActionGroup
 import desktopkit.components.ActionGroupList
@@ -67,7 +71,7 @@ import desktopkit.components.MenuBarMenus
 import desktopkit.components.MenuEntry
 import desktopkit.components.MenuSpec
 import desktopkit.input.hasHardwareKeyboard
-import desktopkit.screens.OverflowScreen
+import desktopkit.screens.OverflowSections
 import desktopkit.theme.DeskGlass
 import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
@@ -125,7 +129,19 @@ class ShellNavigator(private val navController: NavHostController) {
         }
     }
 
+    /**
+     * Opens [route] over the screen shown, as a page of it: Back comes back to that screen, and its tab's entry
+     * stays marked when [route]'s [NavItem.parent] is that tab (a folder opened from the "Folders" screen on a
+     * phone). The tab's entry tapped again goes back to the tab's own screen.
+     */
+    fun open(route: String) {
+        navController.navigate(route) { launchSingleTop = true }
+    }
+
     fun back(): Boolean = navController.popBackStack()
+
+    /** Back to [route] when it is under the screen shown, in the same tab; false when it is not there. */
+    internal fun backTo(route: String): Boolean = navController.popBackStack(route, inclusive = false)
 }
 
 /**
@@ -183,6 +199,9 @@ class ShellNavigator(private val navController: NavHostController) {
  * @param overlays drawn over the whole shell, bars included, with the shell's glass: the place for the
  *   [desktopkit.components.CommandPalette].
  * @param navDrop lets the sidebar's and the rail's entries take drops ([desktopkit.components.dragSource]).
+ * @param navMenu the menu of an entry of the sidebar, the rail or the bottom bar, by route ("Mark all as read",
+ *   "Empty the bin"): a right click, a long press or the Menu key opens it, TalkBack offers it as an action. An
+ *   empty list: no menu for that entry.
  * @param content the screen for a route of [spec]. The "More" route is handled by the shell. On
  *   compact windows a screen can change the top bar with [CompactTopBar]; [LocalWidthClass] and
  *   [currentWidthClass] tell it the width class in use.
@@ -215,6 +234,7 @@ fun DesktopShell(
     toasts: ToastState? = null,
     overlays: @Composable () -> Unit = {},
     navDrop: NavDrop? = null,
+    navMenu: ((route: String) -> List<MenuEntry>)? = null,
     content: @Composable (route: String, navigator: ShellNavigator) -> Unit,
 ) {
     // tablet and DeX read one size larger; phones get the tighter compact sizes
@@ -263,6 +283,7 @@ fun DesktopShell(
                 toasts = toasts,
                 overlays = overlays,
                 navDrop = navDrop,
+                navMenu = navMenu,
                 content = content,
             )
         }
@@ -296,11 +317,16 @@ private fun ShellContent(
     toasts: ToastState?,
     overlays: @Composable () -> Unit,
     navDrop: NavDrop?,
+    navMenu: ((route: String) -> List<MenuEntry>)?,
     content: @Composable (route: String, navigator: ShellNavigator) -> Unit,
 ) {
     val navigator = remember(navController) { ShellNavigator(navController) }
     val entry by navController.currentBackStackEntryAsState()
     val currentRoute = entry?.destination?.route ?: spec.startRoute
+    // read again whenever the current entry changes
+    val routeBelow = remember(entry) { navController.previousBackStackEntry?.destination?.route }
+    val openedOverParent = spec.isUnder(currentRoute, routeBelow)
+    val pageBack: (() -> Unit)? = if (openedOverParent) ({ navigator.back() }) else null
     val navKind = NavKind.forWidth(widthClass)
     val more = moreItem()
     val colors = DeskTheme.colors
@@ -341,6 +367,49 @@ private fun ShellContent(
     val glassSource = remember { HazeState() }
     val glassHolds = remember { GlassHolds() }
     val padding = remember(metrics, density) { shellPaddingValues(metrics, density) }
+    // One graph for the shell's life (a new start route aside): routes the spec gains are added to it and routes it
+    // loses are taken out, so a new folder or account keeps the open screen, the back stacks and their state
+    // (DeskMail's request 3). A new graph would send the shell back to its start and forget every screen's state.
+    val tabPage = remember<@Composable AnimatedContentScope.(String) -> Unit> {
+        { route ->
+            TabPage(transition, leaving = { leavingTab(route) }, route = route) {
+                ShellScreenFrame(metrics, scroll) {
+                    if (route == ShellSpec.MORE_ROUTE) {
+                        OverflowSections(moreSections(currentSpec, currentKind), onSelect = navigator::navigate)
+                    } else {
+                        currentContent(route, navigator)
+                    }
+                }
+            }
+        }
+    }
+    val graph = remember(navController, spec.startRoute) {
+        navController.createGraph(startDestination = spec.startRoute) {
+            spec.items.forEach { item -> composable(item.route) { tabPage(item.route) } }
+            composable(ShellSpec.MORE_ROUTE) { tabPage(ShellSpec.MORE_ROUTE) }
+        }
+    }
+    val routes = spec.items.map { it.route }
+    // added here, in the composition, so a screen the app opens at once with the new spec is there already
+    remember(graph, routes) {
+        val composeNavigator = navController.navigatorProvider[ComposeNavigator::class]
+        routes.filter { graph.findNode(it) == null }.forEach { route ->
+            graph.addDestination(ComposeNavigator.Destination(composeNavigator) { _ -> tabPage(route) }.apply { this.route = route })
+        }
+        routes
+    }
+    LaunchedEffect(graph, routes) {
+        val kept = routes.toSet() + ShellSpec.MORE_ROUTE + spec.startRoute
+        val stale = graph.filter { it.route !in kept }
+        if (stale.isEmpty()) return@LaunchedEffect
+        val staleRoutes = stale.mapNotNull { it.route }.toSet()
+        // a screen that is gone: its tab goes to the start screen first
+        if (navController.currentBackStack.value.any { it.destination.route in staleRoutes }) navigator.navigate(spec.startRoute)
+        stale.forEach { node ->
+            node.route?.let { navController.clearBackStack(it) }
+            graph.remove(node)
+        }
+    }
     // the root leaves the system navigation bar at the bottom to the shell, which draws its chrome behind it
     val rootInsets = LocalRootInsets.current
     DisposableEffect(rootInsets) {
@@ -382,7 +451,15 @@ private fun ShellContent(
     }
     val reselect = remember { ShellReselect() }
     // the current screen's entry again: the screen hears it (OnReselect) and goes to its top
-    val go: (String) -> Unit = { route -> if (route == currentRoute) reselect.events.tryEmit(route) else navigator.navigate(route) }
+    // the marked entry while a page opened in its tab is shown (ShellNavigator.open): back to the tab's own screen
+    val marked = spec.marked(navKind, currentRoute)
+    val go: (String) -> Unit = { route ->
+        when {
+            route == currentRoute -> reselect.events.tryEmit(route)
+            route == marked && navigator.backTo(route) -> Unit
+            else -> navigator.navigate(route)
+        }
+    }
     val select: (String) -> Unit = { route ->
         if (route == ShellSpec.MORE_ROUTE && spec.moreStyle == MoreStyle.Sheet && navKind == NavKind.BottomBar) {
             moreOpen = true
@@ -426,7 +503,8 @@ private fun ShellContent(
                     PageTopBar(
                         title = screen?.title ?: title,
                         onSearch = if (screen?.showSearch == false) null else onSearch,
-                        onBack = screen?.onBack,
+                        // a page opened over its parent (ShellNavigator.open) has a Back button of its own
+                        onBack = screen?.onBack ?: pageBack,
                         backIcon = screen?.backIcon ?: TopBarBackIcon.Back,
                         actions = screen?.actions.orEmpty(),
                         scrolled = navKind == NavKind.BottomBar && scroll.scrolled,
@@ -442,6 +520,7 @@ private fun ShellContent(
                             spec, currentRoute, select,
                             hasMoreActions = moreActions.isNotEmpty(),
                             iconBadges = iconBadges,
+                            navMenu = navMenu,
                             modifier = Modifier
                                 .onSizeChanged {
                                     scroll.maxOffsetPx = it.height.toFloat()
@@ -451,7 +530,7 @@ private fun ShellContent(
                                 .graphicsLayer { translationY = overlayHost.expandProgress() * size.height },
                         )
                     }
-                    NavKind.Rail -> NavRail(spec, currentRoute, go, brand = brand, navDrop = navDrop, iconBadges = iconBadges)
+                    NavKind.Rail -> NavRail(spec, currentRoute, go, brand = brand, navDrop = navDrop, iconBadges = iconBadges, navMenu = navMenu)
                     NavKind.Sidebar -> Sidebar(
                         spec = spec,
                         currentRoute = currentRoute,
@@ -461,6 +540,7 @@ private fun ShellContent(
                         badges = badges,
                         navDrop = navDrop,
                         iconBadges = iconBadges,
+                        navMenu = navMenu,
                     )
                 }
             },
@@ -489,29 +569,14 @@ private fun ShellContent(
                     ) {
                         NavHost(
                             navController = navController,
-                            startDestination = spec.startRoute,
+                            graph = graph,
                             enterTransition = enter,
                             exitTransition = exit,
                             popEnterTransition = enter,
                             popExitTransition = exit,
                             predictivePopEnterTransition = predictiveEnter,
                             predictivePopExitTransition = predictiveExit,
-                        ) {
-                            spec.items.forEach { item ->
-                                composable(item.route) {
-                                    TabPage(transition, leaving = { leavingTab(item.route) }, route = item.route) {
-                                        ShellScreenFrame(metrics, scroll) { currentContent(item.route, navigator) }
-                                    }
-                                }
-                            }
-                            composable(ShellSpec.MORE_ROUTE) {
-                                TabPage(transition, leaving = { leavingTab(ShellSpec.MORE_ROUTE) }, route = ShellSpec.MORE_ROUTE) {
-                                    ShellScreenFrame(metrics, scroll) {
-                                        OverflowScreen(currentSpec.overflow(currentKind), onSelect = navigator::navigate)
-                                    }
-                                }
-                            }
-                        }
+                        )
                     }
                 }
             },
@@ -648,15 +713,19 @@ private fun SystemBand(navKind: NavKind, scroll: ShellScrollState) {
     }
 }
 
-/** The screens the phone's bottom bar leaves out, by sidebar section, as entries of the "⋯" sheet. */
-internal fun moreSheetGroups(spec: ShellSpec, kind: NavKind, navigator: ShellNavigator): List<ActionGroup> {
+/** The screens the chrome of [kind] leaves to "More", by sidebar section (the footer last, untitled). */
+internal fun moreSections(spec: ShellSpec, kind: NavKind): List<NavSection> {
     val left = spec.overflow(kind).map { it.route }.toSet()
-    val sections = spec.sections.map { section -> section.title to section.items.filter { it.route in left } } +
-        listOf(null to listOfNotNull(spec.footer).filter { it.route in left })
-    return sections.filter { it.second.isNotEmpty() }.map { (title, items) ->
-        ActionGroup(title, items.map { item -> MenuEntry.Item(item.label, { navigator.navigate(item.route) }, icon = item.icon) })
-    }
+    return (spec.sections + NavSection(null, listOfNotNull(spec.footer)))
+        .map { section -> NavSection(section.title, section.items.filter { it.route in left }) }
+        .filter { it.items.isNotEmpty() }
 }
+
+/** The screens the phone's bottom bar leaves out, by sidebar section, as entries of the "⋯" sheet. */
+internal fun moreSheetGroups(spec: ShellSpec, kind: NavKind, navigator: ShellNavigator): List<ActionGroup> =
+    moreSections(spec, kind).map { section ->
+        ActionGroup(section.title, section.items.map { item -> MenuEntry.Item(item.label, { navigator.navigate(item.route) }, icon = item.icon) })
+    }
 
 private const val FADE_OUT_MS = 90
 private const val FADE_IN_MS = 210
