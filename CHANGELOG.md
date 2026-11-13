@@ -27,6 +27,25 @@
   zemininden bir şerit bırakmaz. Tabletin ve DeX'in görünüşü değişmedi. Test: `WindowEdgeTest` (donanım
   çizimiyle, bulanıklık açık: üç düğme ve hareketle gezinme, çubuklar açık ve kaydırınca gizli, gizli alt gezinme,
   1440 piksel genişlik, tutmayan paylar).
+- **Bir sayfanın içinden açılan sayfa o sayfayı kapatıyordu** (Nağmedar 1.0.8): 2.8.0'ın "sayfalar üst üste binmez"
+  kuralı, bir sayfanın içeriğinden açılan sayfayı da (telefonda sayfadaki bir satırın "⋯" menüsü) başka bir sayfa
+  sayıp açıldığı sayfayı kapatıyordu; yeni sayfa o sayfanın içeriğinde olduğu için bir an sonra o da gidiyordu
+  (azaltılmış harekette hiç görünmüyordu). Sayfa artık hangi sayfanın içinden açıldığını bilir; kabuk ötekileri
+  eskisi gibi kapatır, açıldığı sayfaları değil. Test: `SheetAccessTest.aSheetOpenedFromAnothersContentLeavesItOpen`.
+- **Sıra değişince tablo başka bir yerde kalıyordu** (Nağmedar 1.0.8, emülatör yürüyüşü): `DenseTable`'ın satırları
+  anahtarlı, `LazyColumn` da ilk görünen satırı yeni sıra onu nereye koyarsa koysun görünür tutar. En üstündeki bir
+  tablo öbür yöne sıralanınca sonunu gösteriyordu; önce görmek istenen satırlar yukarıda, görünmezde kalıyordu (bir
+  sürücü boyuta göre sıralanınca en büyük klasörler). Sıra değişince satırlar baştan başlar; bu, satırlar yeni
+  sırayla yerleşmeden istendiği için hiçbir kare öbür yeri göstermez. Sıra varsayılan olarak `sort`; satırları başka
+  bir şeye göre de dizen uygulama (başlıkların sıra göstermediği telefonda bir menünün sırası) yeni `order`
+  parametresine onu verir. Test: `DenseTableRequestsTest.anotherOrderStartsTheRowsAtTheTop`.
+- **Genişlemiş oynatıcının altındaki yüzen düğmeye ulaşılıyordu** (Nağmedar 1.0.8, bağımsız inceleme): telefonun
+  yüzen düğmesi oynatıcı açılırken soluyor ama yerinde kalıyordu; oynatıcının alt ucuna dokunmak ekranın ana
+  eylemini başlatabiliyor, TalkBack ve Tab ona ulaşıyordu. Oynatıcı tam açılınca düğme gider; yeri ayrılı kalır,
+  oynatıcı inince altındaki listeler kaymaz. Test: `PrimaryActionTest.theExpandedPlayerTakesItAway`.
+- **Gizli kaydırma çubuğu her karede listeye bakıyordu** (Nağmedar 1.0.8, bağımsız inceleme): çubuk gizliyken de
+  her çiziminde listenin yerleşimini okuyordu; fare kipinde bir ızgara kaydıkça her karede satırlarını sayıyordu.
+  Gizliyken hiçbir şeye bakmaz, belirirken yeniden çizilir. Görünüş değişmedi.
 
 ## 2.8.0 (2026-11-13)
 
