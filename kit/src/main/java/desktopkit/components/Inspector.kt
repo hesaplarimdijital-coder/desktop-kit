@@ -30,6 +30,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -53,6 +55,7 @@ import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layoutId
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
@@ -96,6 +99,15 @@ class InspectorState(
         private set
     var selectedTab by mutableIntStateOf(initialTab)
 
+    /** In a window narrower than the layout's showFrom: the inspector is up as a sheet over the main pane. */
+    var sheetOpen by mutableStateOf(false)
+
+    /** Whether the [WorkstationLayout] shows the inspector beside the main pane (its window is wide enough). */
+    internal var docked by mutableStateOf(true)
+
+    /** Whether the inspector is out of sight, beside the main pane or as a sheet. */
+    val hidden: Boolean get() = if (docked) collapsed else !sheetOpen
+
     /** Moves the divider: the pane gets [deltaDp] wider (negative: narrower), within [min]…[max]. */
     fun resizeBy(deltaDp: Float, min: Dp, max: Dp) {
         widthDp = (widthDp + deltaDp).coerceIn(min.value, max.value)
@@ -109,7 +121,10 @@ class InspectorState(
         commit()
     }
 
-    fun toggle() = updateCollapsed(!collapsed)
+    /** Shows or hides the inspector: beside the main pane, or as a sheet in a narrow window. */
+    fun toggle() {
+        if (docked) updateCollapsed(!collapsed) else sheetOpen = !sheetOpen
+    }
 }
 
 /**
@@ -143,7 +158,12 @@ private val InspectorSaver: Saver<InspectorState, List<Any>> = Saver(
  * left (already there), [main] in the middle and an inspector pane on the right ([inspector],
  * usually an [InspectorPane]). The divider between them can be dragged, or moved with the arrow
  * keys when focused; the width is remembered by [state]. A collapsed inspector slides shut (300 ms,
- * like the sidebar). Below [showFrom] (phones, narrow windows) only [main] is shown.
+ * like the sidebar).
+ *
+ * Below [showFrom] (phones, a tablet in split screen, a narrow DeX window) [main] has the window, and
+ * the inspector comes up as a sheet over it ([InspectorToggleButton], [InspectorState.sheetOpen]),
+ * titled [sheetTitle]: what is in it stays reachable at every width. A window that widens while the
+ * sheet is up shows the inspector beside the main pane instead.
  */
 @Composable
 fun WorkstationLayout(
@@ -155,8 +175,24 @@ fun WorkstationLayout(
     minInspector: Dp = 240.dp,
     maxInspector: Dp = 560.dp,
     showFrom: WidthClass = WidthClass.Expanded,
+    sheetTitle: String? = null,
 ) {
     val shown = currentWidthClass() >= showFrom
+    SideEffect { state.docked = shown }
+    // the sheet that was up becomes the pane beside the main one
+    LaunchedEffect(shown) {
+        if (shown && state.sheetOpen) {
+            state.sheetOpen = false
+            state.updateCollapsed(false)
+        }
+    }
+    if (!shown) {
+        val height = LocalConfiguration.current.screenHeightDp.dp * SHEET_SHARE
+        GlassBottomSheet(visible = state.sheetOpen, onDismiss = { state.sheetOpen = false }, title = sheetTitle) {
+            // a pane that scrolls on its own: the sheet gives it a height
+            Box(Modifier.fillMaxWidth().height(height)) { inspector() }
+        }
+    }
     val tier = LocalMotionTier.current
     val target = if (!shown || state.collapsed) 0.dp else state.widthDp.dp.coerceIn(minInspector, maxInspector)
     val width by animateDpAsState(
@@ -358,14 +394,18 @@ private fun InspectorTabButton(tab: InspectorTab, selected: Boolean, onClick: ()
     }
 }
 
-/** A toolbar button that shows or hides the inspector of [state]. */
+/** A toolbar button that shows or hides the inspector of [state]: beside the main pane, or as a sheet in a narrow window. */
 @Composable
 fun InspectorToggleButton(state: InspectorState, modifier: Modifier = Modifier) {
+    val hidden = state.hidden
     DeskIconButton(
         icon = DeskIcons.SidebarToggle,
-        contentDescription = stringResource(if (state.collapsed) R.string.dk_inspector_show else R.string.dk_inspector_hide),
+        contentDescription = stringResource(if (hidden) R.string.dk_inspector_show else R.string.dk_inspector_hide),
         onClick = state::toggle,
         modifier = modifier,
-        selected = !state.collapsed,
+        selected = !hidden,
     )
 }
+
+/** How much of the window's height the inspector's sheet takes in a narrow window. */
+private const val SHEET_SHARE = 0.7f
