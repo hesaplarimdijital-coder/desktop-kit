@@ -56,6 +56,17 @@ class PaletteContrastTest {
     }
 
     @Test
+    fun inputsCanBeFoundByTheirEdge() {
+        val failures = mutableListOf<String>()
+        for ((name, c) in palettes()) {
+            for ((s, bg) in mapOf("background" to c.background, "chrome" to c.chrome, "surface" to c.surface, "raised" to c.surfaceRaised)) {
+                check(failures, name, "control border on $s", c.controlBorder, bg, minimum = 3.0)
+            }
+        }
+        assertTrue(failures.joinToString("\n"), failures.isEmpty())
+    }
+
+    @Test
     fun presetsKeepTheirExactColours() {
         for (accent in Accent.presets) {
             assertEquals(accent.base, DeskPalette.dark(accent).accent)
