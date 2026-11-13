@@ -51,6 +51,8 @@
     <string name="dk_inspector_hide">Ayrıntı panelini gizle</string>
     <string name="dk_resize_inspector">Ayrıntı panelini boyutlandır</string>
     <string name="dk_resize">Bölmeleri boyutlandır</string>
+    <string name="dk_grid_larger">Kapakları büyüt</string>
+    <string name="dk_grid_smaller">Kapakları küçült</string>
     <string name="dk_key_esc">Esc</string>
 
     <!-- 2.0: formlar, geri bildirim, yapı -->
