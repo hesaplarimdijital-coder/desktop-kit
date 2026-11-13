@@ -289,6 +289,8 @@ object PaletteSearch {
             val inGroup = scored.filter { it.first.group == group && it.first !== best }.sortedByDescending { it.second.score }
             if (inGroup.isEmpty()) continue
             val shown = if (filter != null || group in expanded) inGroup else inGroup.take(perGroup)
+            // a group that shows none of its matches is not listed, as in 2.4.1 (rows(perGroup = 0))
+            if (shown.isEmpty()) continue
             rows += PaletteLine.Row(PaletteRow.Heading(group))
             shown.forEach { (item, match) -> rows += PaletteLine.Row(PaletteRow.Result(item, match)) }
             if (shown.size < inGroup.size) rows += PaletteLine.More(group, inGroup.size)
@@ -457,12 +459,15 @@ private fun PalettePanel(
     val results = rows.filter { it is PaletteLine.More || (it is PaletteLine.Row && it.row is PaletteRow.Result) }
     // (kept when a group is shown whole: the line's place is taken by the group's next result)
     var selected by remember(state.query, state.filter) { mutableIntStateOf(0) }
+    // the chosen one within what is listed: a kept choice can be past the end of a list that shrank (open() while open)
+    fun current(): Int = if (results.isEmpty()) -1 else selected.coerceIn(0, results.lastIndex)
+    val chosenIndex = current()
     val listState = rememberLazyListState()
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     // keeps the chosen row in view while the keyboard moves through the list
     LaunchedEffect(selected, rows) {
-        val target = results.getOrNull(selected) ?: return@LaunchedEffect
+        val target = results.getOrNull(current()) ?: return@LaunchedEffect
         val index = rows.indexOf(target)
         val info = listState.layoutInfo
         val shown = info.visibleItemsInfo
@@ -472,7 +477,7 @@ private fun PalettePanel(
     }
     val showAll = { group: String -> state.expansion = PaletteExpansion(state.query, state.filter, expanded + group) }
     val run = { newWindow: Boolean ->
-        when (val chosen = results.getOrNull(selected)) {
+        when (val chosen = results.getOrNull(current())) {
             // "show all": the group whole, the palette stays open
             is PaletteLine.More -> showAll(chosen.group)
             is PaletteLine.Row -> (chosen.row as? PaletteRow.Result)?.item?.let { item ->
@@ -495,9 +500,13 @@ private fun PalettePanel(
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 when (event.key) {
-                    Key.DirectionDown -> { if (results.isNotEmpty()) selected = (selected + 1) % results.size; true }
-                    Key.DirectionUp -> { if (results.isNotEmpty()) selected = (selected - 1 + results.size) % results.size; true }
-                    Key.Enter, Key.NumPadEnter -> { run(event.isCtrlPressed || event.isMetaPressed); true }
+                    Key.DirectionDown -> { if (results.isNotEmpty()) selected = (current() + 1) % results.size; true }
+                    Key.DirectionUp -> { if (results.isNotEmpty()) selected = (current() - 1 + results.size) % results.size; true }
+                    Key.Enter, Key.NumPadEnter -> {
+                        // 2.5.0: a held Enter runs once: on "show all" its repeats ran the result that took the line's place
+                        if (event.nativeKeyEvent.repeatCount == 0) run(event.isCtrlPressed || event.isMetaPressed)
+                        true
+                    }
                     Key.Escape -> { state.close(); true }
                     // the focus stays in the field: Tab goes through the filters, if any
                     Key.Tab -> {
@@ -570,14 +579,18 @@ private fun PalettePanel(
                         modifier = Modifier.padding(start = 12.dp, top = 10.dp, bottom = 4.dp))
                     row is PaletteRow.Result -> {
                         val index = results.indexOf(line)
-                        PaletteResultRow(row, chosen = index == selected, onHover = { selected = index }, onClick = {
+                        PaletteResultRow(row, chosen = index == chosenIndex, onHover = { selected = index }, onClick = {
                             selected = index
                             run(false)
                         })
                     }
                     line is PaletteLine.More -> {
                         val index = results.indexOf(line)
-                        PaletteMoreRow(line, chosen = index == selected, onHover = { selected = index }, onClick = { showAll(line.group) })
+                        // chosen as it is shown whole: the list stays where it is (a tap left the choice above, and the list went back to it)
+                        PaletteMoreRow(line, chosen = index == chosenIndex, onHover = { selected = index }, onClick = {
+                            selected = index
+                            showAll(line.group)
+                        })
                     }
                 }
             }

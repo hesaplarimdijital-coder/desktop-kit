@@ -6,11 +6,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.withKeyDown
@@ -101,6 +105,8 @@ class CommandPaletteTest {
         assertEquals(2 + 7, rows.size)
         // a filter keeps one group whole: the two headings, the best match and the other nine
         assertEquals(2 + 1 + 9, PaletteSearch.rows(albums, "gece", filter = "Albümler", bestHeading = bestHeading).size)
+        // none of a group: no heading for it either
+        assertEquals(listOf(PaletteRow.Heading(bestHeading)), PaletteSearch.rows(albums, "gece", bestHeading = bestHeading, perGroup = 0).filterIsInstance<PaletteRow.Heading>())
     }
 
     private fun lines(items: List<PaletteItem>, query: String, filter: String? = null, expanded: Set<String> = emptySet()) =
@@ -134,9 +140,69 @@ class CommandPaletteTest {
     fun theLineUnderAGroupShowsItWholeAndThePaletteStaysOpen() {
         val state = CommandPaletteState()
         var ran = ""
-        val items = (1..10).map { n -> item("a$n", "Gece $n", "Albümler", onSelect = { ran = "a$n" }) }
+        // two groups over six: the albums' nine besides the best match, the tracks' ten
+        val items = (1..10).map { n -> item("a$n", "Gece $n", "Albümler", onSelect = { ran = "a$n" }) } +
+            (1..10).map { n -> item("t$n", "Gece şarkısı $n", "Parçalar", onSelect = { ran = "t$n" }) }
         compose.setContent {
             DesktopKitTheme(inputMode = InputMode.Pointer) {
+                Box(Modifier.fillMaxSize()) { CommandPalette(state, items = { items }) }
+            }
+        }
+        val list = compose.onNode(hasScrollToIndexAction())
+        compose.runOnIdle { state.open() }
+        compose.waitForIdle()
+        compose.onNode(hasSetTextAction()).performTextInput("gece")
+        compose.waitForIdle()
+        compose.onNodeWithText("9 sonucun hepsini göster").assertExists()
+        compose.onNodeWithText("Gece 8").assertDoesNotExist()
+        // the best match, six albums, the line: seven rows down from the first; Enter on the line, held for a second (it
+        // repeats after half of it): the palette stays open and nothing runs
+        compose.onNode(hasSetTextAction()).performKeyInput {
+            repeat(7) { pressKey(Key.DirectionDown) }
+            pressKey(Key.Enter, 1_000L)
+        }
+        compose.waitForIdle()
+        assertTrue("the palette stays open", state.isOpen)
+        assertEquals("nothing ran", "", ran)
+        compose.onNodeWithText("9 sonucun hepsini göster").assertDoesNotExist()
+        compose.onNodeWithText("Gece 8").assertExists()
+        // only the group whose line it was: the tracks still show their best, and their line
+        list.performScrollToNode(hasText("10 sonucun hepsini göster"))
+        compose.onNodeWithText("Gece şarkısı 7").assertDoesNotExist()
+        // the line's place is the group's next album now, and it is the chosen one: Enter runs it
+        compose.onNode(hasSetTextAction()).performKeyInput { pressKey(Key.Enter) }
+        compose.waitForIdle()
+        assertEquals("a8", ran)
+        assertFalse(state.isOpen)
+
+        // opened again, "gec" typed: the group shows its best again; a click on the line shows it whole
+        compose.runOnIdle { state.open() }
+        compose.waitForIdle()
+        compose.onNode(hasSetTextAction()).performTextInput("gec")
+        compose.waitForIdle()
+        compose.onNodeWithText("Gece 8").assertDoesNotExist()
+        compose.onNodeWithText("9 sonucun hepsini göster").performClick()
+        compose.waitForIdle()
+        assertTrue(state.isOpen)
+        compose.onNodeWithText("9 sonucun hepsini göster").assertDoesNotExist()
+        compose.onNodeWithText("Gece 8").assertExists()
+        // another query ("gece"): the group shows its best again, with its line
+        compose.onNode(hasSetTextAction()).performTextInput("e")
+        compose.waitForIdle()
+        compose.onNodeWithText("9 sonucun hepsini göster").assertExists()
+        compose.onNodeWithText("Gece 8").assertDoesNotExist()
+    }
+
+    /**
+     * A tap on the line shows the group whole where the line was: the result that takes its place is in sight. (The line
+     * was not chosen by the tap, so the list went back to the result chosen before it, away from what the tap showed.)
+     */
+    @Test
+    fun aTappedLineShowsTheRestWhereItWas() {
+        val state = CommandPaletteState()
+        val items = (1..10).map { n -> item("a$n", "Gece $n", "Albümler") } + (1..10).map { n -> item("t$n", "Gece şarkısı $n", "Parçalar") }
+        compose.setContent {
+            DesktopKitTheme(inputMode = InputMode.Touch) {
                 Box(Modifier.fillMaxSize()) { CommandPalette(state, items = { items }) }
             }
         }
@@ -144,39 +210,15 @@ class CommandPaletteTest {
         compose.waitForIdle()
         compose.onNode(hasSetTextAction()).performTextInput("gece")
         compose.waitForIdle()
-        compose.onNodeWithText("9 sonucun hepsini göster").assertExists()
-        compose.onNodeWithText("Gece 8").assertDoesNotExist()
-        // the best match, six albums, the line: seven rows down from the first; Enter on the line
-        compose.onNode(hasSetTextAction()).performKeyInput {
-            repeat(7) { pressKey(Key.DirectionDown) }
-            pressKey(Key.Enter)
-        }
-        compose.waitForIdle()
-        assertTrue("the palette stays open", state.isOpen)
-        assertEquals("nothing ran", "", ran)
-        compose.onNodeWithText("9 sonucun hepsini göster").assertDoesNotExist()
-        compose.onNodeWithText("Gece 8").assertExists()
-        // the line's place is the group's next album now, and it is the chosen one: Enter runs it
-        compose.onNode(hasSetTextAction()).performKeyInput { pressKey(Key.Enter) }
-        compose.waitForIdle()
-        assertEquals("a8", ran)
-        assertFalse(state.isOpen)
-
-        // opened again: the group shows its best again; a click on the line shows it whole
-        compose.runOnIdle { state.open() }
-        compose.waitForIdle()
-        compose.onNode(hasSetTextAction()).performTextInput("gece")
-        compose.waitForIdle()
-        compose.onNodeWithText("Gece 8").assertDoesNotExist()
-        compose.onNodeWithText("9 sonucun hepsini göster").performClick()
+        // the tracks' line is out of sight: the list goes down to it, away from the best match, the chosen one
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("10 sonucun hepsini göster"))
+        compose.onNodeWithText("Gece 1").assertDoesNotExist()
+        compose.onNodeWithText("10 sonucun hepsini göster").performClick()
         compose.waitForIdle()
         assertTrue(state.isOpen)
-        compose.onNodeWithText("9 sonucun hepsini göster").assertDoesNotExist()
-        // another query: its groups show their best again
-        compose.onNode(hasSetTextAction()).performTextInput(" 1")
-        compose.waitForIdle()
-        compose.onNodeWithText("9 sonucun hepsini göster").assertDoesNotExist()
-        compose.onNodeWithText("Gece 10").assertExists()
+        compose.onNodeWithText("10 sonucun hepsini göster").assertDoesNotExist()
+        // the seventh track has the line's place, in sight
+        compose.onNodeWithText("Gece şarkısı 7").assertIsDisplayed()
     }
 
     @Test
