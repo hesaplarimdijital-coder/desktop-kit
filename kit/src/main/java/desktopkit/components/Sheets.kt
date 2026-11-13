@@ -100,7 +100,6 @@ import desktopkit.theme.LocalMotionTier
 import desktopkit.theme.MotionTier
 import desktopkit.theme.glass
 import desktopkit.theme.rememberDeskHaptics
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -261,7 +260,7 @@ fun GlassBottomSheet(
     val progress = way.progress
     LaunchedEffect(visible) {
         if (visible) {
-            way.drag.snapTo(0f)
+            way.drag.moveTo(0f)
             way.carriedOut = false
             progress.animateTo(1f, sheetWay(tier, tween(DeskMotion.LONG_MS, easing = DeskMotion.EmphasizedDecelerate)))
         } else if (way.carriedOut) {
@@ -312,7 +311,7 @@ private fun sheetWay(tier: MotionTier, timed: FiniteAnimationSpec<Float>): Finit
 /** Where a sheet is: how far in ([progress], 0 to 1), how far the finger has pulled it down ([drag], px), and whether the finger took it out. */
 private class SheetWay {
     val progress = Animatable(0f)
-    val drag = Animatable(0f)
+    val drag = FingerOffset()
 
     /** Set when a pull or fling carried the sheet out: the dismiss that follows has nothing left to animate. */
     var carriedOut = false
@@ -360,7 +359,6 @@ private fun SheetSurface(
     val drag = way.drag
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
-    val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     var sheetHeight by remember { mutableIntStateOf(0) }
     val focus = remember { FocusRequester() }
@@ -372,7 +370,6 @@ private fun SheetSurface(
     val pull = remember(way) { SheetPull(way) }
     val settleSpec = DeskMotion.spatial(tier, tween<Float>(DeskMotion.MEDIUM_MS, easing = DeskMotion.Emphasized), 0.5f)
     SideEffect {
-        pull.scope = scope
         pull.flingPx = with(density) { 800.dp.toPx() }
         pull.settleSpec = settleSpec
         pull.carriesOut = tier == MotionTier.Gesture
@@ -462,7 +459,6 @@ private fun SheetSurface(
  */
 private class SheetPull(private val way: SheetWay) : NestedScrollConnection {
     private val drag = way.drag
-    lateinit var scope: CoroutineScope
     var height = 0
     var flingPx = 0f
     var settleSpec: AnimationSpec<Float> = tween()
@@ -471,7 +467,7 @@ private class SheetPull(private val way: SheetWay) : NestedScrollConnection {
     var onDismiss: () -> Unit = {}
     var pressed = false
 
-    /** Where the sheet is: set at once, while the animatable catches up on the next frame. */
+    /** Where the pull has the sheet: where it is drawn while the finger moves it, where it is going once let go. */
     private var offset = 0f
     private var armed = false
 
@@ -495,7 +491,9 @@ private class SheetPull(private val way: SheetWay) : NestedScrollConnection {
             armed = past
             if (past) onThreshold()
         }
-        scope.launch { drag.snapTo(next) }
+        // at once, not in a coroutine of its own: let go in motion, the last move would otherwise land
+        // after the release and stop it (FingerOffset)
+        drag.moveTo(next)
         return used
     }
 
@@ -517,13 +515,13 @@ private class SheetPull(private val way: SheetWay) : NestedScrollConnection {
                 way.carriedOut = true
                 onDismiss()
             }
-            drag.animateTo(end, settleSpec, initialVelocity = velocity.coerceAtLeast(0f)) {
-                if (!gone && value >= end - 0.5f) dismiss()
+            drag.settle(end, settleSpec, velocity.coerceAtLeast(0f)) { at ->
+                if (!gone && at >= end - 0.5f) dismiss()
             }
             if (!gone) dismiss()
         } else {
             offset = 0f
-            drag.animateTo(0f, settleSpec, initialVelocity = velocity)
+            drag.settle(0f, settleSpec, velocity)
         }
     }
 
