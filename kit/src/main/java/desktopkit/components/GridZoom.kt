@@ -49,7 +49,7 @@ import androidx.compose.ui.input.pointer.isMetaPressed as pointerMeta
  * finger than for a mouse); a size the user chose stays when it does, until Ctrl+0 ([reset]).
  */
 @Stable
-class GridZoom(
+class GridZoom @JvmOverloads constructor(
     defaultCellWidth: Dp,
     chosenCellWidth: Dp? = null,
     val minCellWidth: Dp = 96.dp,
