@@ -66,6 +66,9 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
@@ -110,6 +113,23 @@ class TableColumn<T>(
     val hideBelow: WidthClass? = null,
     /** Stable name of the column for [TableColumnsState] (order and visibility are stored by it); the title by default. */
     val id: String = title,
+    /**
+     * Where a value too long for the cell is cut: at its end (the default) or, with
+     * [TextOverflow.MiddleEllipsis], in its middle, so a file name keeps its extension and a path its
+     * last folder ("Kayıt_2026-11-12…tam_kayit.flac").
+     */
+    val ellipsis: TextOverflow = TextOverflow.Ellipsis,
+    /**
+     * Draws the cell instead of [value]'s text: an icon (a star, a paperclip), a badge, a progress bar.
+     * [value] still sorts the column and is what TalkBack reads unless the cell says otherwise.
+     */
+    val cell: (@Composable (T) -> Unit)? = null,
+    /**
+     * Makes the cell a button of its own that does not open the row: a star toggled in place.
+     * [cellClickLabel] names what it does for TalkBack ("Star", "Remove star").
+     */
+    val onCellClick: ((T) -> Unit)? = null,
+    val cellClickLabel: ((T) -> String)? = null,
     val value: (T) -> String,
 )
 
@@ -155,6 +175,11 @@ data class TableSort(val column: Int, val ascending: Boolean)
  * [rowDrag] lets rows be dragged with a mouse to a [dropZone] (the sidebar, a list, another window
  * of the app): it builds what travels for the row under the pointer, usually the whole selection
  * when that row is selected. [loading] shows breathing placeholder rows while [rows] is empty.
+ *
+ * [rowEmphasis] sets rows apart in bold and in the text colour: an unread message. [emptyContent] is
+ * shown under the header when there are no rows and nothing is loading, usually a
+ * [desktopkit.screens.MessageScreen] saying why and what to do (no device connected, nothing found,
+ * the folder could not be read); without it an empty table is only its header.
  */
 @Composable
 fun <T> DenseTable(
@@ -178,6 +203,8 @@ fun <T> DenseTable(
     loading: Boolean = false,
     rowDrag: ((T, Int) -> DeskDragPayload?)? = null,
     clearSelectionOnBack: Boolean = true,
+    rowEmphasis: ((T) -> Boolean)? = null,
+    emptyContent: (@Composable () -> Unit)? = null,
 ) {
     val dimens = DeskTheme.dimens
     val colors = DeskTheme.colors
@@ -276,6 +303,11 @@ fun <T> DenseTable(
             if (pulse != null) {
                 items(8) { i -> SkeletonTableRow(shownColumns, i, pulse) }
             }
+            if (rows.isEmpty() && !skeleton && emptyContent != null) {
+                item(key = "desktopkit.empty") {
+                    Box(Modifier.fillParentMaxWidth().fillParentMaxHeight(0.8f), contentAlignment = Alignment.Center) { emptyContent() }
+                }
+            }
             itemsIndexed(rows, key = { _, item -> key(item) }) { index, item ->
                 val itemKey = key(item)
                 val onClick = {
@@ -300,6 +332,7 @@ fun <T> DenseTable(
                         columns = shownColumns,
                         item = item,
                         selected = itemKey in selection || (selectedKey != null && itemKey == selectedKey),
+                        emphasized = rowEmphasis?.invoke(item) == true,
                         onClick = onClick,
                         modifier = (if (!multi) Modifier else Modifier.onFocusChanged { focus ->
                             if (focus.isFocused) tracker.focused = itemKey else if (tracker.focused == itemKey) tracker.focused = null
@@ -460,15 +493,22 @@ private fun <T> HeaderCell(column: TableColumn<T>, index: Int, sort: TableSort?,
     val active = sort?.column == index
     val clickable = onSortChange != null && column.sortable
     val shape = RoundedCornerShape(4.dp)
+    // TalkBack hears which way the column sorts, and what a tap does
+    val sortedState = if (active) stringResource(if (sort.ascending) R.string.dk_sorted_ascending else R.string.dk_sorted_descending) else null
+    val sortLabel = stringResource(R.string.dk_sort_by, column.title)
     Row(
         modifier = modifier
             .heightIn(min = DeskTheme.dimens.minTarget)
             .focusRing(state, shape)
             .background(if (clickable) stateBackground(state) else Color.Transparent, shape)
+            .semantics {
+                heading()
+                if (sortedState != null) stateDescription = sortedState
+            }
             .then(
                 if (clickable) Modifier.deskClickable(interaction, {
                     onSortChange(TableSort(index, if (active) !sort.ascending else true))
-                }, role = Role.Button) else Modifier,
+                }, role = Role.Button, onClickLabel = sortLabel) else Modifier,
             )
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -484,7 +524,14 @@ private fun <T> HeaderCell(column: TableColumn<T>, index: Int, sort: TableSort?,
 }
 
 @Composable
-private fun <T> TableRow(columns: List<IndexedValue<TableColumn<T>>>, item: T, selected: Boolean, onClick: () -> Unit, modifier: Modifier) {
+private fun <T> TableRow(
+    columns: List<IndexedValue<TableColumn<T>>>,
+    item: T,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier,
+    emphasized: Boolean = false,
+) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
     val interaction = remember { MutableInteractionSource() }
@@ -504,22 +551,48 @@ private fun <T> TableRow(columns: List<IndexedValue<TableColumn<T>>>, item: T, s
         verticalAlignment = Alignment.CenterVertically,
     ) {
         columns.forEach { (index, column) ->
-            Box(Modifier.cell(this, column.width).padding(horizontal = 8.dp), contentAlignment = if (column.alignEnd) Alignment.CenterEnd else Alignment.CenterStart) {
-                Text(
-                    text = column.value(item),
-                    style = column.textStyle ?: if (column.mono) DeskTheme.type.mono else if (index == 0) DeskTheme.type.bodyStrong else DeskTheme.type.body,
-                    color = when {
-                        selected -> colors.onSelection
-                        index == 0 -> colors.text
-                        else -> colors.textSecondary
-                    },
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = if (column.alignEnd) TextAlign.End else TextAlign.Start,
-                )
+            val cellClick = column.onCellClick
+            Box(
+                Modifier
+                    .cell(this, column.width)
+                    .then(if (cellClick == null) Modifier else Modifier.cellButton(column.cellClickLabel?.invoke(item)) { cellClick(item) })
+                    .padding(horizontal = 8.dp),
+                contentAlignment = if (column.alignEnd) Alignment.CenterEnd else Alignment.CenterStart,
+            ) {
+                val custom = column.cell
+                if (custom != null) {
+                    custom(item)
+                } else {
+                    val base = column.textStyle ?: if (column.mono) DeskTheme.type.mono else if (index == 0) DeskTheme.type.bodyStrong else DeskTheme.type.body
+                    Text(
+                        text = column.value(item),
+                        // an emphasized row (unread) is bold and in the text colour throughout
+                        style = if (emphasized) base.copy(fontWeight = FontWeight.SemiBold) else base,
+                        color = when {
+                            selected -> colors.onSelection
+                            index == 0 || emphasized -> colors.text
+                            else -> colors.textSecondary
+                        },
+                        maxLines = 1,
+                        overflow = column.ellipsis,
+                        textAlign = if (column.alignEnd) TextAlign.End else TextAlign.Start,
+                    )
+                }
             }
         }
     }
+}
+
+/** A cell that is a button of its own (a star), with hover and press states and a hand pointer. */
+@Composable
+private fun Modifier.cellButton(label: String?, onClick: () -> Unit): Modifier {
+    val interaction = remember { MutableInteractionSource() }
+    val state = interaction.collectState()
+    val shape = RoundedCornerShape(DeskTheme.dimens.radiusSmall)
+    return this
+        .focusRing(state, shape)
+        .background(stateBackground(state), shape)
+        .deskClickable(interaction, onClick, onClickLabel = label)
 }
 
 /** A table row while the rows load: one breathing bar per cell, of varying length. */

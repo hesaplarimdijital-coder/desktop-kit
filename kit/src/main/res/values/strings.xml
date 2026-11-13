@@ -81,4 +81,7 @@
         <item quantity="other">%d new</item>
     </plurals>
     <string name="dk_badge_dot">New</string>
+    <string name="dk_sorted_ascending">Sorted ascending</string>
+    <string name="dk_sorted_descending">Sorted descending</string>
+    <string name="dk_sort_by">Sort by %1$s</string>
 </resources>

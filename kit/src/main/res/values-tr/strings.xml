@@ -81,4 +81,7 @@
         <item quantity="other">%d yeni</item>
     </plurals>
     <string name="dk_badge_dot">Yeni</string>
+    <string name="dk_sorted_ascending">Artan sırada</string>
+    <string name="dk_sorted_descending">Azalan sırada</string>
+    <string name="dk_sort_by">%1$s sütununa göre sırala</string>
 </resources>
