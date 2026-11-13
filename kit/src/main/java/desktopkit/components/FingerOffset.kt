@@ -14,12 +14,14 @@ import kotlinx.coroutines.coroutineScope
  * down. The finger moves it at once ([moveBy], [moveTo]); let go, [settle] carries it out or back
  * until it has arrived or the finger takes it again.
  *
- * Not an `Animatable` moved with `launch { snapTo() }`, as from 2.0 to 2.4.0: a finger lifted in
+ * Not an `Animatable` moved with `launch { snapTo() }`, as up to 2.4.0: a finger lifted in
  * motion gives the window its last move and the lift together, and Compose's `draggable` starts
  * `onDragStopped` before anything that waits in the queue has run. The last move's coroutine then
  * ran after the release had begun, and its `snapTo` stopped the animation that was to carry the
  * thing out or back: the toast or the sheet stayed where the finger left it. Here nothing of a move
  * waits in a queue.
+ *
+ * For the main thread only, as the gestures and the frames that use it are.
  */
 @Stable
 internal class FingerOffset {

@@ -33,6 +33,7 @@ import desktopkit.theme.ThemeMode
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -45,9 +46,9 @@ import org.robolectric.annotation.GraphicsMode
  * the lift), and nothing of the app runs between the two.
  *
  * The coroutines of these tests wait in a queue, as they do on a device's main thread
- * ([StandardTestDispatcher]). The default of Compose's tests runs each coroutine the moment it is
- * launched, an order no device has: that is why [ToastSwipeTest] and [SheetGestureTest] never showed
- * what happens here.
+ * ([StandardTestDispatcher]). The rule the kit's tests are built on runs each coroutine the moment it
+ * is launched, an order no device has (Compose 1.12 deprecates that rule for one that queues): that
+ * is why [ToastSwipeTest] and [SheetGestureTest] never showed what happens here.
  *
  * In 2.4.0 the toast, and the sheet held by its handle or its title, stayed where the finger left
  * them. Each move was applied in a coroutine of its own (`launch { snapTo() }`); Compose's draggable
@@ -55,10 +56,15 @@ import org.robolectric.annotation.GraphicsMode
  * coroutine ran after the release had begun to carry the thing out (or back) and stopped that
  * ("Mutation interrupted"). Now the finger moves both at once ([FingerOffset]).
  *
- * Every gesture is made with one count of moves and with one move more. Under these tests (not on a
- * device: there the thing follows every move) what moves under the finger may take only every other
- * move of it, and 2.4.0 went wrong only when the last move was one that it took: with one count or
- * the other it is.
+ * Every gesture is made with one count of moves and with one move more. Under these tests what
+ * moves under the finger may take only every other move of it, and 2.4.0 went wrong only when the
+ * last move was one that it took: with one count or the other it is. That was measured in Nağmedar's
+ * tests, where a probe printed each move its notice was given (after the first two, every other
+ * one); why it is so was not found. On an emulator's touch screen, moved by raw touch events, the
+ * notice followed every move.
+ *
+ * Each gesture also says that the finger had moved the thing when it let go: without that, a thing
+ * that never left its place would pass for one that came back.
  */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
@@ -133,6 +139,9 @@ class LetGoInMotionTest {
     private fun toastFlung(moves: Int): Float? {
         val rest = cardLeft()
         compose.onNodeWithText(messages[round]).performTouchInput { letGoInMotion(Offset(-60f, 0f), moves) }
+        // no frame has passed since the lift: it is where the finger had it
+        val under = cardLeft() - rest
+        assertTrue("the finger had moved the toast when it let go ($under dp from its place, $moves moves)", under < -20f)
         framesUntil(90) { toasts.current == null }
         return if (toasts.current == null) null else cardLeft() - rest
     }
@@ -144,6 +153,8 @@ class LetGoInMotionTest {
     private fun toastNudged(moves: Int): Float {
         val rest = cardLeft()
         compose.onNodeWithText(messages[round]).performTouchInput { letGoInMotion(Offset(-9f, 0f), moves) }
+        val under = cardLeft() - rest
+        assertTrue("the finger had moved the toast when it let go ($under dp from its place, $moves moves)", under < -2f)
         frames(120)
         return cardLeft() - rest
     }
@@ -216,6 +227,9 @@ class LetGoInMotionTest {
         val before = dismissed
         val held = if (byRow) compose.onNodeWithTag("row1") else compose.onNodeWithText("Paylaş")
         held.performTouchInput { letGoInMotion(Offset(0f, 60f), moves) }
+        // no frame has passed since the lift: it is where the finger had it
+        val under = rowTop() - rest
+        assertTrue("the finger had pulled the sheet when it let go ($under dp below its place, $moves moves)", under > 20f)
         framesUntil(90) { dismissed > before }
         return if (dismissed > before) null else rowTop() - rest
     }
@@ -224,6 +238,8 @@ class LetGoInMotionTest {
     private fun sheetNudged(moves: Int): Float {
         val rest = rowTop()
         compose.onNodeWithText("Paylaş").performTouchInput { letGoInMotion(Offset(0f, 9f), moves) }
+        val under = rowTop() - rest
+        assertTrue("the finger had pulled the sheet when it let go ($under dp below its place, $moves moves)", under > 2f)
         frames(120)
         return rowTop() - rest
     }
