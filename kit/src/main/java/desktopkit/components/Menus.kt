@@ -190,6 +190,7 @@ fun MenuPopup(
                     else -> 1f
                 }
             }
+            val menuScroll = rememberScrollState()
             Column(
                 modifier = Modifier
                     .graphicsLayer {
@@ -204,7 +205,8 @@ fun MenuPopup(
                     .then(if (glassy) Modifier else Modifier.shadow(12.dp, shape))
                     .glass(DeskGlass.raised(colors, GlassThickness.Regular), shape)
                     .border(1.dp, colors.borderStrong, shape)
-                    .verticalScroll(rememberScrollState())
+                    .verticalScrollbar(menuScroll)
+                    .verticalScroll(menuScroll)
                     .onKeyEvent { event ->
                         val escape = event.type == KeyEventType.KeyDown && event.key == Key.Escape
                         if (escape) dismiss()

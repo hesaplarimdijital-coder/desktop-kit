@@ -238,6 +238,7 @@ fun <T> DeskGrid(
         columns = GridCells.Adaptive(minCellWidth),
         modifier = modifier
             .fillMaxSize()
+            .verticalScrollbar(state)
             .then(gridModifier)
             .then(if (!skeleton) Modifier else Modifier.semantics { contentDescription = loadingLabel }),
         state = state,
