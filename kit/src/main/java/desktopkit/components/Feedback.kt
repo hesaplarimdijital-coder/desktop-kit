@@ -20,7 +20,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,11 +45,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -87,6 +91,7 @@ import kotlin.coroutines.resume
 import kotlin.math.abs
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -273,7 +278,11 @@ fun CountBadge(
 
 // ---------------------------------------------------------------- toasts
 
-/** How long a toast stays: about 4 s, 10 s, or until it is closed. TalkBack users get longer. */
+/**
+ * How long a toast stays: about 4 s, 10 s, or until it is closed. TalkBack users get longer (the
+ * time they set for taking action), and the time stops while a pointer rests on the toast or the
+ * keyboard focus is in it. [ToastState.show] can also take a time of its own.
+ */
 enum class ToastDuration { Short, Long, Indefinite }
 
 /** How a toast ended. */
@@ -290,7 +299,12 @@ class DeskToast internal constructor(
     /** A keyboard shortcut shown next to the action on DeX ("Ctrl+Z"); the app handles the key itself. */
     val shortcut: String?,
     private val continuation: CancellableContinuation<ToastResult>,
+    /** The time it stays, when [ToastState.show] was given one; [duration] otherwise. */
+    val durationMillis: Long? = null,
 ) {
+    /** A pointer rests on it or the keyboard focus is in it: its time stands still. */
+    internal var held by mutableStateOf(false)
+
     /** The action button was used. */
     fun performAction() {
         if (continuation.isActive) continuation.resume(ToastResult.ActionPerformed)
@@ -332,7 +346,9 @@ class ToastState {
     /**
      * Shows [message] and suspends until the toast is dismissed, replaced by a newer one or its
      * action used. [duration] defaults to [ToastDuration.Long] for a toast with an action,
-     * [ToastDuration.Short] otherwise.
+     * [ToastDuration.Short] otherwise. [durationMillis] gives the time exactly instead (an undo that
+     * lasts as long as the app's own setting, "undo send" for 5, 10 or 15 s); TalkBack users get it
+     * lengthened like the others.
      */
     suspend fun show(
         message: String,
@@ -341,6 +357,7 @@ class ToastState {
         tone: BannerTone? = null,
         icon: ImageVector? = tone?.icon,
         shortcut: String? = null,
+        durationMillis: Long? = null,
     ): ToastResult {
         val mine = ++asked
         current?.dismiss()
@@ -349,7 +366,7 @@ class ToastState {
             if (mine != asked) return@withLock ToastResult.Dismissed
             try {
                 suspendCancellableCoroutine { continuation ->
-                    current = DeskToast(message, actionLabel, duration, tone, icon, shortcut, continuation)
+                    current = DeskToast(message, actionLabel, duration, tone, icon, shortcut, continuation, durationMillis)
                 }
             } finally {
                 current = null
@@ -378,7 +395,7 @@ fun ToastHost(state: ToastState, modifier: Modifier = Modifier) {
     val accessibility = LocalAccessibilityManager.current
     LaunchedEffect(current) {
         if (current == null) return@LaunchedEffect
-        val base = when (current.duration) {
+        val base = current.durationMillis ?: when (current.duration) {
             ToastDuration.Short -> 4000L
             ToastDuration.Long -> 10000L
             ToastDuration.Indefinite -> Long.MAX_VALUE
@@ -386,7 +403,18 @@ fun ToastHost(state: ToastState, modifier: Modifier = Modifier) {
         val millis = accessibility?.calculateRecommendedTimeoutMillis(base, containsIcons = true, containsText = true,
             containsControls = current.actionLabel != null) ?: base
         if (millis == Long.MAX_VALUE) return@LaunchedEffect
-        delay(millis)
+        // the time stands still while a pointer rests on the toast or the focus is in it: reaching for its
+        // action must not lose it (the design standard's ERİ-11)
+        var left = millis
+        while (left > 0) {
+            if (current.held) {
+                snapshotFlow { current.held }.first { !it }
+                continue
+            }
+            val step = minOf(left, TOAST_TICK_MS)
+            delay(step)
+            left -= step
+        }
         current.dismiss()
     }
     // the last toast stays drawn while it fades out (remembered after each composition, not during it)
@@ -417,10 +445,16 @@ private fun ToastCard(toast: DeskToast) {
     var width by remember { mutableStateOf(1) }
     val glassy = DeskGlass.source != null && DeskGlass.mode != GlassMode.Solid
     val label = stringResource(R.string.dk_notification)
+    val hover = remember { MutableInteractionSource() }
+    val hovered by hover.collectIsHoveredAsState()
+    var focused by remember { mutableStateOf(false) }
+    LaunchedEffect(toast, hovered, focused) { toast.held = hovered || focused }
     Row(
         modifier = Modifier
             .padding(horizontal = dimens.pagePadding, vertical = dimens.gapM)
             .widthIn(max = 560.dp)
+            .hoverable(hover)
+            .onFocusChanged { focused = it.hasFocus }
             .onSizeChanged { width = it.width.coerceAtLeast(1) }
             .graphicsLayer {
                 translationX = swipe.value
@@ -479,10 +513,14 @@ private fun ToastCard(toast: DeskToast) {
             TextAction(toast.actionLabel, onClick = { toast.performAction() })
             if (toast.shortcut != null && showShortcutHints()) KeyCap(toast.shortcut)
         }
+        // a finger's target is 48 dp, as everywhere (it was 40)
         DeskIconButton(DeskIcons.Close, stringResource(R.string.dk_close), onClick = { toast.dismiss() },
-            size = if (touch) 40.dp else 28.dp, iconSize = if (touch) 18.dp else 14.dp)
+            size = if (touch) 48.dp else 28.dp, iconSize = if (touch) 18.dp else 14.dp)
     }
 }
+
+/** How often a toast's time is counted down (the steps it can stand still between). */
+private const val TOAST_TICK_MS = 100L
 
 /** A text-only button in the accent colour: the action of a toast. */
 @Composable
