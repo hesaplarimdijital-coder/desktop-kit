@@ -38,6 +38,7 @@ import desktopkit.components.MoreButton
 import desktopkit.components.StatusBanner
 import desktopkit.components.dropZone
 import desktopkit.components.listAppear
+import desktopkit.components.rememberGridZoom
 import desktopkit.components.rememberListAppear
 import desktopkit.screens.PageHeader
 import desktopkit.shell.CompactTopBar
@@ -105,6 +106,8 @@ fun AlbumsScreen(opened: String?, onOpen: (String?) -> Unit, onPlay: (Int) -> Un
                         )
                     },
                     loading = loading,
+                    // Ctrl with the wheel, a pinch or Ctrl with + and − make the covers larger or smaller
+                    zoom = rememberGridZoom(),
                     itemDrag = { album, _ ->
                         val ids = if (album.id in selected) selected.map { it as String } else listOf(album.id)
                         DeskDragPayload(DragKinds.ALBUM, ids, if (ids.size == 1) album.title else "${ids.size} albums")

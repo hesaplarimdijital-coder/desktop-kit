@@ -51,6 +51,8 @@
     <string name="dk_inspector_hide">Hide the inspector</string>
     <string name="dk_resize_inspector">Resize the inspector</string>
     <string name="dk_resize">Resize the panes</string>
+    <string name="dk_grid_larger">Larger covers</string>
+    <string name="dk_grid_smaller">Smaller covers</string>
     <string name="dk_key_esc">Esc</string>
 
     <!-- 2.0: forms, feedback, structure -->
