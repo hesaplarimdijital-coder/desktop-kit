@@ -94,6 +94,12 @@ data class DeskColors(
     /** Second brand colour (Material "secondary"). */
     val brandSecondary: Color,
     val scrim: Color,
+    /**
+     * The edge of an input at rest (a text field, a switch's off track): at least 3:1 against the
+     * background and the surfaces, so the control can be found where it is (WCAG 1.4.11). [borderStrong]
+     * stays for the edges that only part things (buttons, panels, menus).
+     */
+    val controlBorder: Color = borderStrong,
 )
 
 object DeskPalette {
@@ -138,6 +144,7 @@ object DeskPalette {
             danger = Color(0xFFFF7A6E),
             brandSecondary = Color(0xFFFF7A6E),
             scrim = Color(0x99000000),
+            controlBorder = Color(0xFF6A7480),
         )
     }
 
@@ -185,6 +192,7 @@ object DeskPalette {
             danger = Color(0xFFB4382B),
             brandSecondary = Color(0xFFE0574B),
             scrim = Color(0x6612161B),
+            controlBorder = Color(0xFF7E8794),
         )
     }
 }
