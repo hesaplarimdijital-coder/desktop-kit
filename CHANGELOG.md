@@ -1,5 +1,44 @@
 # Değişiklikler
 
+## 2.4.1 (2026-11-13)
+
+Düzeltme: dokunmatik ekranda parmak hâlâ hareket ederken bırakılan bildirim (`ToastHost`) ve alt sayfa
+(`GlassBottomSheet`) artık bırakıldığı yerde kalmaz. Nağmedar'da (Galaxy S24, Android 17) yana kaydırılan bir bildirim
+sayfanın önünde, yana kaymış ve yarı soluk hâlde, süresi dolana kadar duruyordu. Nağmedar'ın bildirimleri kitin
+bildiriminden uyarlandığı için aynı kod kitte de vardı; alt sayfanın tutamağında ve başlığında da. Kod değişmeden
+derlenir, API aynı; kitin bileşenlerini olduğu gibi kullanan uygulamanın yapacağı bir şey yok
+([MIGRATION.md](MIGRATION.md#240dan-241e)). Görünür bir değişiklik olsa da sürüm üçüncü sayıyı artırır: yeni bir
+davranış gelmiyor, 2.3.0'ın yazdığı davranış (kaydırılan bildirim ve fırlatılan sayfa yoluna devam eder, kısa
+bırakılan yerine döner) parmak nasıl kalkarsa kalksın geçerli oluyor.
+
+- **Neden:** parmağın her hareketi kendi coroutine'inde uygulanıyordu (`scope.launch { snapTo(…) }`). Parmak
+  hareket hâlindeyken kalkınca Android son hareketi ve kalkışı pencereye birlikte verir, Compose'un `draggable`'ı
+  da `onDragStopped`'u sırada bekleyenlerden önce başlatır. Son hareketin `snapTo`'su böylece bırakışın başlattığı
+  `animateTo`'dan sonra çalışıp onu durduruyordu (`Animatable`'ın kilidi, "Mutation interrupted"). Parmak durup
+  öyle kalkınca sırada bekleyen hareket kalmadığı için sorun görünmüyordu.
+- **Bildirim:** telefonda yana fırlatılıp bırakılan bildirim gider (geniş pencerede zaten bir anda kapanıyordu); az
+  kaydırılıp bırakılan her genişlikte yerine döner (telefonda hareketin yayıyla, genişte 2.2.0'ın yayıyla).
+  Bırakış kararı artık son hareketi de görür; 2.4.0 bir hareket geriden bakıyordu.
+- **Alt sayfa:** tutamağından ya da başlığından aşağı fırlatılıp bırakılan sayfa kapanır; az çekilip bırakılan
+  yerine döner. Sayfa listesinden çekildiğinde bırakış, listenin kaydırmasının fırlatışı olarak sıraya girer; o
+  yolun 2.4.0'da da doğru çalıştığı koddan okundu, test edilmedi. Bu sürümde o yolun da testi var.
+- **Nasıl:** kaydırılan şeyin yeri artık kit içi bir `FingerOffset`: parmak onu anında taşır (`moveBy`, `moveTo`),
+  bırakınca `settle()` dışarı ya da yerine götürür; parmak onu yeniden sürüklerse süren yol kesilir. Bir hareketin
+  sırada bekleyen hiçbir parçası kalmadı. `SheetPull`'un coroutine kapsamına ihtiyacı da kalmadı.
+- **Testler:** `LetGoInMotionTest` son hareketle kalkışı birlikte verir ve coroutine'leri cihazın ana iş
+  parçacığındaki gibi sıraya koyar (`StandardTestDispatcher`). Kitin testlerinin kurulduğu Compose test kuralı her
+  coroutine'i başlatıldığı anda çalıştırır (Compose 1.12 bu kuralı, sıraya koyan yenisi lehine kullanımdan
+  kaldırıyor); hiçbir cihazda olmayan bu sıra yüzünden `ToastSwipeTest` ve `SheetGestureTest` sorunu hiç
+  göstermedi. PR'ın ilk gönderisi aynı testlerle 2.4.0'ın davranışını kaydeder (bildirim ve sayfa bırakıldığı yerde
+  kalır), sonraki ikisi düzeltip testleri çevirir. Her hareket, bırakıldığı anda parmağın o şeyi gerçekten taşımış
+  olduğunu da doğrular.
+- **Doğrulama, neyi kapsıyor:** kitin kendi kodunu kitin testleri sınar (yukarıda). Cihaz tarafı Nağmedar'da görüldü;
+  onun bildirimi kitinkinden uyarlanmıştır, düzeltmesi aynı tasarımdır (kendi `SwipeAway` sınıfı). Android 17
+  emülatöründe, telefon boyutunda ekranda, ham dokunma olaylarıyla (son hareket ve kalkış 0–0,1 ms arayla): Nağmedar
+  1.0.5'te fırlatılıp bırakılan bildirim üç okumada da bırakıldığı yerde, az kaydırılan yana kaymış duruyor; 1.0.6'da
+  fırlatılan gidiyor, az kaydırılan yerine dönüyor. Bu, kitin `ToastCard`'ının ya da alt sayfasının bir cihazda
+  denenmesi değildir: kitin örnek uygulaması hiçbir cihazda ya da emülatörde çalıştırılmadı.
+
 ## 2.4.0 (2026-11-05)
 
 Ayrıntı geçişi: açılan sayfa baştan saydam değil, listenin üstüne kayarak gelir; liste yalnızca kararır, iki sayfanın

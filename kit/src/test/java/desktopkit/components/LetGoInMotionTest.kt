@@ -60,8 +60,11 @@ import org.robolectric.annotation.GraphicsMode
  * moves under the finger may take only every other move of it, and 2.4.0 went wrong only when the
  * last move was one that it took: with one count or the other it is. That was measured in Nağmedar's
  * tests, where a probe printed each move its notice was given (after the first two, every other
- * one); why it is so was not found. On an emulator's touch screen, moved by raw touch events, the
- * notice followed every move.
+ * one). Compose gives a node no move whose place within the node has not changed (HitPathTracker,
+ * read in androidx's main branch); a thing that has followed the finger exactly, under the even
+ * steps of a test, is there again at every second move. A person's finger does not move in even
+ * steps, and on an emulator's touch screen, moved by raw touch events, the notice followed every
+ * move.
  *
  * Each gesture also says that the finger had moved the thing when it let go: without that, a thing
  * that never left its place would pass for one that came back.

@@ -1,10 +1,11 @@
-# 2.4.0'a geçiş
+# 2.4.1'e geçiş
 
-Bu rehber kiti kullanan uygulamaları en güncel sürüme, 2.4.0'a taşımak için. 0.1.3'ten gelenler baştan
+Bu rehber kiti kullanan uygulamaları en güncel sürüme, 2.4.1'e taşımak için. 0.1.3'ten gelenler baştan
 başlar; adımlardan sonra [görünümde fark edecekleri](#013ten-gelince-görünümde-fark-edecekleriniz) ayrıca
 yazılı. 1.0.0'dan geçenler 1. adımdan sonra doğrudan [1.0'dan 2.0'a](#10dan-20a) bölümüne atlayabilir. 2.0.0,
-2.1.0, 2.2.0 ya da 2.3.0 kullananlar yalnızca [2.0.0'dan 2.1.0'a](#200dan-210a), [2.1.0'dan 2.2.0'a](#210dan-220a),
-[2.2.0'dan 2.3.0'a](#220dan-230a) ve [2.3.0'dan 2.4.0'a](#230dan-240a) bölümlerine bakar.
+2.1.0, 2.2.0, 2.3.0 ya da 2.4.0 kullananlar [2.0.0'dan 2.1.0'a](#200dan-210a),
+[2.1.0'dan 2.2.0'a](#210dan-220a), [2.2.0'dan 2.3.0'a](#220dan-230a), [2.3.0'dan 2.4.0'a](#230dan-240a) ve
+[2.4.0'dan 2.4.1'e](#240dan-241e) bölümlerinden yalnızca kendi sürümünden sonrakilere bakar.
 
 Sıra şöyle: önce derleme ortamı (kitin kendisi aynı adımları `7845eb5` gönderisinde attı, örnek olarak
 oraya bakılabilir), sonra uygulamanın kendi yazdığı bileşenler kitinkilerle değiştirilir, en son yeni
@@ -12,7 +13,7 @@ oraya bakılabilir), sonra uygulamanın kendi yazdığı bileşenler kitinkilerl
 
 ## 1. Derleme ortamı
 
-| | 0.1.3 uygulamaları | 2.4.0 |
+| | 0.1.3 uygulamaları | 2.4.1 |
 | --- | --- | --- |
 | Android Gradle eklentisi (AGP) | 8.7.3 | 9.4.1 (en az 9.1.1) |
 | Gradle | 8.11.1 | 9.8.2 |
@@ -25,13 +26,13 @@ oraya bakılabilir), sonra uygulamanın kendi yazdığı bileşenler kitinkilerl
 | navigation-compose | 2.8.4 | 2.10.2 (kitle birlikte gelir) |
 | JDK | 17 | 17 (Robolectric testleri için 21) |
 
-`minSdk` 34 olunca Galaxy Tab S11 Ultra ve Galaxy S24 (Android 16) etkilenmez; Android 13 ve öncesi
+`minSdk` 34 olunca Galaxy Tab S11 Ultra ve Galaxy S24 (Android 17) etkilenmez; Android 13 ve öncesi
 cihazlar uygulamayı kuramaz. Uygulamalar Play'de olmadığı için başka bir etkisi yok.
 
 Adımlar:
 
 1. `gradle/wrapper/gradle-wrapper.properties`: `distributionUrl=https\://services.gradle.org/distributions/gradle-9.8.2-bin.zip`
-2. `gradle/libs.versions.toml`: yukarıdaki sürümler ve `desktopKit = "2.4.0"`. En kolayı kitin kendi
+2. `gradle/libs.versions.toml`: yukarıdaki sürümler ve `desktopKit = "2.4.1"`. En kolayı kitin kendi
    `gradle/libs.versions.toml` dosyasındaki sürümleri almak.
 3. AGP 9 Kotlin'i kendisi derler (yerleşik Kotlin). Modüllerden `alias(libs.plugins.kotlin.android)`
    satırını sil, `kotlin.compose` kalsın. Kökteki `build.gradle.kts` dosyasında eklentiyi uygulamadan
@@ -325,3 +326,21 @@ Uygulamanın yapacağı bir şey yok. Değişen `DetailTransition`'ın görünü
   `NavHost`'unu kuran uygulama bunları kitten almaz.
 - **Sekmeler arası Geri (tablet ve DeX):** Geri düğmesi Navigation'ın öngörülü geçişini (yüzde 70'e küçülme) değil
   hareketsiz Geri'nin geçişini oynatır; hareketle gezinme 2.2.0'daki gibi.
+
+## 2.4.0'dan 2.4.1'e
+
+Kod değişmeden derlenir (2.4.0'a karşı derlenmiş kod da bağlanır, API aynı); sürümü `2.4.1` yapmak yeter. Kitin
+bileşenlerini olduğu gibi kullanan uygulamanın yapacağı bir şey yok. Bir düzeltme
+([CHANGELOG](CHANGELOG.md#241-2026-11-13)): dokunmatik ekranda parmak hâlâ hareket ederken bırakılan bildirim ve alt
+sayfa bırakıldığı yerde kalmaz; bildirim gider ya da yerine döner, sayfa kapanır ya da yerine döner.
+
+İki durumda uygulamanın bakacağı bir yer var:
+
+- **Kitin bildirimini ya da alt sayfasını kendi koduna kopyalayıp uyarlayan uygulama** (Nağmedar'ın bildirimleri
+  böyle) düzeltmeyi kitten almaz; aynı değişikliği kendi kopyasında yapar. Değişiklik `FingerOffset.kt` ile onu
+  kullanan yerlerdedir: `ToastCard` (`Feedback.kt`), `SheetWay` ve `SheetPull` (`Sheets.kt`).
+- **Kendi kaydırması olan uygulama:** bir `Animatable`'ı `Modifier.draggable` içinden
+  `scope.launch { snapTo(…) }` diye taşıyıp `onDragStopped` içinde `animateTo` çağıran her yerde aynı sorun
+  vardır. Üç şey gerekir: parmağın taşıdığı değeri doğrudan yazmak (bir `mutableFloatStateOf`), yalnızca bırakıştan
+  sonrasını canlandırmak ve yeni bir hareket gelince süren canlandırmayı iptal etmek (bunu önceden `Animatable`'ın
+  kilidi yapıyordu). `FingerOffset.kt` üçünü de yapar; kit içi olduğu için kopyalanır.
