@@ -5,15 +5,23 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import desktopkit.SampleFullPlayer
+import desktopkit.SampleMiniPlayer
 import desktopkit.TestShell
 import desktopkit.components.DeskIcons
+import desktopkit.components.ExpandablePlayer
+import desktopkit.components.ExpandablePlayerState
+import desktopkit.components.rememberExpandablePlayerState
 import desktopkit.theme.DesktopKitTheme
 import desktopkit.theme.InputMode
 import desktopkit.theme.ThemeMode
@@ -66,6 +74,36 @@ class PrimaryActionTest {
         compose.waitForIdle()
         compose.onNodeWithText("ekran-documents").assertExists()
         button.assertDoesNotExist()
+    }
+
+    /** Under the expanded player it is gone: not tapped, focused nor read out (found in Nağmedar 1.0.8). */
+    @Test
+    fun theExpandedPlayerTakesItAway() {
+        lateinit var player: ExpandablePlayerState
+        compose.runOnUiThread { compose.activity.actionBar?.hide() }
+        compose.setContent {
+            DesktopKitTheme(themeMode = ThemeMode.Dark, inputMode = InputMode.Touch) {
+                player = rememberExpandablePlayerState()
+                TestShell(
+                    WidthClass.Compact,
+                    bottomBar = {
+                        ExpandablePlayer(player, mini = { SampleMiniPlayer(3) }, full = { SampleFullPlayer(3) }, modifier = Modifier.testTag("mini"))
+                    },
+                ) { route, _ ->
+                    if (route == "home") ShellPrimaryAction("Yeni ileti", DeskIcons.Plus) { clicks++ }
+                    Text("ekran-$route")
+                }
+            }
+        }
+        compose.waitForIdle()
+        button.assertExists()
+        compose.onNodeWithTag("mini").performClick()
+        compose.waitForIdle()
+        assertTrue(player.isExpanded)
+        button.assertDoesNotExist()
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        compose.waitForIdle()
+        button.assertExists()
     }
 
     @Test

@@ -51,6 +51,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -289,13 +290,19 @@ fun GlassBottomSheet(
     }
     val host = LocalShellOverlayHost.current
     if (host != null) {
-        OverlayLayer(host) { SheetSurface(way, tier, title, modifier, { latestDismiss() }, content, host.systemBottomPx) }
+        // one sheet at a time: opening this one closes the one that was up, unless this one is opened from its content
+        // (a row's "⋯" in it): closing it would take this one away with its content
+        val token = remember { Any() }
+        val parent = LocalSheetToken.current
+        OverlayLayer(host) {
+            CompositionLocalProvider(LocalSheetToken provides token) {
+                SheetSurface(way, tier, title, modifier, { latestDismiss() }, content, host.systemBottomPx)
+            }
+        }
         ReturnFocusOnClose(host, visible)
         BackHandler(enabled = visible) { latestDismiss() }
-        // one sheet at a time: opening this one closes the one that was up
-        val token = remember { Any() }
         DisposableEffect(host, visible) {
-            if (visible) host.sheetOpened(token) { latestDismiss() }
+            if (visible) host.sheetOpened(token, parent) { latestDismiss() }
             onDispose { if (visible) host.sheetClosed(token) }
         }
     } else {
@@ -591,3 +598,6 @@ private class TopLeftPositionProvider(private val top: Int) : PopupPositionProvi
     override fun calculatePosition(anchorBounds: IntRect, windowSize: IntSize, layoutDirection: LayoutDirection, popupContentSize: IntSize) =
         IntOffset(0, top.coerceAtLeast(0))
 }
+
+/** The sheet whose content this is (a sheet opened from it leaves it open); null outside any. */
+private val LocalSheetToken = staticCompositionLocalOf<Any?> { null }

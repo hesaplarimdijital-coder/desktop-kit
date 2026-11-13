@@ -193,18 +193,26 @@ internal class ShellOverlayHost {
     /** The kit's text fields in the content: a tap elsewhere or a scroll closes the keyboard (touch). */
     val textFields = TextFields()
 
-    /** The sheet that is up and how to close it: a newer sheet closes it ([sheetOpened]). */
-    private var sheet: Pair<Any, () -> Unit>? = null
+    /** An open sheet, the sheet it was opened from, if any, and how to close it. */
+    private class OpenSheet(val token: Any, val parent: Any?, val dismiss: () -> Unit)
 
-    /** The sheet [token] opened: the one that was up closes. */
-    fun sheetOpened(token: Any, dismiss: () -> Unit) {
-        val previous = sheet
-        sheet = token to dismiss
-        if (previous != null && previous.first !== token) previous.second()
+    /** The sheets that are up: one, or one opened from another's content (a row's "⋯" in a sheet). */
+    private val sheets = ArrayList<OpenSheet>()
+
+    /**
+     * The sheet [token] opened from the content of the sheet [parent] (null: from the screen): every other sheet that is
+     * up closes, but not the ones it was opened from: their content holds it.
+     */
+    fun sheetOpened(token: Any, parent: Any?, dismiss: () -> Unit) {
+        val ancestors = generateSequence(parent) { p -> sheets.firstOrNull { it.token === p }?.parent }.toList()
+        val others = sheets.filter { open -> open.token !== token && ancestors.none { it === open.token } }
+        sheets.removeAll { it.token === token }
+        sheets += OpenSheet(token, parent, dismiss)
+        others.forEach { it.dismiss() }
     }
 
     fun sheetClosed(token: Any) {
-        if (sheet?.first === token) sheet = null
+        sheets.removeAll { it.token === token }
     }
 }
 
