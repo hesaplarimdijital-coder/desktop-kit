@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.shell.CompactTopBarTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-11-13T20:23:43.395Z" hostname="runnervmccnms" time="0.839">
+  <properties/>
+  <testcase name="widthClassIsProvided" classname="desktopkit.shell.CompactTopBarTest" time="0.099"/>
+  <testcase name="aPageCanShowItsBarOnTheRail" classname="desktopkit.shell.CompactTopBarTest" time="0.083"/>
+  <testcase name="aLeftScreensBarGivesWayAtOnce" classname="desktopkit.shell.CompactTopBarTest" time="0.099"/>
+  <testcase name="defaultTransitionsKeepState" classname="desktopkit.shell.CompactTopBarTest" time="0.129"/>
+  <testcase name="compactShowsBackTitleActionsAndOverflow" classname="desktopkit.shell.CompactTopBarTest" time="0.085"/>
+  <testcase name="compactSystemBackCallsOnBack" classname="desktopkit.shell.CompactTopBarTest" time="0.061"/>
+  <testcase name="expandedIsUnchanged" classname="desktopkit.shell.CompactTopBarTest" time="0.05"/>
+  <testcase name="lastComposedWinsAndLeavingRestores" classname="desktopkit.shell.CompactTopBarTest" time="0.131"/>
+  <testcase name="theSameTitleDoesNotFadeWhenTheBackButtonComes" classname="desktopkit.shell.CompactTopBarTest" time="0.071"/>
+  <testcase name="overflowKeepsPrimaryActionsInTheBar" classname="desktopkit.shell.CompactTopBarTest" time="0.028"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

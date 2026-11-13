@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.components.ProgressBarSemanticsTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-13T20:23:23.792Z" hostname="runnervmccnms" time="0.234">
+  <properties/>
+  <testcase name="theAppsNameWinsEitherWay" classname="desktopkit.components.ProgressBarSemanticsTest" time="0.083"/>
+  <testcase name="aListRowsCopyIsNotCalledLoading" classname="desktopkit.components.ProgressBarSemanticsTest" time="0.049"/>
+  <testcase name="aBarWithAnAmountSaysItsPercentageOnly" classname="desktopkit.components.ProgressBarSemanticsTest" time="0.051"/>
+  <testcase name="aBarWithoutAnAmountSaysLoading" classname="desktopkit.components.ProgressBarSemanticsTest" time="0.047"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

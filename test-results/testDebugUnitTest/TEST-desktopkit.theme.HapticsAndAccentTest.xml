@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.theme.HapticsAndAccentTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-13T20:23:54.321Z" hostname="runnervmccnms" time="0.134">
+  <properties/>
+  <testcase name="aMouseFeelsNothing" classname="desktopkit.theme.HapticsAndAccentTest" time="0.048"/>
+  <testcase name="wallpaperAccentIsOfferedAfterThePresets" classname="desktopkit.theme.HapticsAndAccentTest" time="0.039"/>
+  <testcase name="fingersFeelTheControls" classname="desktopkit.theme.HapticsAndAccentTest" time="0.045"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

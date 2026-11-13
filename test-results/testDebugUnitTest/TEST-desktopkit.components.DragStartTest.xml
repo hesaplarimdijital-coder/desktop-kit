@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.components.DragStartTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-13T20:23:14.308Z" hostname="runnervmccnms" time="0.42">
+  <properties/>
+  <testcase name="aQuickPressAndMoveStartsNoDrag" classname="desktopkit.components.DragStartTest" time="0.065"/>
+  <testcase name="aFingerHeldStillStartsTheDragWhereAsked" classname="desktopkit.components.DragStartTest" time="0.053"/>
+  <testcase name="aDraggableRowShowsTheSelectionMovingToIt" classname="desktopkit.components.DragStartTest" time="0.088"/>
+  <testcase name="aMouseHeldStillThenMovedStartsTheDrag" classname="desktopkit.components.DragStartTest" time="0.056"/>
+  <testcase name="aSlowClickStaysAClick" classname="desktopkit.components.DragStartTest" time="0.097"/>
+  <testcase name="aFingerDragsOnlyWhereAsked" classname="desktopkit.components.DragStartTest" time="0.055"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

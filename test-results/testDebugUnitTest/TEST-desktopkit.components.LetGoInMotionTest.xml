@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.components.LetGoInMotionTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-13T20:23:19.228Z" hostname="runnervmccnms" time="0.771">
+  <properties/>
+  <testcase name="onAPhoneAToastFlungAwayLeaves" classname="desktopkit.components.LetGoInMotionTest" time="0.167"/>
+  <testcase name="aSheetFlungDownOnItsListCloses" classname="desktopkit.components.LetGoInMotionTest" time="0.178"/>
+  <testcase name="widerUpAToastLetGoShortOfTheWayComesBack" classname="desktopkit.components.LetGoInMotionTest" time="0.082"/>
+  <testcase name="aSheetLetGoShortOfTheWayComesBack" classname="desktopkit.components.LetGoInMotionTest" time="0.131"/>
+  <testcase name="aSheetFlungDownByItsTitleCloses" classname="desktopkit.components.LetGoInMotionTest" time="0.134"/>
+  <testcase name="onAPhoneAToastLetGoShortOfTheWayComesBack" classname="desktopkit.components.LetGoInMotionTest" time="0.073"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

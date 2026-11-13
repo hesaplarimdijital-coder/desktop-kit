@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.shell.ReselectTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-11-13T20:23:50.806Z" hostname="runnervmccnms" time="0.063">
+  <properties/>
+  <testcase name="theCurrentTabHearsItsEntryAgain" classname="desktopkit.shell.ReselectTest" time="0.059"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

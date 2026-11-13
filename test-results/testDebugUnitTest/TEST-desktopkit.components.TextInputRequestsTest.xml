@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.components.TextInputRequestsTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-13T20:23:26.240Z" hostname="runnervmccnms" time="0.387">
+  <properties/>
+  <testcase name="separatorsMakeChipsAndAPastedListSplits" classname="desktopkit.components.TextInputRequestsTest" time="0.158"/>
+  <testcase name="aSuggestionIsTakenWithTheKeyboardOrATap" classname="desktopkit.components.TextInputRequestsTest" time="0.11"/>
+  <testcase name="aFieldTellsWhereTheCursorIsAndTakesOne" classname="desktopkit.components.TextInputRequestsTest" time="0.055"/>
+  <testcase name="backspaceInAnEmptyFieldRemovesTheLastChip" classname="desktopkit.components.TextInputRequestsTest" time="0.061"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
