@@ -620,6 +620,8 @@ private fun ShellContent(
                         val barsBottom: () -> Int = {
                             metrics.navPx + metrics.playerPx + systemBottom() - scroll.offsetPx.roundToInt().coerceIn(0, metrics.navPx)
                         }
+                        // the expanded player lies over it: not tapped nor read out there (found in Nağmedar 1.0.8)
+                        val playerOver by remember(overlayHost) { derivedStateOf { overlayHost.expandProgress() >= 1f } }
                         PhoneActionButton(
                             action = primary,
                             shown = !(imeVisible && imeTakesSpace),
@@ -627,6 +629,7 @@ private fun ShellContent(
                             metrics = metrics,
                             expandProgress = { overlayHost.expandProgress() },
                             modifier = Modifier.align(Alignment.BottomEnd).bottomInsetPadding(barsBottom),
+                            covered = playerOver,
                         )
                     } else {
                         SideEffect { metrics.actionPx = 0 }
