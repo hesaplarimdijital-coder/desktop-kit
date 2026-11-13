@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -99,6 +100,9 @@ interface GridCellScope {
     val selected: Boolean
     val selecting: Boolean
     fun openMenu()
+
+    /** Whether the cell has a menu ([DeskGrid]'s itemMenu): only then is there a "⋯" to show. */
+    val hasMenu: Boolean get() = true
 }
 
 /** Accessibility actions a cell's content adds to its cell (a cover's Play), next to the menu's. */
@@ -110,6 +114,7 @@ private class CellScope(
     override val focused: Boolean,
     override val selected: Boolean,
     override val selecting: Boolean,
+    override val hasMenu: Boolean,
     private val onOpenMenu: () -> Unit,
 ) : GridCellScope {
     override fun openMenu() = onOpenMenu()
@@ -334,7 +339,7 @@ private fun GridItem(
             },
     ) {
         CompositionLocalProvider(LocalCellActions provides cellActions) {
-            CellScope(state.hovered, state.pressed, state.focused, selected, selecting) { open(IntOffset(0, height)) }.content()
+            CellScope(state.hovered, state.pressed, state.focused, selected, selecting, hasMenu = menu != null) { open(IntOffset(0, height)) }.content()
         }
         if (menu != null) {
             key(menuState.generation) {
@@ -357,9 +362,10 @@ private fun GridItem(
  * on the title, e.g. [desktopkit.shell.detailSharedBounds] so it flies into the album's page; a
  * [desktopkit.shell.detailSharedElement] in [cover] keeps the cover's rounded corners in flight.
  *
- * TalkBack finds [onPlay] among the cell's actions ([playLabel], "Play" by default). The Play
- * button itself shows only under a mouse: from the keyboard, put Play in the grid's itemMenu too
- * (the Menu key opens it).
+ * TalkBack finds [onPlay] among the cell's actions ([playLabel], "Play" by default). Play and "⋯"
+ * show under a mouse and while the keyboard focus is on the cell (Tab reaches them then). On touch a
+ * "⋮" button at the end of the title opens the menu, so a finger has a way to it besides the long
+ * press, which not everyone finds ([showMore] false leaves it out; a grid without a menu has none).
  */
 @Composable
 fun GridCellScope.CoverCell(
@@ -379,7 +385,10 @@ fun GridCellScope.CoverCell(
     val ring = selected || focused || (hovered && pointer)
     val tier = LocalMotionTier.current
     val ringAlpha by animateFloatAsState(if (ring) 1f else 0f, DeskMotion.fade(tier, tween(DeskMotion.SHORT_MS)), label = "coverRing")
-    val overlay by animateFloatAsState(if (hovered && pointer) 1f else 0f, DeskMotion.fade(tier, tween(DeskMotion.SHORT_MS)), label = "coverOverlay")
+    // the mouse's hover, or the keyboard's focus: Play and "⋯" over the cover (a finger gets "⋮" by the title)
+    val overlay by animateFloatAsState(if ((hovered && pointer) || (focused && pointer)) 1f else 0f,
+        DeskMotion.fade(tier, tween(DeskMotion.SHORT_MS)), label = "coverOverlay")
+    val touchMore = !pointer && showMore && hasMenu && !selecting
     val play = playLabel ?: stringResource(R.string.dk_play)
     val cellActions = LocalCellActions.current
     if (onPlay != null && cellActions != null) {
@@ -439,11 +448,18 @@ fun GridCellScope.CoverCell(
             }
         }
         Spacer(Modifier.height(dimens.gapS - 4.dp))
-        Text(title, style = DeskTheme.type.label.copy(fontWeight = FontWeight.Medium), color = if (selected) colors.accentText else colors.text,
-            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 4.dp).then(titleModifier))
-        if (subtitle != null) {
-            Text(subtitle, style = DeskTheme.type.labelSmall, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 4.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(title, style = DeskTheme.type.label.copy(fontWeight = FontWeight.Medium), color = if (selected) colors.accentText else colors.text,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 4.dp).then(titleModifier))
+                if (subtitle != null) {
+                    Text(subtitle, style = DeskTheme.type.labelSmall, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 4.dp))
+                }
+            }
+            if (touchMore) {
+                DeskIconButton(DeskIcons.MoreVertical, stringResource(R.string.dk_more_options), onClick = { openMenu() }, tooltip = false)
+            }
         }
     }
 }
