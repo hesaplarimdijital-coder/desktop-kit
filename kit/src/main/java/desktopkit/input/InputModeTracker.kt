@@ -17,6 +17,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import desktopkit.theme.DensityPreference
 import desktopkit.theme.InputMode
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.key
 
 /**
  * Tracks whether the user drives the app with a mouse/touchpad (pointer density) or with
@@ -114,4 +116,26 @@ private fun isPrecisePointer(device: InputDevice?): Boolean {
     val sources = device.sources
     return (sources and InputDevice.SOURCE_MOUSE) == InputDevice.SOURCE_MOUSE ||
         (sources and InputDevice.SOURCE_TOUCHPAD) == InputDevice.SOURCE_TOUCHPAD
+}
+
+/**
+ * Whether the keyboard focus is being moved with Tab right now: [desktopkit.DesktopKitRoot] notes
+ * every key that goes down. A collection that is one Tab stop ([desktopkit.components.DenseTable])
+ * lets Tab reach only its current row and leaves the others to the arrow keys; a focus asked for in
+ * any other way (a click, the arrow keys, the app) reaches every row.
+ */
+internal object TabNavigation {
+    var active = false
+        private set
+
+    fun see(event: androidx.compose.ui.input.key.KeyEvent) {
+        if (event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown) {
+            active = event.key == androidx.compose.ui.input.key.Key.Tab
+        }
+    }
+
+    /** Forgets the last key (tests run one after another in one process). */
+    fun reset() {
+        active = false
+    }
 }
