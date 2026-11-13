@@ -32,7 +32,12 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import desktopkit.theme.DeskTheme
 
-/** Square icon button with hover, press and focus states. Its size never drops below the touch or pointer target. */
+/**
+ * Square icon button with hover, press and focus states. Its size never drops below the touch or
+ * pointer target. Its [contentDescription] is also its tooltip, shown when a mouse rests on it or
+ * the keyboard focus reaches it, with [shortcut] when there is one ([tooltip] false leaves it out:
+ * a button whose name is written next to it).
+ */
 @Composable
 fun DeskIconButton(
     icon: ImageVector,
@@ -44,6 +49,29 @@ fun DeskIconButton(
     size: Dp = DeskTheme.dimens.minTarget.coerceAtLeast(DeskTheme.dimens.controlHeight),
     iconSize: Dp = DeskTheme.dimens.icon,
     tint: Color = if (selected) DeskTheme.colors.onSelection else DeskTheme.colors.textSecondary,
+    tooltip: Boolean = true,
+    shortcut: String? = null,
+) {
+    if (tooltip) {
+        TooltipArea(contentDescription, modifier, shortcut = shortcut) {
+            IconButtonBody(icon, contentDescription, onClick, Modifier, enabled, selected, size, iconSize, tint)
+        }
+    } else {
+        IconButtonBody(icon, contentDescription, onClick, modifier, enabled, selected, size, iconSize, tint)
+    }
+}
+
+@Composable
+private fun IconButtonBody(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier,
+    enabled: Boolean,
+    selected: Boolean,
+    size: Dp,
+    iconSize: Dp,
+    tint: Color,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val state = interaction.collectState()

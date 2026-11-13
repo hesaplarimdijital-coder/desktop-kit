@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -41,31 +43,49 @@ import desktopkit.theme.DeskTheme
 import desktopkit.theme.LocalMotionTier
 import desktopkit.theme.MotionTier
 
+/** Where a tooltip appears: under its anchor (buttons, toolbars) or beside it (a collapsed sidebar's entries). */
+enum class TooltipPlacement { Below, End }
+
 /**
- * Desktop tooltip: appears after the mouse rests on [content] for [delayMillis], shows the
- * label and, when there is one, the keyboard shortcut (so menus, buttons and the shortcut list
- * agree). Touch input never opens it; long press is the context menu.
+ * Desktop tooltip: appears after the mouse rests on [content] for [delayMillis] (500 ms), or as soon
+ * as the keyboard focus reaches it ([showOnFocus]), and shows the label and, when there is one, the
+ * keyboard shortcut (so menus, buttons and the shortcut list agree). Moving on to a neighbour while
+ * one is showing, or within a second of it closing, shows the next one at once (100 ms), as on a
+ * desktop. Touch input never opens it; long press is the context menu. A press, or focus that came
+ * with a pointer's press, closes it.
  */
 @Composable
 fun TooltipArea(
     text: String,
     modifier: Modifier = Modifier,
     shortcut: String? = null,
-    delayMillis: Long = 550,
+    delayMillis: Long = TooltipTiming.DELAY_MS,
+    placement: TooltipPlacement = TooltipPlacement.Below,
+    showOnFocus: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     var hovering by remember { mutableStateOf(false) }
+    var focused by remember { mutableStateOf(false) }
     var visible by remember { mutableStateOf(false) }
-    LaunchedEffect(hovering) {
-        if (hovering) {
-            delay(delayMillis)
+    // a focus that comes with a pointer's press (a click that also focuses) is not a keyboard's
+    var pressedAt by remember { mutableStateOf(0L) }
+    LaunchedEffect(hovering, focused) {
+        if (hovering || focused) {
+            delay(TooltipTiming.delayFor(delayMillis))
+            if (!visible) TooltipTiming.opened()
             visible = true
         } else {
+            if (visible) TooltipTiming.closed()
             visible = false
         }
     }
+    DisposableEffect(Unit) { onDispose { if (visible) TooltipTiming.closed() } }
     Box(
         modifier = modifier
+            .onFocusChanged { state ->
+                val now = android.os.SystemClock.uptimeMillis()
+                focused = showOnFocus && state.hasFocus && now - pressedAt > TooltipTiming.PRESS_FOCUS_MS
+            }
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {
@@ -75,7 +95,10 @@ fun TooltipArea(
                             PointerEventType.Enter -> if (mouse) hovering = true
                             PointerEventType.Exit -> hovering = false
                             PointerEventType.Press -> {
+                                pressedAt = android.os.SystemClock.uptimeMillis()
                                 hovering = false
+                                focused = false
+                                if (visible) TooltipTiming.closed()
                                 visible = false
                             }
                             else -> Unit
@@ -86,7 +109,8 @@ fun TooltipArea(
     ) {
         content()
         if (visible) {
-            Popup(popupPositionProvider = remember { BelowAnchorPositionProvider() }) {
+            val position = remember(placement) { if (placement == TooltipPlacement.End) EndOfAnchorPositionProvider() else BelowAnchorPositionProvider() }
+            Popup(popupPositionProvider = position) {
                 val appear = remember { MutableTransitionState(false).apply { targetState = true } }
                 AnimatedVisibility(
                     visibleState = appear,
@@ -99,6 +123,42 @@ fun TooltipArea(
                 }
             }
         }
+    }
+}
+
+/** When tooltips appear: the first after a rest, the next ones at once while the user moves along a toolbar. */
+internal object TooltipTiming {
+    /** The rest before a tooltip appears. */
+    const val DELAY_MS = 500L
+
+    /** The short wait for a neighbour's tooltip, while one is up or [HANDOFF_WINDOW_MS] after it closed. */
+    const val HANDOFF_MS = 100L
+    const val HANDOFF_WINDOW_MS = 1000L
+
+    /** A focus within this long after a press came with the press. */
+    const val PRESS_FOCUS_MS = 300L
+
+    private var lastClosed = Long.MIN_VALUE / 2
+    private var open = 0
+
+    fun delayFor(rest: Long): Long {
+        val now = android.os.SystemClock.uptimeMillis()
+        return if (open > 0 || now - lastClosed < HANDOFF_WINDOW_MS) minOf(rest, HANDOFF_MS) else rest
+    }
+
+    fun opened() {
+        open++
+    }
+
+    fun closed() {
+        lastClosed = android.os.SystemClock.uptimeMillis()
+        if (open > 0) open--
+    }
+
+    /** Forgets the last tooltip (tests run one after another in one process). */
+    fun reset() {
+        lastClosed = Long.MIN_VALUE / 2
+        open = 0
     }
 }
 
@@ -118,6 +178,28 @@ internal fun TooltipBubble(text: String, shortcut: String?) {
             Spacer(Modifier.width(8.dp))
             Text(shortcut, style = DeskTheme.type.mono, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
+    }
+}
+
+/** Beside the anchor at its end, vertically centred; on the other side when there is no room. */
+internal class EndOfAnchorPositionProvider : PopupPositionProvider {
+    override fun calculatePosition(
+        anchorBounds: IntRect,
+        windowSize: IntSize,
+        layoutDirection: LayoutDirection,
+        popupContentSize: IntSize,
+    ): IntOffset {
+        val gap = 8
+        val ltr = layoutDirection == LayoutDirection.Ltr
+        var x = if (ltr) anchorBounds.right + gap else anchorBounds.left - gap - popupContentSize.width
+        if (x < 0 || x + popupContentSize.width > windowSize.width) {
+            x = if (ltr) anchorBounds.left - gap - popupContentSize.width else anchorBounds.right + gap
+        }
+        val y = anchorBounds.top + (anchorBounds.height - popupContentSize.height) / 2
+        return IntOffset(
+            x.coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0)),
+            y.coerceIn(0, (windowSize.height - popupContentSize.height).coerceAtLeast(0)),
+        )
     }
 }
 

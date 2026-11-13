@@ -76,6 +76,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import desktopkit.R
 import desktopkit.components.DeskIconButton
+import desktopkit.components.TooltipArea
+import desktopkit.components.TooltipPlacement
 import desktopkit.components.DeskDragPayload
 import desktopkit.components.DeskIcons
 import desktopkit.components.dropZone
@@ -493,42 +495,46 @@ private fun SidebarItem(item: NavItem, selected: Boolean, collapsed: Boolean, ba
     // the icon's mark only while the sidebar is collapsed: open, the entry's text badge says it
     val shownIconBadge = if (collapsed) iconBadge else null
     val iconBadgeText = shownIconBadge?.let { badgeDescription(it) }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = dimens.navItemHeight.coerceAtLeast(dimens.minTarget))
-            .padding(vertical = 1.dp)
-            .navDropZone(navDrop, item.route, shape)
-            .focusRing(state, shape)
-            .background(indicator, shape)
-            .semantics {
-                this.selected = selected
-                if (collapsed) contentDescription = if (iconBadgeText != null) "${item.label}, $iconBadgeText" else item.label
+    val row = @Composable {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = dimens.navItemHeight.coerceAtLeast(dimens.minTarget))
+                .padding(vertical = 1.dp)
+                .navDropZone(navDrop, item.route, shape)
+                .focusRing(state, shape)
+                .background(indicator, shape)
+                .semantics {
+                    this.selected = selected
+                    if (collapsed) contentDescription = if (iconBadgeText != null) "${item.label}, $iconBadgeText" else item.label
+                }
+                .deskClickable(interaction, onClick, role = Role.Tab)
+                .padding(start = lerp(collapsedStart, 10.dp, open), end = if (showLabel) 10.dp else 0.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Start,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(item.icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(dimens.icon))
+                IconBadge(shownIconBadge, dimens.icon, ring = colors.chrome)
             }
-            .deskClickable(interaction, onClick, role = Role.Tab)
-            .padding(start = lerp(collapsedStart, 10.dp, open), end = if (showLabel) 10.dp else 0.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Start,
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(item.icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(dimens.icon))
-            IconBadge(shownIconBadge, dimens.icon, ring = colors.chrome)
-        }
-        if (showLabel) {
-            Spacer(Modifier.width(10.dp))
-            Row(Modifier.weight(1f).alpha(labelAlpha(open)), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = item.label,
-                    style = if (selected) DeskTheme.type.bodyStrong else DeskTheme.type.body,
-                    color = labelColor,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                if (badge != null) Text(badge, style = DeskTheme.type.caption, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (showLabel) {
+                Spacer(Modifier.width(10.dp))
+                Row(Modifier.weight(1f).alpha(labelAlpha(open)), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = item.label,
+                        style = if (selected) DeskTheme.type.bodyStrong else DeskTheme.type.body,
+                        color = labelColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (badge != null) Text(badge, style = DeskTheme.type.caption, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
         }
     }
+    // collapsed, the entry is a bare icon: its name shows beside it (mouse rest, keyboard focus)
+    if (collapsed) TooltipArea(item.label, placement = TooltipPlacement.End) { row() } else row()
 }
 
 // ---------------------------------------------------------------- top bars
