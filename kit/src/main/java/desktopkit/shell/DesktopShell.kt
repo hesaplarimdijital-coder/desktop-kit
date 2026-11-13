@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.widthIn
@@ -64,6 +65,7 @@ import androidx.navigation.get
 import desktopkit.LocalRootInsets
 import desktopkit.components.ActionGroup
 import desktopkit.components.ActionGroupList
+import desktopkit.components.DeskButton
 import desktopkit.components.ToastState
 import desktopkit.components.ToastHost
 import desktopkit.components.GlassBottomSheet
@@ -360,6 +362,8 @@ private fun ShellContent(
     val predictiveExit: AnimatedContentTransitionScope<NavBackStackEntry>.(Int) -> ExitTransition =
         remember { { edge -> shellPredictiveExit(currentTransitions, currentKind, currentTier, edge) ?: NavigationPredictiveExit } }
     val topBarHost = remember { CompactTopBarHost() }
+    val primaryHost = remember { PrimaryActionHost() }
+    val primary = primaryHost.current
     val scroll = remember { ShellScrollState() }
     val metrics = remember { ShellChromeMetrics() }
     val overlayHost = remember { ShellOverlayHost() }
@@ -480,6 +484,7 @@ private fun ShellContent(
         LocalShellContentPadding provides padding,
         LocalShellBottomGlass provides sharedGlass,
         LocalShellReselect provides reselect,
+        LocalPrimaryActionHost provides primaryHost,
     ) {
         ShellLayout(
             navKind = navKind,
@@ -529,7 +534,10 @@ private fun ShellContent(
                                 .graphicsLayer { translationY = overlayHost.expandProgress() * size.height },
                         )
                     }
-                    NavKind.Rail -> NavRail(spec, currentRoute, go, brand = brand, navDrop = navDrop, iconBadges = iconBadges, navMenu = navMenu)
+                    NavKind.Rail -> NavRail(
+                        spec, currentRoute, go, brand = brand, navDrop = navDrop, iconBadges = iconBadges, navMenu = navMenu,
+                        action = primary?.let { action -> { PrimaryActionButton(action, extended = false, height = 48.dp) } },
+                    )
                     NavKind.Sidebar -> Sidebar(
                         spec = spec,
                         currentRoute = currentRoute,
@@ -540,6 +548,15 @@ private fun ShellContent(
                         navDrop = navDrop,
                         iconBadges = iconBadges,
                         navMenu = navMenu,
+                        action = primary?.let { action ->
+                            { collapsed ->
+                                if (collapsed) {
+                                    PrimaryActionButton(action, extended = false, height = 40.dp)
+                                } else {
+                                    DeskButton(action.label, action.onClick, Modifier.fillMaxWidth(), icon = action.icon, primary = true)
+                                }
+                            }
+                        },
                     )
                 }
             },
@@ -581,13 +598,29 @@ private fun ShellContent(
             },
             overlay = {
                 Box(Modifier.fillMaxSize().onGloballyPositioned { overlayHost.coordinates = it }) {
-                    // toasts sit above the bars and the player, under sheets and the expanded player
+                    // the phone's floating action button (ShellPrimaryAction), above the bars and the player and with them
+                    if (navKind == NavKind.BottomBar) {
+                        val barsBottom: () -> Int = {
+                            metrics.navPx + metrics.playerPx + systemBottom() - scroll.offsetPx.roundToInt().coerceIn(0, metrics.navPx)
+                        }
+                        PhoneActionButton(
+                            action = primary,
+                            shown = !(imeVisible && imeTakesSpace),
+                            extended = !scroll.scrolled,
+                            metrics = metrics,
+                            expandProgress = { overlayHost.expandProgress() },
+                            modifier = Modifier.align(Alignment.BottomEnd).bottomInsetPadding(barsBottom),
+                        )
+                    } else {
+                        SideEffect { metrics.actionPx = 0 }
+                    }
+                    // toasts sit above the bars, the player and the action button, under sheets and the expanded player
                     if (toasts != null) {
                         val toastBottom: () -> Int = {
                             val system = systemBottom()
                             when {
                                 navKind == NavKind.BottomBar ->
-                                    metrics.navPx + metrics.playerPx + system - scroll.offsetPx.roundToInt().coerceIn(0, metrics.navPx)
+                                    metrics.navPx + metrics.playerPx + metrics.actionPx + system - scroll.offsetPx.roundToInt().coerceIn(0, metrics.navPx)
                                 floating -> metrics.playerPx + metrics.floatingMarginPx + system
                                 else -> metrics.playerPx + system
                             }
