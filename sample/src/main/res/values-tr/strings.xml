@@ -7,11 +7,13 @@
     <string name="action_refresh">Yenile</string>
     <string name="not_in_sample">“%1$s” örnek uygulamada yok</string>
     <string name="files_title">Dosyalar</string>
+    <string name="files_pick">Burada görmek için bir dosya seçin</string>
     <string name="action_select">Seç</string>
     <string name="action_done">Bitti</string>
     <string name="view_grid">Izgara</string>
     <string name="view_list">Liste</string>
     <string name="filter_files">Dosyalarda süz</string>
+    <string name="inspector_title">Ayrıntılar</string>
     <string name="tab_tags">Etiketler</string>
     <string name="tab_signal">Sinyal yolu</string>
     <string name="tab_lyrics">Şarkı sözü</string>

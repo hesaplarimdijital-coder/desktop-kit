@@ -7,11 +7,13 @@
     <string name="action_refresh">Refresh</string>
     <string name="not_in_sample">“%1$s” is not part of the sample</string>
     <string name="files_title">Files</string>
+    <string name="files_pick">Choose a file to see it here</string>
     <string name="action_select">Select</string>
     <string name="action_done">Done</string>
     <string name="view_grid">Grid</string>
     <string name="view_list">List</string>
     <string name="filter_files">Filter files</string>
+    <string name="inspector_title">Details</string>
     <string name="tab_tags">Tags</string>
     <string name="tab_signal">Signal path</string>
     <string name="tab_lyrics">Lyrics</string>
