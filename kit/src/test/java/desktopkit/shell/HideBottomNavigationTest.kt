@@ -94,7 +94,8 @@ class HideBottomNavigationTest {
         val strip = compose.onNodeWithText("Kopyalanıyor: Yedek.zip").getBoundsInRoot()
         val save = compose.onNodeWithTag("save").getBoundsInRoot()
         val root = compose.onRoot().getBoundsInRoot()
-        near(root.bottom, strip.bottom, "the strip sits at the bottom")
+        // the strip's text lies inside its 48 dp, with no 65 dp bar under it
+        assertTrue("the strip sits at the bottom: ${strip.bottom} of ${root.bottom}", root.bottom - strip.bottom < 24.dp)
 
         // scrolling moves nothing but the form: no bar slides in or out under its buttons
         compose.onNodeWithTag("form").performTouchInput { swipeUp(startY = bottom - 100f, endY = top + 100f, durationMillis = 600) }
