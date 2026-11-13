@@ -331,6 +331,8 @@ fun <T> DenseTable(
     Box(
         modifier
             .fillMaxSize()
+            // before the frame: a press on the scrollbar is the scrollbar's
+            .verticalScrollbar(state)
             .then(
                 if (!multi) Modifier else Modifier
                     .pointerInput(Unit) {
@@ -352,7 +354,7 @@ fun <T> DenseTable(
                     .pointerInput(Unit) {
                         awaitEachGesture {
                             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                            if (down.type != PointerType.Mouse || !currentEvent.buttons.isPrimaryPressed) return@awaitEachGesture
+                            if (down.type != PointerType.Mouse || !currentEvent.buttons.isPrimaryPressed || down.isConsumed) return@awaitEachGesture
                             if (!latestMulti || down.position.y < headerPx.intValue) return@awaitEachGesture
                             val startIndex = indexAt(down.position.y)
                             val startKey = keysRef.value.getOrNull(startIndex)

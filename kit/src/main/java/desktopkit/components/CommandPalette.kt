@@ -589,6 +589,7 @@ private fun PalettePanel(
         LazyColumn(
             state = listState,
             modifier = (if (compact) Modifier.weight(1f) else Modifier.heightIn(max = 440.dp)).fillMaxWidth()
+                .verticalScrollbar(listState)
                 // 2.5.0: the row under the pointer is chosen here, for the whole list, by where the pointer is in it (each row
                 // chose itself when the pointer came over it, also when the list brought it there under a resting pointer)
                 .pointerInput(Unit) {
