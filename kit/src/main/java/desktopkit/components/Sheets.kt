@@ -473,7 +473,8 @@ private fun SheetSurface(
                 Text(title, style = DeskTheme.type.title, color = colors.text, maxLines = 2, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(horizontal = dimens.gapL + 4.dp, vertical = dimens.gapS))
             }
-            Column(Modifier.nestedScroll(pull).verticalScroll(rememberScrollState()), content = content)
+            val scroll = rememberScrollState()
+            Column(Modifier.nestedScroll(pull).verticalScrollbar(scroll).verticalScroll(scroll), content = content)
         }
     }
 }

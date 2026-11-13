@@ -209,6 +209,8 @@ private class DragSourceNode(
     private suspend fun PointerInputScope.awaitHold() {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            // a press something around took (a scrollbar) is not a drag
+            if (down.isConsumed) return@awaitEachGesture
             val precise = down.type == PointerType.Mouse || down.type == PointerType.Stylus || down.type == PointerType.Eraser
             // a finger only where asked; a mouse only with its main button, nothing with the button
             // that opens menus
