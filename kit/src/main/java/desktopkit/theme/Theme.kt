@@ -155,6 +155,8 @@ fun lerpColors(a: DeskColors, b: DeskColors, t: Float): DeskColors = if (t >= 1f
     brandSecondary = lerp(a.brandSecondary, b.brandSecondary, t),
     scrim = lerp(a.scrim, b.scrim, t),
     controlBorder = lerp(a.controlBorder, b.controlBorder, t),
+    overlayScrim = lerp(a.overlayScrim, b.overlayScrim, t),
+    onOverlay = lerp(a.onOverlay, b.onOverlay, t),
 )
 
 private fun DeskColors.toMaterialScheme(): ColorScheme = if (isDark) darkColorScheme(

@@ -66,6 +66,7 @@
     <string name="dk_number_increase">Increase</string>
     <string name="dk_notification">Notification</string>
     <string name="dk_selection_clear">Clear selection</string>
+    <string name="dk_select_all">Select all</string>
     <string name="dk_tab_close">Close tab</string>
     <string name="dk_tabs">Tabs</string>
     <string name="dk_loading">Loading</string>
