@@ -66,6 +66,7 @@
     <string name="dk_number_increase">Artır</string>
     <string name="dk_notification">Bildirim</string>
     <string name="dk_selection_clear">Seçimi kaldır</string>
+    <string name="dk_select_all">Tümünü seç</string>
     <string name="dk_tab_close">Sekmeyi kapat</string>
     <string name="dk_tabs">Sekmeler</string>
     <string name="dk_loading">Yükleniyor</string>

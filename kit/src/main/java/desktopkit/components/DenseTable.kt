@@ -1,5 +1,8 @@
 package desktopkit.components
 
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.State
@@ -28,6 +31,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.state.ToggleableState
+import androidx.compose.ui.unit.LayoutDirection
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import desktopkit.input.TabNavigation
@@ -235,7 +240,11 @@ fun <T> DenseTable(
     val glassMode = DeskGlass.mode
     val rowsGlass = remember { HazeState() }
     // the rows start under the header; its height is known after the first layout
-    val headerPx = remember { mutableIntStateOf(with(density) { (dimens.minTarget.coerceAtLeast(28.dp) + 1.dp).roundToPx() }) }
+    val headerPx = remember { mutableIntStateOf(with(density) { (dimens.rowHeight.coerceAtLeast(dimens.minTarget) + 1.dp).roundToPx() }) }
+    // the select mode (toggleOnClick) shows a check box on every row and one for them all in the header
+    val checks = onSelectionChange != null && toggleOnClick
+    val checkWidth = if (DeskTheme.inputMode == InputMode.Touch) 48.dp else 32.dp
+    val selectAllLabel = stringResource(R.string.dk_select_all)
     val padding = remember(contentPadding, density) { HeaderPadding(contentPadding, headerPx, density) }
     val scrolled by remember(state) { derivedStateOf { state.firstVisibleItemIndex > 0 || state.firstVisibleItemScrollOffset > 0 } }
     val chooserLabels = ColumnChooserLabels(
@@ -538,6 +547,7 @@ fun <T> DenseTable(
                         item = item,
                         selected = itemKey in selection || (selectedKey != null && itemKey == selectedKey),
                         emphasized = rowEmphasis?.invoke(item) == true,
+                        checkWidth = if (checks) checkWidth else null,
                         onClick = onClick,
                         modifier = Modifier
                             .focusRequester(requester)
@@ -579,10 +589,26 @@ fun <T> DenseTable(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = dimens.minTarget.coerceAtLeast(28.dp))
+                    // as tall as a row: the header reads as the first line of the table
+                    .heightIn(min = dimens.rowHeight.coerceAtLeast(dimens.minTarget))
                     .padding(horizontal = dimens.pagePadding - 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                if (checks) {
+                    val all = rows.isNotEmpty() && rows.all { key(it) in selection }
+                    val checkState = when {
+                        all -> ToggleableState.On
+                        selection.isEmpty() -> ToggleableState.Off
+                        else -> ToggleableState.Indeterminate
+                    }
+                    Box(Modifier.width(checkWidth), contentAlignment = Alignment.Center) {
+                        DeskCheckbox(
+                            state = checkState,
+                            onClick = { update(if (all) TableSelection.clear() else TableSelection.all(rows.map(key), tracker.anchor)) },
+                            modifier = Modifier.semantics { contentDescription = selectAllLabel },
+                        )
+                    }
+                }
                 shownColumns.forEach { (index, column) ->
                     if (columnsState != null) {
                         ContextMenuArea(
@@ -815,6 +841,7 @@ private fun <T> TableRow(
     onClick: () -> Unit,
     modifier: Modifier,
     emphasized: Boolean = false,
+    checkWidth: Dp? = null,
 ) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
@@ -822,6 +849,7 @@ private fun <T> TableRow(
     val state = interaction.collectState()
     val shape = RoundedCornerShape(dimens.radiusControl)
     val background by animatedStateBackground(state, selected)
+    val marker = colors.accent
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -829,11 +857,23 @@ private fun <T> TableRow(
             .heightIn(min = dimens.rowHeight.coerceAtLeast(dimens.minTarget))
             .focusRing(state, shape)
             .background(background, shape)
+            // a selected row is marked by a bar at its start as well as by its colour
+            .drawBehind {
+                if (selected) {
+                    val bar = 4.dp.toPx()
+                    val inset = (size.height / 4).coerceAtMost(8.dp.toPx())
+                    val x = if (layoutDirection == LayoutDirection.Rtl) size.width - bar else 0f
+                    drawRoundRect(marker, Offset(x, inset), Size(bar, size.height - 2 * inset), CornerRadius(bar / 2))
+                }
+            }
             .semantics { this.selected = selected }
             .deskClickable(interaction, onClick)
             .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (checkWidth != null) {
+            Box(Modifier.width(checkWidth), contentAlignment = Alignment.Center) { DeskCheckbox(selected, onCheckedChange = null) }
+        }
         columns.forEach { (index, column) ->
             val cellClick = column.onCellClick
             Box(

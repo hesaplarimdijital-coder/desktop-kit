@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import desktopkit.theme.DeskMotion
+import desktopkit.theme.DeskPalette
 import desktopkit.theme.DeskTheme
 import desktopkit.theme.LocalMotionTier
 import desktopkit.theme.rememberDeskHaptics
@@ -118,7 +119,7 @@ fun <T> SwatchChoice(options: List<Triple<T, Color, String>>, selected: T, onSel
                         .border(if (isSelected) 2.dp else 1.dp, if (isSelected) colors.text else colors.borderStrong, CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
-                    if (isSelected) Icon(DeskIcons.Check, contentDescription = null, tint = Color(0xFF0E1420), modifier = Modifier.size(14.dp))
+                    if (isSelected) Icon(DeskIcons.Check, contentDescription = null, tint = DeskPalette.onSwatch, modifier = Modifier.size(14.dp))
                 }
             }
         }

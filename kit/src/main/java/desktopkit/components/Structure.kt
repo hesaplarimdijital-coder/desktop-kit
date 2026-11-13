@@ -599,11 +599,12 @@ fun DeskTab(
         if (busy) Box(Modifier.size(6.dp).background(colors.accentText, CircleShape))
         CountBadge(badge)
         if (onClose != null) {
-            Box(Modifier.size(if (touch) 32.dp else 24.dp), contentAlignment = Alignment.Center) {
+            // a finger's target is 48 dp (it was 32)
+            Box(Modifier.size(if (touch) 48.dp else 24.dp), contentAlignment = Alignment.Center) {
                 if (showClose) {
                     // a tab's close button is a Tab stop with its tab only
                     Box(Modifier.focusProperties { canFocus = tabStop() }) {
-                        DeskIconButton(DeskIcons.Close, closeLabel, onClose, size = if (touch) 32.dp else 24.dp, iconSize = if (touch) 16.dp else 12.dp)
+                        DeskIconButton(DeskIcons.Close, closeLabel, onClose, size = if (touch) 48.dp else 24.dp, iconSize = if (touch) 16.dp else 12.dp)
                     }
                 }
             }
