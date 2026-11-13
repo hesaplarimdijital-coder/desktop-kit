@@ -414,9 +414,18 @@ modül) yeniden derlenmelidir: bazı bileşenlerin parametre listesi uzadı. Ne 
   üst öğesi (`parent`) ya da hiçbiri. `bottomBar`/`rail` listesinde, o gezinmede gösterilmeyen bir rota hata verir.
 - **`NavRail`, `Sidebar`, `BottomNavBar`, `PageTopBar`:** sonlarına `navMenu`, `action` ve `menus` parametreleri geldi.
   Ray düzeninin üst çubuğunda menüler varsa "≡" görünür.
-- **Klavye (görünür):** tablo, kapak ızgarası ve sekme şeridi Tab'ın tek durağıdır; içlerinde oklar gezer. Her satırı,
-  kapağı ya da sekmeyi Tab'la dolaşan bir test ya da kullanıcı alışkanlığı varsa değişir. Açık alt sayfa odağı tutar.
-  Bu, `DesktopKitRoot` içinde geçerli; kökü kullanmayan uygulamada her öğe eskisi gibi durak.
+- **`DesktopShell`:** yeni parametreler (`navMenu`, `heightClass`, `iconBadges`) listenin sonunda, `content`'in önünde;
+  parametreleri sırasıyla veren çağrılar aynen derlenir.
+- **İpuçları (görünür):** `DeskIconButton` kendi ipucunu gösterir (imleç durunca ve klavye odağında; `shortcut` ile
+  kısayolu da). Simge düğmesini `TooltipArea` ile saran uygulama sarmalayıcıyı kaldırıp kısayolu düğmeye verebilir
+  (`DeskIconButton(…, shortcut = "Space")`); kalırsa düğme ikinci bir ipucu açmaz. İpucu istemeyen düğme
+  `tooltip = false` alır. `TooltipArea`'ya `placement`, `showOnFocus` ve `enabled` eklendi.
+- **Klavye (görünür):** tablo, kapak ızgarası ve sekme şeridi Tab'ın tek durağıdır; içlerinde oklar gezer, Tab ve
+  Shift+Tab hemen dışarı çıkar. Satırın yıldız gibi hücre düğmeleri ve kapağın Oynat'ı ile "⋯"'si Tab durağı değil
+  (fareyle ve parmakla kalırlar). Tablonun sıralanabilir başlıkları Tab sırasında satırlardan önce gelir
+  (eskiden sonra). Her satırı, kapağı ya da sekmeyi Tab'la dolaşan bir test ya da kullanıcı alışkanlığı varsa değişir.
+  Açık alt sayfa odağı Tab'da da Shift+Tab'da da tutar, kapanınca odak eski yerine döner. Bu, `DesktopKitRoot` içinde
+  geçerli; kökü kullanmayan uygulamada her öğe eskisi gibi durak.
 - **Renkler (görünür):** `DeskColors`'a `controlBorder`, `overlayScrim`, `onOverlay` eklendi (varsayılanlı, sonda);
   kendi paletini elle kuran uygulama `controlBorder`'ı 3:1 verecek biçimde doldurmalı. Kitin paletlerinde basılı ton
   koyulaştı, açık temada üzerine gelme belirginleşti; metin alanlarının kenarı belirgin. Devre dışı `DeskButton` artık

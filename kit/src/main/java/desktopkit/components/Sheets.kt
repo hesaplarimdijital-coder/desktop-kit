@@ -9,6 +9,7 @@ import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -279,6 +280,7 @@ fun GlassBottomSheet(
             progress.animateTo(0f, sheetWay(tier, tween(DeskMotion.MEDIUM_MS, easing = DeskMotion.EmphasizedAccelerate)))
         }
     }
+    way.open = visible
     val showing = visible || progress.value > 0f || progress.isRunning
     if (!showing) return
     val latestDismiss by rememberUpdatedState(onDismiss)
@@ -328,6 +330,9 @@ private class SheetWay {
 
     /** Set when a pull or fling carried the sheet out: the dismiss that follows has nothing left to animate. */
     var carriedOut = false
+
+    /** Whether the sheet is meant to be up (not on its way out); read when the focus moves. */
+    var open = false
 }
 
 /**
@@ -431,8 +436,11 @@ private fun SheetSurface(
                     if (esc) onDismiss()
                     esc
                 }
-                // the keyboard's focus stays in the sheet while it is up: Tab does not reach the screen behind
-                .focusProperties { onExit = { cancelFocusChange() } }
+                // the keyboard's focus stays in the sheet while it is up: Tab and Shift+Tab do not reach the screen behind.
+                // On a group around the sheet's own focus target, so a move from the sheet itself is held as well as one
+                // from a control in it; not once it is closing, when the focus goes back where it was (ReturnFocusOnClose)
+                .focusProperties { onExit = { if (way.open) cancelFocusChange() } }
+                .focusGroup()
                 .focusRequester(focus)
                 .focusable()
                 // a finger or a mouse button is down: only then may a scroll at the list's top pull

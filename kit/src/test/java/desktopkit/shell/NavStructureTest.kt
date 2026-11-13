@@ -120,6 +120,7 @@ class NavStructureTest {
 
     private var spec by mutableStateOf(mail())
     private var widthClass by mutableStateOf(WidthClass.Compact)
+    private var sidebarCollapsed by mutableStateOf(false)
     private lateinit var navigator: ShellNavigator
     private lateinit var navController: NavHostController
     private val menuOpened = mutableListOf<String>()
@@ -132,6 +133,7 @@ class NavStructureTest {
                     spec = spec,
                     widthClass = widthClass,
                     navController = navController,
+                    sidebarCollapsed = sidebarCollapsed,
                     transitions = ShellTransitions.None,
                     navMenu = { route ->
                         if (route == "sent") listOf(MenuEntry.Item("Tümünü okundu say", { menuOpened += route })) else emptyList()
@@ -171,7 +173,7 @@ class NavStructureTest {
     }
 
     @Test
-    fun aFolderThatIsGoneSendsItsScreenToTheStart() {
+    fun aFolderThatIsGoneTakesItsScreenAway() {
         widthClass = WidthClass.Large
         shell()
         compose.onNodeWithText("Taslaklar").performClick()
@@ -179,8 +181,38 @@ class NavStructureTest {
         compose.onNodeWithText("ekran drafts: 0").assertExists()
         spec = mail(drafts = false)
         compose.waitForIdle()
+        // the screen it was opened over comes back; the folder is in no chrome any more
         compose.onNodeWithText("ekran inbox: 0").assertExists()
-        assertTrue(navController.graph.findNode("drafts") == null)
+        compose.onNodeWithText("ekran drafts: 0").assertDoesNotExist()
+        compose.onNodeWithText("Taslaklar").assertDoesNotExist()
+    }
+
+    /**
+     * The review's crash: a folder opened from the Folders screen is saved with the Folders tab when another tab is
+     * chosen; the folder goes; the Folders tab comes back without it (it used to throw "Restore State failed").
+     */
+    @Test
+    fun aGoneFolderInASavedBackStackIsLeftOut() {
+        shell()
+        compose.onNodeWithText("Klasörler").performClick()
+        compose.waitForIdle()
+        compose.runOnUiThread { navigator.open("drafts") }
+        compose.waitForIdle()
+        compose.onNodeWithText("ekran drafts: 0").assertExists()
+        entry("Gelen").performClick()
+        compose.waitForIdle()
+        spec = mail(drafts = false)
+        compose.waitForIdle()
+        entry("Klasörler").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("ekran folders: 0").assertExists()
+        compose.onNodeWithText("ekran drafts: 0").assertDoesNotExist()
+        // and a folder that comes back is a screen again
+        spec = mail(drafts = true)
+        compose.waitForIdle()
+        compose.runOnUiThread { navigator.open("drafts") }
+        compose.waitForIdle()
+        compose.onNodeWithText("ekran drafts: 0").assertExists()
     }
 
     @Test
@@ -226,6 +258,23 @@ class NavStructureTest {
         val projects = compose.onNodeWithText("Projeler", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.left
         val year = compose.onNodeWithText("2026", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.left
         assertTrue("2026 sits under Projeler: $year > $projects", year > projects)
+    }
+
+    @Test
+    fun aShutAccountsFoldersShowOnTheCollapsedSidebar() {
+        widthClass = WidthClass.Large
+        shell()
+        compose.onNode(hasText("ayse@ornek.org") and hasClickAction()).performSemanticsAction(SemanticsActions.Collapse)
+        compose.waitForIdle()
+        entry("Projeler").assertDoesNotExist()
+        // collapsed, the sidebar has no header to open the account with: its folders are there, as icons
+        sidebarCollapsed = true
+        compose.waitForIdle()
+        entry("Projeler").assertExists()
+        // open again, the account is as the user left it
+        sidebarCollapsed = false
+        compose.waitForIdle()
+        entry("Projeler").assertDoesNotExist()
     }
 
     @Test

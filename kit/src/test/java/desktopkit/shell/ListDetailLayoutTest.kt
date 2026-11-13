@@ -3,6 +3,7 @@ package desktopkit.shell
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -17,6 +18,8 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import desktopkit.theme.DesktopKitTheme
 import desktopkit.theme.InputMode
@@ -45,7 +48,7 @@ class ListDetailLayoutTest {
     private var widthClass by mutableStateOf(WidthClass.Expanded)
     private var chosen by mutableStateOf<String?>(null)
 
-    private fun screen() {
+    private fun screen(width: Dp? = null) {
         compose.setContent {
             DesktopKitTheme(themeMode = ThemeMode.Dark, inputMode = InputMode.Pointer) {
                 val tier = if (widthClass == WidthClass.Compact) MotionTier.Gesture else MotionTier.Timed
@@ -53,8 +56,12 @@ class ListDetailLayoutTest {
                     ListDetailLayout(
                         detail = chosen,
                         onBack = { chosen = null },
+                        modifier = if (width == null) Modifier else Modifier.width(width),
                         list = {
                             Column {
+                                // the list's own state (a scroll position, a typed filter)
+                                var taps by rememberSaveable { mutableIntStateOf(0) }
+                                Text("liste: $taps", Modifier.testTag("list").clickable { taps++ })
                                 listOf("Gelen", "Gönderilmiş").forEach { name ->
                                     Text("satır $name", Modifier.clickable { chosen = name })
                                 }
@@ -102,5 +109,40 @@ class ListDetailLayoutTest {
         compose.waitForIdle()
         compose.onNodeWithTag("detail").assertTextEquals("ayrıntı Gelen: 2")
         compose.onNodeWithText("satır Gönderilmiş").assertDoesNotExist()
+    }
+
+    @Test
+    fun theListKeepsItsStateWhileItIsOutOfSight() {
+        screen()
+        repeat(3) { compose.onNodeWithTag("list").performClick() }
+        compose.onNodeWithText("satır Gelen").performClick()
+        compose.waitForIdle()
+        // the window narrows with the detail open: the detail alone, the list out of the composition
+        widthClass = WidthClass.Compact
+        compose.waitForIdle()
+        compose.onNodeWithTag("list").assertDoesNotExist()
+        // it widens again: the list is back as it was
+        widthClass = WidthClass.Expanded
+        compose.waitForIdle()
+        compose.onNodeWithTag("list").assertTextEquals("liste: 3")
+        // narrow again, and Back to the list
+        widthClass = WidthClass.Compact
+        compose.waitForIdle()
+        chosen = null
+        compose.waitForIdle()
+        compose.onNodeWithTag("list").assertTextEquals("liste: 3")
+    }
+
+    @Test
+    fun aWideWindowWithoutRoomForBothShowsOneAtATime() {
+        // an Expanded window, but the layout has 500 dp of it (beside an inspector): less than the two panes' least widths
+        chosen = "Gelen"
+        screen(width = 500.dp)
+        compose.onNodeWithTag("detail").assertTextEquals("ayrıntı Gelen: 0")
+        compose.onNodeWithText("satır Gönderilmiş").assertDoesNotExist()
+        chosen = null
+        compose.waitForIdle()
+        compose.onNodeWithText("satır Gönderilmiş").assertExists()
+        compose.onNodeWithText("Bir ileti seç").assertDoesNotExist()
     }
 }

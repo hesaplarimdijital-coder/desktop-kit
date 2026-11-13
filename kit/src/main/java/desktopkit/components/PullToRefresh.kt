@@ -8,6 +8,7 @@ import androidx.compose.animation.core.withInfiniteAnimationFrameNanos
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
@@ -21,6 +22,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
@@ -30,18 +32,21 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import desktopkit.R
 import desktopkit.shell.LocalShellContentPadding
-import desktopkit.shell.LocalShellScreen
+import desktopkit.shell.LocalShellOverlayHost
 import desktopkit.theme.DeskGlass
 import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
@@ -60,8 +65,10 @@ import desktopkit.theme.rememberDeskHaptics
  * list with it: a `LazyColumn`, a [DenseTable], a [DeskGrid].
  *
  * A mouse, a touchpad and the keyboard leave it alone ([enabled] is for touch by default): they have the
- * app's "Sync" button and its key (F5). Inside a [desktopkit.shell.DesktopShell] the disc stops under
- * the phone's glass top bar, where the list lies under it.
+ * app's "Sync" button and its key (F5). Inside a [desktopkit.shell.DesktopShell] the disc comes out
+ * under the phone's glass top bar where the list lies beneath it, else at the list's own top (a
+ * field or tabs above the list); nothing of it shows above the list. With reduced motion it jumps
+ * to its place and back.
  */
 @Composable
 fun PullToRefresh(
@@ -86,15 +93,22 @@ fun PullToRefresh(
         )
     }
     pull.enabled = enabled
+    pull.tier = LocalMotionTier.current
     // down by itself while refreshing, up once done
     LaunchedEffect(refreshing, pull) { pull.settle() }
-    // under the phone's top bar where the screen lays its list out beneath it; the shell pads the others itself
-    val screen = LocalShellScreen.current
+    // Where the disc comes out: under the phone's top bar when the list lies beneath it, else at the list's own top
+    // (the shell pads the screen, or the screen put a field or tabs above the list). The bar covers the shell's top
+    // padding, counted from the top of the shell's overlay.
+    val overlay = LocalShellOverlayHost.current
     val shellPadding = LocalShellContentPadding.current
-    val top: () -> Dp = { if (screen != null && screen.handlers > 0) shellPadding.calculateTopPadding() else 0.dp }
-    Box(modifier.nestedScroll(pull)) {
+    val boxTop = remember { mutableFloatStateOf(0f) }
+    val top: Density.() -> Float = {
+        val shellTop = overlay?.coordinates?.takeIf { it.isAttached }?.positionInRoot()?.y ?: boxTop.floatValue
+        (shellPadding.calculateTopPadding().toPx() - (boxTop.floatValue - shellTop)).coerceAtLeast(0f)
+    }
+    Box(modifier.nestedScroll(pull).onGloballyPositioned { boxTop.floatValue = it.positionInRoot().y }) {
         content()
-        RefreshDisc(pull, refreshing, Modifier.align(Alignment.TopCenter), top)
+        RefreshDisc(pull, refreshing, top)
     }
 }
 
@@ -116,6 +130,9 @@ private class PullState(
     val onArmed: () -> Unit,
 ) : NestedScrollConnection {
     var enabled = true
+
+    /** With reduced motion the disc jumps to its place instead of sliding there. */
+    var tier = MotionTier.Timed
 
     /** How far the disc has come down, in pixels. */
     var distance by mutableFloatStateOf(0f)
@@ -162,12 +179,13 @@ private class PullState(
 
     private suspend fun animateTo(target: Float) {
         if (distance == target) return
-        animate(distance, target, animationSpec = DeskMotion.page()) { value, _ -> distance = value }
+        animate(distance, target, animationSpec = DeskMotion.fade(tier, DeskMotion.page(DeskMotion.PIXEL))) { value, _ -> distance = value }
     }
 }
 
+/** The disc, [top] pixels under the list's top at the start of a pull (where it comes out) and lower as the pull goes on. */
 @Composable
-private fun RefreshDisc(pull: PullState, refreshing: Boolean, modifier: Modifier, top: () -> Dp) {
+private fun BoxScope.RefreshDisc(pull: PullState, refreshing: Boolean, top: Density.() -> Float) {
     val colors = DeskTheme.colors
     val tier = LocalMotionTier.current
     val label = stringResource(R.string.dk_refreshing)
@@ -188,34 +206,38 @@ private fun RefreshDisc(pull: PullState, refreshing: Boolean, modifier: Modifier
     val accent = colors.accent
     val track = colors.border
     val disc = 40.dp
-    Box(
-        modifier
-            .graphicsLayer {
-                // out from under the top bar, its edge first
-                translationY = top().toPx() + pull.distance - disc.toPx()
-                alpha = if (refreshing) 1f else (pull.progress * 1.5f).coerceAtMost(1f)
-            }
-            .size(disc)
-            .glass(DeskGlass.raised(colors, GlassThickness.Regular), CircleShape)
-            .border(1.dp, colors.borderStrong, CircleShape)
-            .then(
-                if (!refreshing) Modifier else Modifier.semantics {
-                    contentDescription = label
-                    progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate
-                },
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
-        Canvas(Modifier.size(20.dp)) {
-            val stroke = 2.dp.toPx()
-            val inset = stroke / 2
-            val arcSize = Size(size.width - stroke, size.height - stroke)
-            val progress = pull.progress
-            // the arc fills while the finger pulls and turns once refreshing
-            val sweep = if (refreshing) 270f else 300f * progress
-            rotate(if (refreshing) spin.value else progress * 180f) {
-                drawArc(track, 0f, 360f, false, Offset(inset, inset), arcSize, style = Stroke(stroke))
-                drawArc(accent, -90f, sweep, false, Offset(inset, inset), arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
+    // nothing of it shows above the list (over a field or tabs the screen put above it)
+    Box(Modifier.matchParentSize().clipToBounds()) {
+        Box(
+            Modifier
+                .align(Alignment.TopCenter)
+                .graphicsLayer {
+                    // out from under the top bar, its edge first
+                    translationY = top() + pull.distance - disc.toPx()
+                    alpha = if (refreshing) 1f else (pull.progress * 1.5f).coerceAtMost(1f)
+                }
+                .size(disc)
+                .glass(DeskGlass.raised(colors, GlassThickness.Regular), CircleShape)
+                .border(1.dp, colors.borderStrong, CircleShape)
+                .then(
+                    if (!refreshing) Modifier else Modifier.semantics {
+                        contentDescription = label
+                        progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate
+                    },
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Canvas(Modifier.size(20.dp)) {
+                val stroke = 2.dp.toPx()
+                val inset = stroke / 2
+                val arcSize = Size(size.width - stroke, size.height - stroke)
+                val progress = pull.progress
+                // the arc fills while the finger pulls and turns once refreshing
+                val sweep = if (refreshing) 270f else 300f * progress
+                rotate(if (refreshing) spin.value else progress * 180f) {
+                    drawArc(track, 0f, 360f, false, Offset(inset, inset), arcSize, style = Stroke(stroke))
+                    drawArc(accent, -90f, sweep, false, Offset(inset, inset), arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
+                }
             }
         }
     }

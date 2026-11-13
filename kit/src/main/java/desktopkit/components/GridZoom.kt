@@ -12,6 +12,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isAltPressed
 import androidx.compose.ui.input.key.isCtrlPressed
@@ -29,6 +30,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import desktopkit.R
+import desktopkit.input.typedCharacter
 import desktopkit.settings.DeskPreferences
 import desktopkit.theme.DeskTheme
 import desktopkit.theme.InputMode
@@ -42,18 +44,27 @@ import androidx.compose.ui.input.pointer.isMetaPressed as pointerMeta
  * the touchpad) over the grid, two fingers pinched on the screen, Ctrl with + and − on the keyboard
  * (Ctrl+0 goes back to [defaultCellWidth]), and TalkBack's actions. The width is the grid's least
  * cell width; the columns are as many as fit it. Make one with [rememberGridZoom].
+ *
+ * Until the user chooses a size the grid follows [defaultCellWidth], which may change (the default is larger for a
+ * finger than for a mouse); a size the user chose stays when it does, until Ctrl+0 ([reset]).
  */
 @Stable
-class GridZoom @JvmOverloads constructor(
-    val defaultCellWidth: Dp,
-    initialCellWidth: Dp = defaultCellWidth,
+class GridZoom(
+    defaultCellWidth: Dp,
+    chosenCellWidth: Dp? = null,
     val minCellWidth: Dp = 96.dp,
     val maxCellWidth: Dp = 320.dp,
-    private val onCommit: (Dp) -> Unit = {},
+    private val onCommit: (Dp?) -> Unit = {},
 ) {
-    /** The grid's least cell width now. */
-    var cellWidth: Dp by mutableStateOf(initialCellWidth.coerceIn(minCellWidth, maxCellWidth))
+    /** The width the grid has while the user has chosen none. */
+    var defaultCellWidth: Dp by mutableStateOf(defaultCellWidth)
+
+    /** The width the user chose, or null: the grid has [defaultCellWidth]. */
+    var chosenCellWidth: Dp? by mutableStateOf(chosenCellWidth?.coerceIn(minCellWidth, maxCellWidth))
         private set
+
+    /** The grid's least cell width now. */
+    val cellWidth: Dp get() = (chosenCellWidth ?: defaultCellWidth).coerceIn(minCellWidth, maxCellWidth)
 
     /** One step larger (a quarter wider). */
     fun zoomIn() = set(snap(cellWidth * STEP))
@@ -61,23 +72,29 @@ class GridZoom @JvmOverloads constructor(
     /** One step smaller. */
     fun zoomOut() = set(snap(cellWidth / STEP))
 
-    /** Back to [defaultCellWidth]. */
-    fun reset() = set(defaultCellWidth)
+    /** Back to [defaultCellWidth], which the grid follows again. */
+    fun reset() {
+        if (chosenCellWidth == null) return
+        chosenCellWidth = null
+        onCommit(null)
+    }
 
     /** During a pinch: follows the fingers, stored once they let go ([commit]). */
     internal fun follow(width: Dp) {
-        cellWidth = width.coerceIn(minCellWidth, maxCellWidth)
+        chosenCellWidth = width.coerceIn(minCellWidth, maxCellWidth)
     }
 
     internal fun commit() {
-        cellWidth = snap(cellWidth)
-        onCommit(cellWidth)
+        val width = chosenCellWidth ?: return
+        val snapped = snap(width)
+        chosenCellWidth = snapped
+        onCommit(snapped)
     }
 
     private fun set(width: Dp) {
         val next = width.coerceIn(minCellWidth, maxCellWidth)
-        if (next == cellWidth) return
-        cellWidth = next
+        if (next == chosenCellWidth) return
+        chosenCellWidth = next
         onCommit(next)
     }
 
@@ -87,16 +104,18 @@ class GridZoom @JvmOverloads constructor(
     companion object {
         private const val STEP = 1.25f
 
+        /** Keeps the chosen width (NaN for none); the default comes from the composition again. */
         internal fun saver(default: Dp, min: Dp, max: Dp): Saver<GridZoom, Float> = Saver(
-            save = { it.cellWidth.value },
-            restore = { GridZoom(default, it.dp, min, max) },
+            save = { it.chosenCellWidth?.value ?: Float.NaN },
+            restore = { GridZoom(default, if (it.isNaN()) null else it.dp, min, max) },
         )
     }
 }
 
 /**
  * A [GridZoom] for a [DeskGrid]; with [prefs] and [key] (one key per grid of the app) the size the user
- * chose is kept in every window and after a restart.
+ * chose is kept in every window and after a restart. [defaultCellWidth] may change from one composition to the next
+ * (by default it is larger for a finger): the grid follows it until the user chooses a size.
  */
 @Composable
 fun rememberGridZoom(
@@ -105,19 +124,23 @@ fun rememberGridZoom(
     maxCellWidth: Dp = 320.dp,
     prefs: DeskPreferences? = null,
     key: String? = null,
-): GridZoom =
-    if (prefs != null && key != null) {
-        remember(prefs, key, defaultCellWidth, minCellWidth, maxCellWidth) {
+): GridZoom {
+    val zoom = if (prefs != null && key != null) {
+        remember(prefs, key, minCellWidth, maxCellWidth) {
             val stored = prefs.gridCellWidth(key)
-            GridZoom(defaultCellWidth, if (stored.isNaN()) defaultCellWidth else stored.dp, minCellWidth, maxCellWidth) {
-                prefs.updateGridCellWidth(key, it.value)
+            GridZoom(defaultCellWidth, if (stored.isNaN()) null else stored.dp, minCellWidth, maxCellWidth) {
+                prefs.updateGridCellWidth(key, it?.value ?: Float.NaN)
             }
         }
     } else {
-        rememberSaveable(defaultCellWidth, minCellWidth, maxCellWidth, saver = GridZoom.saver(defaultCellWidth, minCellWidth, maxCellWidth)) {
-            GridZoom(defaultCellWidth, defaultCellWidth, minCellWidth, maxCellWidth)
+        rememberSaveable(minCellWidth, maxCellWidth, saver = GridZoom.saver(defaultCellWidth, minCellWidth, maxCellWidth)) {
+            GridZoom(defaultCellWidth, null, minCellWidth, maxCellWidth)
         }
     }
+    // a new default (the user touched the screen after the mouse) is followed; a size the user chose stays
+    zoom.defaultCellWidth = defaultCellWidth
+    return zoom
+}
 
 /** The gestures, keys and TalkBack actions of a [GridZoom], for the grid itself. */
 @Composable
@@ -180,10 +203,10 @@ internal fun Modifier.gridZoom(zoom: GridZoom): Modifier {
         .onKeyEvent { event ->
             if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
             if (!(event.isCtrlPressed || event.isMetaPressed) || event.isAltPressed) return@onKeyEvent false
-            when (event.key) {
-                Key.Equals, Key.Plus, Key.NumPadAdd -> { zoom.zoomIn(); true }
-                Key.Minus, Key.NumPadSubtract -> { zoom.zoomOut(); true }
-                Key.Zero, Key.NumPad0 -> { zoom.reset(); true }
+            when (zoomKey(event)) {
+                1 -> { zoom.zoomIn(); true }
+                -1 -> { zoom.zoomOut(); true }
+                0 -> { zoom.reset(); true }
                 else -> false
             }
         }
@@ -193,4 +216,30 @@ internal fun Modifier.gridZoom(zoom: GridZoom): Modifier {
                 CustomAccessibilityAction(smaller) { zoom.zoomOut(); true },
             )
         }
+}
+
+/**
+ * Which way a key held with Ctrl zooms: 1 larger (+ or =), -1 smaller (−), 0 back to the default (0), null not at all.
+ * The keypad's keys go by the key; the others by the character they type, as a browser's zoom does: on a Turkish Q
+ * keyboard − is the key a US one has = on, and + is Shift+4.
+ */
+private fun zoomKey(event: KeyEvent): Int? {
+    when (event.key) {
+        Key.NumPadAdd -> return 1
+        Key.NumPadSubtract -> return -1
+        Key.NumPad0 -> return 0
+    }
+    return when (typedCharacter(event)) {
+        '+', '=' -> 1
+        '-' -> -1
+        '0' -> 0
+        null -> when (event.key) {
+            // a key that types nothing (an event made by hand): its US meaning
+            Key.Equals, Key.Plus -> 1
+            Key.Minus -> -1
+            Key.Zero -> 0
+            else -> null
+        }
+        else -> null
+    }
 }

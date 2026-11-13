@@ -71,7 +71,6 @@ import desktopkit.components.SwatchChoice
 import desktopkit.components.SwitchRow
 import desktopkit.components.TabStrip
 import desktopkit.components.ToastDuration
-import desktopkit.components.TooltipArea
 import desktopkit.components.dropZone
 import desktopkit.screens.PageHeader
 import desktopkit.settings.AppearanceSection
@@ -158,7 +157,8 @@ private fun Buttons() {
         })
     }
     Examples {
-        TooltipArea("Play", shortcut = "Space") { DeskIconButton(DeskIcons.Play, "Play", {}) }
+        // an icon button names itself (with its shortcut) on the mouse's rest and the keyboard's focus
+        DeskIconButton(DeskIcons.Play, "Play", {}, shortcut = "Space")
         DeskIconButton(DeskIcons.Shuffle, "Shuffle (on)", {}, selected = true)
         DeskIconButton(DeskIcons.Delete, "Delete (disabled)", {}, enabled = false)
         IconMenuButton(DeskIcons.Sort, "Sort", entries = { listOf(MenuEntry.Item("Name", {}, checked = true), MenuEntry.Item("Size", {})) })

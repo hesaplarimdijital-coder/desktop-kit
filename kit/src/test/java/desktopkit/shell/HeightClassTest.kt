@@ -1,15 +1,22 @@
 package desktopkit.shell
 
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import desktopkit.DesktopKitRoot
 import desktopkit.TestShell
+import desktopkit.settings.rememberDeskPreferences
 import desktopkit.theme.DeskTheme
 import desktopkit.theme.DesktopKitTheme
 import desktopkit.theme.InputMode
@@ -68,5 +75,22 @@ class HeightClassTest {
         compose.waitForIdle()
         assertTrue("$body > $base", body.value > base.value)
         assertEquals(MotionTier.Timed, tier)
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun theKeyboardDoesNotMakeAPhoneShort() {
+        var seen: HeightClass? = null
+        compose.setContent {
+            // what the window keeps of its height while the on-screen keyboard is up (adjustResize)
+            Box(Modifier.fillMaxWidth().height(300.dp)) {
+                DesktopKitRoot(rememberDeskPreferences()) {
+                    seen = LocalHeightClass.current
+                    Text("ekran")
+                }
+            }
+        }
+        compose.waitForIdle()
+        assertEquals("the window's height, not what the keyboard leaves of it", HeightClass.Medium, seen)
     }
 }

@@ -98,6 +98,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import desktopkit.R
 import desktopkit.input.ContextMenuArea
 import desktopkit.settings.DeskPreferences
@@ -266,6 +267,8 @@ fun <T> DenseTable(
     val keysInOrder = { keysRef.value }
     // each composed row's focus, so the arrow keys can move it to a row that is scrolled into view
     val rowFocus = remember { HashMap<Any, FocusRequester>() }
+    val hop = remember { TabHop() }
+    val focusManager = LocalFocusManager.current
     val latestSelection by rememberUpdatedState(selection)
     val latestMulti by rememberUpdatedState(multi)
     val latestDrag by rememberUpdatedState(rowDrag != null)
@@ -454,6 +457,10 @@ fun <T> DenseTable(
                 tracker.toggle = event.isCtrlPressed || event.isMetaPressed
                 tracker.range = event.isShiftPressed
                 tracker.finger = false
+                // Tab leaves the rows at once, wherever in them the focus is (a row, a cell's button): the rows are one stop
+                if (hop.handle(event, focusManager) { rovingKey()?.let { key -> runCatching { rowFocus[key]?.requestFocus() } } }) {
+                    return@onPreviewKeyEvent true
+                }
                 // the rows are one Tab stop: the arrows, Home, End and the page keys move the focus among them. Taken
                 // before the list sees them: its own scrolling takes the page keys and would leave the focus behind
                 val focusedIndex = tracker.focused?.let { keysRef.value.indexOf(it) } ?: -1
@@ -501,10 +508,60 @@ fun <T> DenseTable(
                 }
             },
     ) {
+        // sticky header over the rows: glass once rows pass beneath it. Composed before the rows, so its sort buttons
+        // come before them in the Tab order as they do on screen; drawn over them
+        Column(
+            Modifier
+                .zIndex(1f)
+                .fillMaxWidth()
+                .onSizeChanged { headerPx.intValue = it.height }
+                .glass(DeskGlass.chrome(colors, GlassThickness.Thin), source = rowsGlass, mode = glassMode, enabled = glassHeader && scrolled),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    // as tall as a row: the header reads as the first line of the table
+                    .heightIn(min = dimens.rowHeight.coerceAtLeast(dimens.minTarget))
+                    .padding(horizontal = dimens.pagePadding - 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (checks) {
+                    val all = rows.isNotEmpty() && rows.all { key(it) in selection }
+                    val checkState = when {
+                        all -> ToggleableState.On
+                        selection.isEmpty() -> ToggleableState.Off
+                        else -> ToggleableState.Indeterminate
+                    }
+                    Box(Modifier.width(checkWidth), contentAlignment = Alignment.Center) {
+                        DeskCheckbox(
+                            state = checkState,
+                            onClick = { update(if (all) TableSelection.clear() else TableSelection.all(rows.map(key), tracker.anchor)) },
+                            modifier = Modifier.semantics { contentDescription = selectAllLabel },
+                        )
+                    }
+                }
+                shownColumns.forEach { (index, column) ->
+                    if (columnsState != null) {
+                        ContextMenuArea(
+                            entries = { columnChooserEntries(columns, columnsState, column.id, chooserLabels) },
+                            modifier = Modifier.cell(this, column.width),
+                            accessibilityLabel = chooserLabels.title,
+                        ) {
+                            Row { HeaderCell(column, index, sort, onSortChange, Modifier.weight(1f)) }
+                        }
+                    } else {
+                        HeaderCell(column, index, sort, onSortChange, Modifier.cell(this, column.width))
+                    }
+                }
+            }
+            HorizontalRule()
+        }
+        HopSpot(hop, hop.before)
         LazyColumn(
             state = state,
             modifier = Modifier
                 .fillMaxSize()
+                .onFocusChanged { hop.inside = it.hasFocus }
                 .glassSource(rowsGlass, glassMode)
                 .then(if (!skeleton) Modifier else Modifier.semantics { contentDescription = loadingLabel }),
             contentPadding = padding,
@@ -579,52 +636,7 @@ fun <T> DenseTable(
                 }
             }
         }
-        // sticky header over the rows: glass once rows pass beneath it
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .onSizeChanged { headerPx.intValue = it.height }
-                .glass(DeskGlass.chrome(colors, GlassThickness.Thin), source = rowsGlass, mode = glassMode, enabled = glassHeader && scrolled),
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    // as tall as a row: the header reads as the first line of the table
-                    .heightIn(min = dimens.rowHeight.coerceAtLeast(dimens.minTarget))
-                    .padding(horizontal = dimens.pagePadding - 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (checks) {
-                    val all = rows.isNotEmpty() && rows.all { key(it) in selection }
-                    val checkState = when {
-                        all -> ToggleableState.On
-                        selection.isEmpty() -> ToggleableState.Off
-                        else -> ToggleableState.Indeterminate
-                    }
-                    Box(Modifier.width(checkWidth), contentAlignment = Alignment.Center) {
-                        DeskCheckbox(
-                            state = checkState,
-                            onClick = { update(if (all) TableSelection.clear() else TableSelection.all(rows.map(key), tracker.anchor)) },
-                            modifier = Modifier.semantics { contentDescription = selectAllLabel },
-                        )
-                    }
-                }
-                shownColumns.forEach { (index, column) ->
-                    if (columnsState != null) {
-                        ContextMenuArea(
-                            entries = { columnChooserEntries(columns, columnsState, column.id, chooserLabels) },
-                            modifier = Modifier.cell(this, column.width),
-                            accessibilityLabel = chooserLabels.title,
-                        ) {
-                            Row { HeaderCell(column, index, sort, onSortChange, Modifier.weight(1f)) }
-                        }
-                    } else {
-                        HeaderCell(column, index, sort, onSortChange, Modifier.cell(this, column.width))
-                    }
-                }
-            }
-            HorizontalRule()
-        }
+        HopSpot(hop, hop.after)
     }
 }
 
@@ -916,6 +928,8 @@ private fun Modifier.cellButton(label: String?, onClick: () -> Unit): Modifier {
     return this
         .focusRing(state, shape)
         .background(stateBackground(state), shape)
+        // reached with the arrows from its row, not a stop of the Tab key: the rows are one stop
+        .focusProperties { canFocus = !TabNavigation.active }
         .deskClickable(interaction, onClick, onClickLabel = label)
 }
 

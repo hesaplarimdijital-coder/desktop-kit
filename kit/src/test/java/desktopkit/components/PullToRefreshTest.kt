@@ -1,11 +1,15 @@
 package desktopkit.components
 
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -18,10 +22,17 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import desktopkit.SampleTrackList
+import desktopkit.TestShell
+import desktopkit.shell.WidthClass
+import desktopkit.shell.rememberShellContentPadding
 import desktopkit.theme.DesktopKitTheme
 import desktopkit.theme.InputMode
+import desktopkit.theme.LocalMotionTier
+import desktopkit.theme.MotionTier
 import desktopkit.theme.ThemeMode
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -71,6 +82,64 @@ class PullToRefreshTest {
         compose.onNodeWithTag("list").performTouchInput { swipeDown(startY = top + 10f, endY = top + 110f, durationMillis = 300) }
         compose.waitForIdle()
         assertEquals(0, refreshes)
+    }
+
+    @Test
+    fun inAShellTheDiscComesOutUnderTheBarOrAtTheListsOwnTop() {
+        var topPad = 0.dp
+        var header by mutableStateOf(false)
+        refreshing = true
+        compose.setContent {
+            DesktopKitTheme(themeMode = ThemeMode.Dark, inputMode = InputMode.Touch) {
+                TestShell(WidthClass.Compact, content = { _, _ ->
+                    val padding = rememberShellContentPadding()
+                    topPad = padding.calculateTopPadding()
+                    if (!header) {
+                        // the list lies under the glass bar
+                        PullToRefresh(refreshing, onRefresh = {}, modifier = Modifier.testTag("box")) { SampleTrackList() }
+                    } else {
+                        // a field above the list, below the bar
+                        Column(Modifier.fillMaxSize().padding(top = topPad)) {
+                            Box(Modifier.fillMaxWidth().height(48.dp))
+                            PullToRefresh(refreshing, onRefresh = {}, modifier = Modifier.testTag("box")) {
+                                LazyColumn(Modifier.fillMaxSize()) { items(30) { i -> Text("İleti $i", Modifier.fillMaxWidth().height(56.dp)) } }
+                            }
+                        }
+                    }
+                })
+            }
+        }
+        compose.waitForIdle()
+        val disc = { compose.onNodeWithContentDescription("Refreshing").fetchSemanticsNode().boundsInRoot }
+        val box = { compose.onNodeWithTag("box").fetchSemanticsNode().boundsInRoot }
+        // at rest the disc is 20 dp below where it comes out: three quarters of the 80 dp threshold, less its own 40 dp
+        assertTrue("a bar above: $topPad", topPad > 0.dp)
+        assertEquals(box().top + topPad.value + 20f, disc().top, 1f)
+        header = true
+        compose.waitForIdle()
+        assertEquals("at the list's top, not a bar's height lower", box().top + 20f, disc().top, 1f)
+    }
+
+    @Test
+    fun withReducedMotionTheDiscJumpsToItsPlace() {
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            DesktopKitTheme(themeMode = ThemeMode.Dark, inputMode = InputMode.Touch) {
+                CompositionLocalProvider(LocalMotionTier provides MotionTier.Reduced) {
+                    PullToRefresh(refreshing = refreshing, onRefresh = {}, modifier = Modifier.testTag("box")) {
+                        LazyColumn(Modifier.fillMaxSize()) { items(30) { i -> Text("İleti $i", Modifier.fillMaxWidth().height(56.dp)) } }
+                    }
+                }
+            }
+        }
+        compose.mainClock.advanceTimeByFrame()
+        refreshing = true
+        compose.mainClock.advanceTimeByFrame()
+        compose.mainClock.advanceTimeByFrame()
+        compose.mainClock.advanceTimeByFrame()
+        val top = compose.onNodeWithTag("box").fetchSemanticsNode().boundsInRoot.top
+        // a spring would still be on its way three frames in
+        assertEquals("at rest at once", top + 20f, compose.onNodeWithContentDescription("Refreshing").fetchSemanticsNode().boundsInRoot.top, 1f)
     }
 
     @Test

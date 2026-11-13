@@ -29,7 +29,8 @@ Standardı" belgesinde, sürümler arası geçiş [MIGRATION.md](MIGRATION.md)'d
   `plurals`; cümle kod içinde parça parça birleştirilmez. Ünlem ve "..." yok; üç nokta için "…".
 - Telefonda liste çubukların altından geçer: `rememberShellContentPadding()` listenin
   `contentPadding`'ine verilir. WebView ya da video gösteren ekran `PauseGlassBlur()` çağırır.
-- Liste–ayrıntı için `DetailTransition`; telefonda ayrıntının üst çubuğu `CompactTopBar` ile.
+- Liste–ayrıntı için `ListDetailLayout` (tablet genişliğinden yan yana, daha darda `DetailTransition`'ın tek
+  bölmesi); telefonda ayrıntının üst çubuğu `CompactTopBar` ile.
 - Satır animasyonu (`ListAppear`) yalnızca veri iskeletten sonra geldiğinde; anahtar olarak yükleme
   durumu verilir.
 - Kısayollar tek bir `ShortcutRegistry`'de; menü çubuğu, Meta+/ listesi ve komut paleti oradan

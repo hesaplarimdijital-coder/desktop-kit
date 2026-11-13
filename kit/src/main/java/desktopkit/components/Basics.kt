@@ -75,7 +75,8 @@ private fun IconButtonBody(
     val state = interaction.collectState()
     val shape = RoundedCornerShape(DeskTheme.dimens.radiusControl)
     val background by animatedStateBackground(state, selected)
-    val tip = if (tooltip) rememberTooltipState() else null
+    // inside a TooltipArea (an app's own, from before 2.8.0) that one names the button
+    val tip = if (tooltip && !LocalInTooltipArea.current) rememberTooltipState() else null
     Box(
         modifier = modifier
             .then(if (tip != null) Modifier.tooltipTrigger(tip) else Modifier)

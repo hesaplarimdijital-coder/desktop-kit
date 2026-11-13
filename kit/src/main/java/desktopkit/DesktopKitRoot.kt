@@ -32,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Density
@@ -165,7 +166,9 @@ fun DesktopKitRoot(
                 .windowInsetsPadding(padding),
         ) {
             val widthClass = WidthClass.fromWidth(maxWidth.value)
-            val heightClass = HeightClass.fromHeight(maxHeight.value)
+            // the window's height, not what the on-screen keyboard leaves of it: a field taking the focus must not turn a
+            // phone into a "short window" (a lower top bar, no larger text) while the keyboard is up
+            val heightClass = HeightClass.fromHeight(LocalConfiguration.current.screenHeightDp.toFloat())
             val reduced = rememberReducedMotion()
             CompositionLocalProvider(
                 LocalWidthClass provides widthClass,

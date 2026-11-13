@@ -53,7 +53,7 @@ data class KeyChord(
         val wanted = typedChar ?: return false
         // the right Alt (AltGr) types characters, so only the left one counts as the chord's Alt here
         val leftAlt = event.nativeKeyEvent.metaState and AndroidKeyEvent.META_ALT_LEFT_ON != 0
-        return event.isCtrlPressed == ctrl && leftAlt == alt && event.isMetaPressed == meta && typed(event) == wanted
+        return event.isCtrlPressed == ctrl && leftAlt == alt && event.isMetaPressed == meta && typedCharacter(event) == wanted
     }
 
     /** "Ctrl+Shift+N", "Space", "Alt+→": the same text in menus, tooltips and the shortcut list. */
@@ -89,8 +89,11 @@ private fun punctuation(key: Key): Char? = when (key) {
 /** Meta states that only make chords and type nothing themselves (AltGr, the right Alt, types). */
 private const val CHORD_ONLY_META = AndroidKeyEvent.META_CTRL_MASK or AndroidKeyEvent.META_META_MASK or AndroidKeyEvent.META_ALT_LEFT_ON
 
-/** The character [event] types with Shift, Caps Lock and AltGr as held, Ctrl, Meta and the left Alt left aside. */
-private fun typed(event: KeyEvent): Char? {
+/**
+ * The character [event] types with Shift, Caps Lock and AltGr as held, Ctrl, Meta and the left Alt left aside: what
+ * a chord made of punctuation goes by, since keyboard layouts put punctuation on different keys.
+ */
+internal fun typedCharacter(event: KeyEvent): Char? {
     val native = event.nativeKeyEvent
     var meta = native.metaState and CHORD_ONLY_META.inv()
     // with only the left Alt gone, the plain Alt bit would stay and pick the layout's Alt row

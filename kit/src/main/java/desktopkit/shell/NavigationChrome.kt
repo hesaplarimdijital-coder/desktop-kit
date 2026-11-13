@@ -485,7 +485,8 @@ fun Sidebar(
                     if (items.isEmpty()) return@forEach
                     val title = section.title
                     val foldable = section.collapsible && title != null
-                    val folded = section.collapsible && title != null && title in shut
+                    // shut only while the sidebar is open: collapsed it shows no header to open the section again
+                    val folded = !collapsed && section.collapsible && title != null && title in shut
                     if (!collapsed && title != null) {
                         if (foldable) {
                             SectionHeader(title, folded, Modifier.alpha(labelAlpha(open))) {
@@ -602,8 +603,9 @@ private fun SidebarItem(item: NavItem, selected: Boolean, collapsed: Boolean, ba
             }
         }
     }
-    // collapsed, the entry is a bare icon: its name shows beside it (mouse rest, keyboard focus)
-    if (collapsed) TooltipArea(item.label, placement = TooltipPlacement.End) { row() } else row()
+    // collapsed, the entry is a bare icon: its name shows beside it (mouse rest, keyboard focus). The same tree either way,
+    // so the entry keeps its focus and its state while the sidebar opens or shuts
+    TooltipArea(item.label, placement = TooltipPlacement.End, enabled = collapsed) { row() }
 }
 
 // ---------------------------------------------------------------- top bars

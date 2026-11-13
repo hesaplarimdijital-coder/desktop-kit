@@ -1,6 +1,6 @@
 {
   "dead-handler": {
-    "sample/src/main/java/desktopkit/sample/Catalog.kt": 9
+    "sample/src/main/java/desktopkit/sample/Catalog.kt": 8
   },
   "infinite": {
     "kit/src/main/java/desktopkit/components/Feedback.kt": 2

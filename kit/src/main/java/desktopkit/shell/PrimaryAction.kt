@@ -182,7 +182,9 @@ internal fun PhoneActionButton(
     val last = remember { LastAction() }
     if (action != null) last.value = action
     val visible = action != null && shown
-    SideEffect { if (!visible) metrics.actionPx = 0 }
+    // its room, also when it comes back before its way out has ended (the size does not change then, so no new
+    // measurement says it)
+    SideEffect { metrics.actionPx = if (visible) last.height else 0 }
     val corner = TransformOrigin(1f, 1f)
     AnimatedVisibility(
         visible = visible,
@@ -194,7 +196,10 @@ internal fun PhoneActionButton(
         val current = last.value ?: return@AnimatedVisibility
         Box(
             Modifier
-                .onSizeChanged { if (visible) metrics.actionPx = it.height }
+                .onSizeChanged {
+                    last.height = it.height
+                    if (visible) metrics.actionPx = it.height
+                }
                 .padding(end = dimens.gapL, bottom = dimens.gapL),
         ) {
             PrimaryActionButton(current, extended, height = 56.dp, floating = true)
@@ -202,7 +207,8 @@ internal fun PhoneActionButton(
     }
 }
 
-/** The action the phone's button last showed; nothing redraws from it. */
+/** The action the phone's button last showed and its height with the margin; nothing redraws from them. */
 private class LastAction {
     var value: PrimaryAction? = null
+    var height = 0
 }

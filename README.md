@@ -494,9 +494,10 @@ ListDetailLayout(
 
 Tablet genişliğinden (`twoPanesFrom`, varsayılan Expanded) itibaren liste 360 dp (Large'dan 412) solda, seçilenin
 ayrıntısı sağda; bölücü sürüklenir. Seçim yokken ayrıntı bölmesi `placeholder`'ı gösterir, yeni seçim ayrıntıyı
-çapraz geçişle değiştirir. Daha dar pencerede `DetailTransition`'ın tek bölmesi ve hareketi. Pencere eşiği geçince
-(DeX'te boyutlandırma, tablet çevrilince) liste ve açık ayrıntı durumlarını korur: telefonda açık ayrıntı genişleyince
-listenin yanında açık kalır. İki bölmede Geri uygulamanındır (`handleBackInTwoPanes = true` ayrıntıyı kapatır).
+çapraz geçişle değiştirir. Daha dar pencerede, ya da yerleşime iki bölme sığmıyorsa (`minListWidth` +
+`minDetailWidth`; yanında açık bir ayrıntı paneli varken), `DetailTransition`'ın tek bölmesi ve hareketi. Pencere eşiği
+geçince (DeX'te boyutlandırma, tablet çevrilince) liste ve açık ayrıntı durumlarını korur: telefonda açık ayrıntı
+genişleyince listenin yanında açık kalır; ayrıntının altında kaldığı sürece liste kaydırma yerini korur. İki bölmede Geri uygulamanındır (`handleBackInTwoPanes = true` ayrıntıyı kapatır).
 Seçili satırı listede uygulama işaretler.
 
 ### Tabloda çoklu seçim
@@ -619,8 +620,8 @@ PullToRefresh(refreshing = esitleniyor, onRefresh = ::esitle) {
 }
 ```
 
-İkisi de yalnızca parmakla: fare ve klavye için aynı işler bir düğmede ve menüde durur. Yenileme diski telefonun cam
-üst çubuğunun altından iner; satır eşiği geçince eylemin rengini alır ve telefon titrer. Silme ya da arşivleme gibi
+İkisi de yalnızca parmakla: fare ve klavye için aynı işler bir düğmede ve menüde durur. Yenileme diski, liste telefonun
+cam üst çubuğunun altından geçiyorsa çubuğun altından, değilse listenin kendi tepesinden iner; satır eşiği geçince eylemin rengini alır ve telefon titrer. Silme ya da arşivleme gibi
 satırı çıkaran bir eylemin "Geri al"ını bildirimle ver.
 
 ### Satırlar, ayarlar, düğmeler
@@ -789,11 +790,12 @@ DeskGrid(albümler, key = { it.id }, onItemClick = { albüm, _ -> aç(albüm) },
 Seçim kuralları tablonunkiyle aynı (Ctrl/Shift ile tıklama, Shift ile oklar, Ctrl+A, Esc; parmak dokunuşu açar,
 seçim modunda ya da seçim varken ekler/çıkarır; uzun basma menüyü açar ve kapağı seçer; Geri seçimi temizler). Oynat düğmesi
 farenin altında ve klavye odağında çıkar; dokunmatikte başlığın yanında "⋮" var. TalkBack onu hücrenin eylemlerinde
-bulur. Izgara Tab'ın tek durağıdır, oklar kapaklar arasında gezer.
+bulur. Izgara Tab'ın tek durağıdır, oklar kapaklar arasında gezer; Tab kapaktan da düğmelerinden de hemen çıkar.
 
 `DeskGrid(zoom = rememberGridZoom(prefs = prefs, key = "albumler"))` kapakları kullanıcının büyütüp küçültmesine
-bırakır: Ctrl ile tekerlek (ya da dokunmatik yüzeyde kıstırma), ekranda iki parmak, Ctrl ile + ve − (Ctrl+0 geri
-alır); seçim saklanır.
+bırakır: Ctrl ile tekerlek (ya da dokunmatik yüzeyde kıstırma), ekranda iki parmak, Ctrl ile + ve − (yazdıkları
+karakterle, Türkçe Q klavyede de; Ctrl+0 varsayılana döner); seçim saklanır. Seçilmedikçe ızgara varsayılanı izler
+(parmakla daha büyük).
 
 ### Sürükle bırak
 
