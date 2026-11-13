@@ -25,7 +25,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.Layout
@@ -123,21 +128,54 @@ fun <T> SwatchChoice(options: List<Triple<T, Color, String>>, selected: T, onSel
 /**
  * Label and control on one settings line. When the control does not fit beside the label (a long
  * segmented choice on a phone), the control moves under the label instead of squeezing it.
+ *
+ * With [onClick] the whole line is one button that opens something (an account's page, a
+ * sub-page): a chevron ends it, after [control] if there is one (a value: "2 hesap"), and hover
+ * and press tint the line a little beyond its edges, so its text stays in line with the other rows.
  */
 @Composable
-fun SettingRow(title: String, modifier: Modifier = Modifier, subtitle: String? = null, control: @Composable () -> Unit) {
+fun SettingRow(
+    title: String,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    onClick: (() -> Unit)? = null,
+    control: @Composable () -> Unit = {},
+) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
     val gap = dimens.gapL
     val stackGap = dimens.gapS
+    val interaction = remember { MutableInteractionSource() }
+    val state = interaction.collectState()
+    val tint by animatedStateBackground(state)
+    val reach = dimens.gapS
+    val radius = dimens.radiusControl
+    val clickable = if (onClick == null) Modifier else Modifier
+        // the tint and the focus ring reach past the row's edges: its text keeps the column of the rows around it
+        .drawBehind {
+            val out = reach.toPx()
+            val corner = CornerRadius(radius.toPx())
+            if (tint.alpha > 0f) drawRoundRect(tint, topLeft = Offset(-out, 0f), size = Size(size.width + 2 * out, size.height), cornerRadius = corner)
+            if (state.focused) {
+                drawRoundRect(colors.focusRing, topLeft = Offset(-out, 0f), size = Size(size.width + 2 * out, size.height),
+                    cornerRadius = corner, style = Stroke(2.dp.toPx()))
+            }
+        }
+        .deskClickable(interaction, onClick)
     Layout(
-        modifier = modifier.padding(vertical = dimens.gapS),
+        modifier = modifier.then(clickable).heightIn(min = if (onClick != null) dimens.minTarget else 0.dp).padding(vertical = dimens.gapS),
         content = {
             androidx.compose.foundation.layout.Column {
                 Text(title, style = DeskTheme.type.bodyStrong, color = colors.text)
                 if (subtitle != null) Text(subtitle, style = DeskTheme.type.labelSmall, color = colors.textTertiary)
             }
-            Box { control() }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                control()
+                if (onClick != null) {
+                    Spacer(Modifier.width(dimens.gapXs))
+                    Icon(DeskIcons.ChevronRight, contentDescription = null, tint = colors.textTertiary, modifier = Modifier.size(dimens.icon))
+                }
+            }
         },
     ) { measurables, constraints ->
         val label = measurables[0]

@@ -66,4 +66,21 @@ class AppRequestsTest {
         compose.onNodeWithContentDescription("More options").performClick()
         compose.onNodeWithText("Arşivle").assertIsDisplayed()
     }
+
+    /** Requests 16 and 17: a filled button on an empty screen, a whole settings line as a button, a danger button. */
+    @Test
+    fun accountsScreenPieces() {
+        val used = mutableListOf<String>()
+        content {
+            SettingRow("ayse@example.com", subtitle = "IMAP · Gmail", onClick = { used += "account" })
+            DeskButton("Hesabı kaldır", onClick = { used += "remove" }, danger = true)
+            desktopkit.screens.MessageScreen("Henüz hesap yok", DeskIcons.Folder, actionLabel = "Hesap ekle",
+                onAction = { used += "add" }, actionPrimary = true)
+        }
+        compose.onNodeWithText("ayse@example.com").performClick()
+        compose.onNodeWithText("Hesabı kaldır").performClick()
+        compose.onNodeWithText("Hesap ekle").performClick()
+        assertEquals(listOf("account", "remove", "add"), used)
+        compose.onNode(androidx.compose.ui.test.isHeading() and androidx.compose.ui.test.hasText("Henüz hesap yok")).assertExists()
+    }
 }

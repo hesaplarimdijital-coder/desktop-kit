@@ -104,7 +104,8 @@ private fun Modifier.verticalPaddingUnlessEmpty(padding: Dp): Modifier = layout 
 
 /**
  * Centred icon, title, description and an optional button: for empty states, screens that
- * are not built yet and errors.
+ * are not built yet and errors. [actionPrimary] fills the button with the accent colour, for a
+ * screen whose one way on is that button ("No account yet · Add account").
  */
 @Composable
 fun MessageScreen(
@@ -115,6 +116,7 @@ fun MessageScreen(
     description: String? = null,
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
+    actionPrimary: Boolean = false,
 ) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
@@ -129,14 +131,15 @@ fun MessageScreen(
                     Icon(icon, contentDescription = null, tint = colors.accentText, modifier = Modifier.size(28.dp))
                 }
                 Spacer(Modifier.height(dimens.gapL))
-                Text(title, style = DeskTheme.type.title, color = colors.text, textAlign = TextAlign.Center)
+                Text(title, style = DeskTheme.type.title, color = colors.text, textAlign = TextAlign.Center,
+                    modifier = Modifier.semantics { heading() })
                 if (description != null) {
                     Spacer(Modifier.height(dimens.gapS))
                     Text(description, style = DeskTheme.type.body, color = colors.textSecondary, textAlign = TextAlign.Center)
                 }
                 if (actionLabel != null && onAction != null) {
                     Spacer(Modifier.height(dimens.gapL))
-                    DeskButton(text = actionLabel, onClick = onAction)
+                    DeskButton(text = actionLabel, onClick = onAction, primary = actionPrimary)
                 }
             }
         }

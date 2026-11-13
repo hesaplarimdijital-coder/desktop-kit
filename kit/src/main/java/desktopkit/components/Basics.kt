@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -68,7 +69,10 @@ fun DeskIconButton(
 
 /**
  * Text button. [primary] fills it with the accent colour. [icon] goes before the text,
- * [trailingIcon] after it (a menu button's chevron).
+ * [trailingIcon] after it (a menu button's chevron). [danger] marks an action that cannot be undone
+ * ("Remove account", "Empty the bin"): its text, icon and edge take the danger colour and hover
+ * and press tint it with that colour; it is never filled, so it never looks like the screen's
+ * main action ([primary] is ignored with it).
  */
 @Composable
 fun DeskButton(
@@ -80,13 +84,18 @@ fun DeskButton(
     enabled: Boolean = true,
     trailingIcon: ImageVector? = null,
     role: Role = Role.Button,
+    danger: Boolean = false,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val state = interaction.collectState()
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
     val shape = RoundedCornerShape(dimens.radiusControl)
+    @Suppress("NAME_SHADOWING") val primary = primary && !danger
     val target = when {
+        danger && state.pressed -> colors.danger.copy(alpha = 0.22f).compositeOver(colors.surfaceRaised)
+        danger && state.hovered -> colors.danger.copy(alpha = 0.12f).compositeOver(colors.surfaceRaised)
+        danger -> colors.surfaceRaised
         // the accent moves toward its text colour: darker on the dark themes, lighter on the light one
         primary && state.pressed -> lerp(colors.accent, colors.onAccent, 0.24f)
         primary && state.hovered -> lerp(colors.accent, colors.onAccent, 0.12f)
@@ -94,7 +103,11 @@ fun DeskButton(
         else -> stateBackground(state, rest = colors.surfaceRaised)
     }
     val background by animateInteractionColor(target)
-    val content = if (primary) colors.onAccent else colors.text
+    val content = when {
+        danger -> colors.danger
+        primary -> colors.onAccent
+        else -> colors.text
+    }
     Row(
         modifier = modifier
             .defaultMinSize(minHeight = dimens.minTarget.coerceAtLeast(dimens.controlHeight))
@@ -103,7 +116,7 @@ fun DeskButton(
             .pressScale(state.pressed)
             .focusRing(state, shape)
             .background(background, shape)
-            .then(if (primary) Modifier else Modifier.border(1.dp, colors.borderStrong, shape))
+            .then(if (primary) Modifier else Modifier.border(1.dp, if (danger) colors.danger.copy(alpha = 0.6f) else colors.borderStrong, shape))
             .deskClickable(interaction, onClick, enabled = enabled, role = role)
             .padding(start = dimens.gapM, end = if (trailingIcon != null) dimens.gapS else dimens.gapM),
         verticalAlignment = Alignment.CenterVertically,
@@ -116,7 +129,7 @@ fun DeskButton(
         Text(text, style = DeskTheme.type.label, color = content, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (trailingIcon != null) {
             Spacer(Modifier.width(dimens.gapXs + 2.dp))
-            Icon(trailingIcon, contentDescription = null, tint = if (primary) content else colors.textSecondary, modifier = Modifier.size(dimens.icon))
+            Icon(trailingIcon, contentDescription = null, tint = if (primary || danger) content else colors.textSecondary, modifier = Modifier.size(dimens.icon))
         }
     }
 }
