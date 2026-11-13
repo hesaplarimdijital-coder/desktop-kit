@@ -56,6 +56,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.isUnspecified
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
@@ -66,6 +68,7 @@ import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
@@ -229,6 +232,18 @@ sealed interface PaletteRow {
     data class Result(val item: PaletteItem, val match: PaletteMatcher.Match, val best: Boolean = false) : PaletteRow
 }
 
+/**
+ * 2.5.0: a line of the palette's list as the palette itself draws it: a [PaletteRow], or the line under a group
+ * that shows its best only, which says how many matches the group has and shows them all when chosen.
+ */
+internal sealed interface PaletteLine {
+    data class Row(val row: PaletteRow) : PaletteLine
+    data class More(val group: String, val total: Int) : PaletteLine
+}
+
+/** 2.5.0: the groups shown whole ("show all" chosen under them) for one query and filter; typing or filtering starts again. */
+internal data class PaletteExpansion(val query: String = "", val filter: String? = null, val groups: Set<String> = emptySet())
+
 /** Ranking of the palette, free of Compose so it can be tested. */
 object PaletteSearch {
     /**
@@ -242,7 +257,20 @@ object PaletteSearch {
         filter: String? = null,
         bestHeading: String = "",
         perGroup: Int = 6,
-    ): List<PaletteRow> {
+    ): List<PaletteRow> = lines(items, query, filter, bestHeading, perGroup, emptySet()).mapNotNull { (it as? PaletteLine.Row)?.row }
+
+    /**
+     * 2.5.0: [rows] as the palette draws them: a group that has more matches than the [perGroup] it shows ends
+     * with a [PaletteLine.More] that counts them; a group in [expanded] shows them all, as a filtered one does.
+     */
+    internal fun lines(
+        items: List<PaletteItem>,
+        query: String,
+        filter: String?,
+        bestHeading: String,
+        perGroup: Int,
+        expanded: Set<String>,
+    ): List<PaletteLine> {
         val scored = items.filter { filter == null || it.group == filter }.mapNotNull { item ->
             val title = PaletteMatcher.match(query, item.title)
             if (title != null) return@mapNotNull item to title
@@ -252,22 +280,23 @@ object PaletteSearch {
         }
         if (scored.isEmpty()) return emptyList()
         val groups = scored.map { it.first.group }.distinct()
-        val rows = mutableListOf<PaletteRow>()
+        val rows = mutableListOf<PaletteLine>()
         var best: PaletteItem? = null
         if (query.isNotBlank()) {
             val (item, match) = scored.maxBy { it.second.score }
             best = item
-            rows += PaletteRow.Heading(bestHeading)
-            rows += PaletteRow.Result(item, match, best = true)
+            rows += PaletteLine.Row(PaletteRow.Heading(bestHeading))
+            rows += PaletteLine.Row(PaletteRow.Result(item, match, best = true))
         }
-        val limit = if (filter != null) Int.MAX_VALUE else perGroup
         for (group in groups) {
-            val inGroup = scored.filter { it.first.group == group && it.first !== best }
-                .sortedByDescending { it.second.score }
-                .take(limit)
+            val inGroup = scored.filter { it.first.group == group && it.first !== best }.sortedByDescending { it.second.score }
             if (inGroup.isEmpty()) continue
-            rows += PaletteRow.Heading(group)
-            inGroup.forEach { (item, match) -> rows += PaletteRow.Result(item, match) }
+            val shown = if (filter != null || group in expanded) inGroup else inGroup.take(perGroup)
+            // a group that shows none of its matches is not listed, as in 2.4.1 (rows(perGroup = 0))
+            if (shown.isEmpty()) continue
+            rows += PaletteLine.Row(PaletteRow.Heading(group))
+            shown.forEach { (item, match) -> rows += PaletteLine.Row(PaletteRow.Result(item, match)) }
+            if (shown.size < inGroup.size) rows += PaletteLine.More(group, inGroup.size)
         }
         return rows
     }
@@ -299,10 +328,14 @@ class CommandPaletteState {
     /** The group chosen with a filter chip; null shows every group. */
     var filter by mutableStateOf<String?>(null)
 
+    /** 2.5.0: the groups shown whole, for the query and the filter they were opened under. */
+    internal var expansion by mutableStateOf(PaletteExpansion())
+
     /** Opens the palette, empty or with [initialQuery] (also when it is open already). */
     fun open(initialQuery: String = "") {
         query = initialQuery
         filter = null
+        expansion = PaletteExpansion()
         isOpen = true
     }
 
@@ -323,8 +356,9 @@ fun rememberCommandPaletteState(): CommandPaletteState = remember { CommandPalet
  *   a back arrow.
  * - The keyboard focus stays in the field: Up and Down choose, Enter runs, Ctrl+Enter opens in a
  *   new window (when the item can), Tab and Shift+Tab move between the [filters] (group names; "All"
- *   comes first), Esc, Back or a click on the scrim closes. The mouse chooses by hovering. Inside
- *   the shell, the focus goes back where it was when the palette closes.
+ *   comes first), Esc, Back or a click on the scrim closes. The mouse chooses the row it moves over
+ *   (2.5.0: by a move of its own: a row the list brings under a resting pointer is not chosen, the
+ *   arrows keep theirs). Inside the shell, the focus goes back where it was when the palette closes.
  * - [hint] is the grey text of the empty field.
  *
  * Inside [desktopkit.shell.DesktopShell] put it in the shell's `overlays`, so it is drawn over the
@@ -420,17 +454,31 @@ private fun PalettePanel(
     val allLabel = stringResource(R.string.dk_palette_all)
     val label = stringResource(R.string.dk_palette)
     val currentItems by rememberUpdatedState(items)
-    val rows = remember(state.query, state.filter) {
-        PaletteSearch.rows(currentItems(state.query), state.query, state.filter, bestHeading)
+    // 2.5.0: the groups "show all" was chosen under, while the query and the filter are the ones it was chosen for
+    val expanded = state.expansion.takeIf { it.query == state.query && it.filter == state.filter }?.groups.orEmpty()
+    val rows = remember(state.query, state.filter, expanded) {
+        PaletteSearch.lines(currentItems(state.query), state.query, state.filter, bestHeading, perGroup = 6, expanded = expanded)
     }
-    val results = rows.filterIsInstance<PaletteRow.Result>()
-    var selected by remember(rows) { mutableIntStateOf(0) }
+    // what the arrows stop at: the results, and the "show all" line under a group that shows its best only
+    val results = rows.filter { it is PaletteLine.More || (it is PaletteLine.Row && it.row is PaletteRow.Result) }
+    // (kept when a group is shown whole: the line's place is taken by the group's next result)
+    var selected by remember(state.query, state.filter) { mutableIntStateOf(0) }
+    // the chosen one within what is listed: a kept choice can be past the end of a list that shrank (open() while open)
+    fun current(): Int = if (results.isEmpty()) -1 else selected.coerceIn(0, results.lastIndex)
+    val chosenIndex = current()
     val listState = rememberLazyListState()
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-    // keeps the chosen row in view while the keyboard moves through the list
+    // 2.5.0: whether the pointer chooses: after a move of its own, not when the list moved under it
+    val pointer = remember { PointerChoice() }
+    val shownRows by rememberUpdatedState(rows)
+    val shownResults by rememberUpdatedState(results)
+    LaunchedEffect(state.query, state.filter) { pointer.byKeys() }
+    // keeps the chosen row in view while the keyboard moves through the list; not one the pointer chose: the list would
+    // move under it
     LaunchedEffect(selected, rows) {
-        val target = results.getOrNull(selected) ?: return@LaunchedEffect
+        if (pointer.chooses) return@LaunchedEffect
+        val target = results.getOrNull(current()) ?: return@LaunchedEffect
         val index = rows.indexOf(target)
         val info = listState.layoutInfo
         val shown = info.visibleItemsInfo
@@ -438,11 +486,16 @@ private fun PalettePanel(
             listState.animateScrollToItem((index - 1).coerceAtLeast(0))
         }
     }
+    val showAll = { group: String -> state.expansion = PaletteExpansion(state.query, state.filter, expanded + group) }
     val run = { newWindow: Boolean ->
-        val item = results.getOrNull(selected)
-        if (item != null) {
-            state.close()
-            if (newWindow && item.item.onOpenInNewWindow != null) item.item.onOpenInNewWindow.invoke() else item.item.onSelect()
+        when (val chosen = results.getOrNull(current())) {
+            // "show all": the group whole, the palette stays open
+            is PaletteLine.More -> showAll(chosen.group)
+            is PaletteLine.Row -> (chosen.row as? PaletteRow.Result)?.item?.let { item ->
+                state.close()
+                if (newWindow && item.onOpenInNewWindow != null) item.onOpenInNewWindow.invoke() else item.onSelect()
+            }
+            null -> Unit
         }
     }
     val chips = if (filters.isEmpty()) emptyList() else listOf<String?>(null) + filters
@@ -458,9 +511,21 @@ private fun PalettePanel(
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 when (event.key) {
-                    Key.DirectionDown -> { if (results.isNotEmpty()) selected = (selected + 1) % results.size; true }
-                    Key.DirectionUp -> { if (results.isNotEmpty()) selected = (selected - 1 + results.size) % results.size; true }
-                    Key.Enter, Key.NumPadEnter -> { run(event.isCtrlPressed || event.isMetaPressed); true }
+                    Key.DirectionDown -> {
+                        pointer.byKeys()
+                        if (results.isNotEmpty()) selected = (current() + 1) % results.size
+                        true
+                    }
+                    Key.DirectionUp -> {
+                        pointer.byKeys()
+                        if (results.isNotEmpty()) selected = (current() - 1 + results.size) % results.size
+                        true
+                    }
+                    Key.Enter, Key.NumPadEnter -> {
+                        // 2.5.0: a held Enter runs once: on "show all" its repeats ran the result that took the line's place
+                        if (event.nativeKeyEvent.repeatCount == 0) run(event.isCtrlPressed || event.isMetaPressed)
+                        true
+                    }
                     Key.Escape -> { state.close(); true }
                     // the focus stays in the field: Tab goes through the filters, if any
                     Key.Tab -> {
@@ -523,18 +588,52 @@ private fun PalettePanel(
         }
         LazyColumn(
             state = listState,
-            modifier = (if (compact) Modifier.weight(1f) else Modifier.heightIn(max = 440.dp)).fillMaxWidth(),
+            modifier = (if (compact) Modifier.weight(1f) else Modifier.heightIn(max = 440.dp)).fillMaxWidth()
+                // 2.5.0: the row under the pointer is chosen here, for the whole list, by where the pointer is in it (each row
+                // chose itself when the pointer came over it, also when the list brought it there under a resting pointer)
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull() ?: continue
+                            val hovers = (event.type == PointerEventType.Enter || event.type == PointerEventType.Move) && !change.pressed
+                            when {
+                                event.type == PointerEventType.Exit -> Unit
+                                // its wheel, a press, a drag: the pointer's own doing
+                                !hovers -> pointer.byPointer()
+                                pointer.hover(change.position) -> {
+                                    val info = listState.layoutInfo
+                                    // the lines' places are counted from under the list's padding
+                                    val at = change.position.y - info.beforeContentPadding
+                                    val line = info.visibleItemsInfo.firstOrNull { at >= it.offset && at < it.offset + it.size }
+                                        ?.let { shownRows.getOrNull(it.index) }
+                                    val index = if (line == null) -1 else shownResults.indexOf(line)
+                                    if (index >= 0) selected = index
+                                }
+                            }
+                        }
+                    }
+                },
             contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 6.dp, end = 6.dp, bottom = 8.dp),
         ) {
-            itemsIndexed(rows) { _, row ->
-                when (row) {
-                    is PaletteRow.Heading -> Text(row.title, style = DeskTheme.type.labelSmall, color = colors.textTertiary,
+            itemsIndexed(rows) { _, line ->
+                val row = (line as? PaletteLine.Row)?.row
+                when {
+                    row is PaletteRow.Heading -> Text(row.title, style = DeskTheme.type.labelSmall, color = colors.textTertiary,
                         modifier = Modifier.padding(start = 12.dp, top = 10.dp, bottom = 4.dp))
-                    is PaletteRow.Result -> {
-                        val index = results.indexOf(row)
-                        PaletteResultRow(row, chosen = index == selected, onHover = { selected = index }, onClick = {
+                    row is PaletteRow.Result -> {
+                        val index = results.indexOf(line)
+                        PaletteResultRow(row, chosen = index == chosenIndex, onClick = {
                             selected = index
                             run(false)
+                        })
+                    }
+                    line is PaletteLine.More -> {
+                        val index = results.indexOf(line)
+                        // chosen as it is shown whole: the list stays where it is (a tap left the choice above, and the list went back to it)
+                        PaletteMoreRow(line, chosen = index == chosenIndex, onClick = {
+                            selected = index
+                            showAll(line.group)
                         })
                     }
                 }
@@ -548,7 +647,7 @@ private fun PalettePanel(
 }
 
 @Composable
-private fun PaletteResultRow(row: PaletteRow.Result, chosen: Boolean, onHover: () -> Unit, onClick: () -> Unit) {
+private fun PaletteResultRow(row: PaletteRow.Result, chosen: Boolean, onClick: () -> Unit) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
     val touch = DeskTheme.inputMode == InputMode.Touch
@@ -556,8 +655,6 @@ private fun PaletteResultRow(row: PaletteRow.Result, chosen: Boolean, onHover: (
     val keys = showShortcutHints()
     val interaction = remember { MutableInteractionSource() }
     val state = interaction.collectState()
-    val latestHover by rememberUpdatedState(onHover)
-    LaunchedEffect(state.hovered) { if (state.hovered) latestHover() }
     val item = row.item
     val shape = RoundedCornerShape(dimens.radiusControl)
     val textColor = if (chosen) colors.onSelection else colors.text
@@ -603,6 +700,75 @@ private fun PaletteResultRow(row: PaletteRow.Result, chosen: Boolean, onHover: (
         }
         if (item.shortcut != null && keys) KeyCap(item.shortcut)
         Spacer(Modifier.width(0.dp))
+    }
+}
+
+/**
+ * 2.5.0: under a group that shows its best only: how many matches it has. Enter on it (the arrows stop there), a
+ * click or a tap shows them all; the palette stays open.
+ */
+@Composable
+private fun PaletteMoreRow(line: PaletteLine.More, chosen: Boolean, onClick: () -> Unit) {
+    val colors = DeskTheme.colors
+    val dimens = DeskTheme.dimens
+    val touch = DeskTheme.inputMode == InputMode.Touch
+    val interaction = remember { MutableInteractionSource() }
+    val state = interaction.collectState()
+    val shape = RoundedCornerShape(dimens.radiusControl)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = if (touch) 52.dp else 44.dp)
+            .background(if (chosen) colors.selection else if (state.pressed) colors.pressed else androidx.compose.ui.graphics.Color.Transparent, shape)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .hoverable(interaction)
+            // as the results: the keyboard stays in the field
+            .focusProperties { canFocus = false }
+            .deskClickable(interaction, onClick, role = Role.Button)
+            .semantics { selected = chosen }
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(stringResource(R.string.dk_palette_show_all, line.total), style = DeskTheme.type.body.copy(fontWeight = FontWeight.Medium),
+            color = if (chosen) colors.onSelection else colors.accentText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/**
+ * 2.5.0: whether the pointer chooses the palette's row. After a layout Compose gives the pointer's last move again to
+ * what is under it now (for the hover states under a resting pointer), so each row the arrows scrolled under a resting
+ * pointer took the choice back: the arrows never got past the list's edge. The pointer chooses by a move of its own (or
+ * its wheel, a press); after a key chose a row or changed what is listed, not until it moves again.
+ */
+private class PointerChoice {
+    var chooses = false
+        private set
+    private var last = Offset.Unspecified
+    private var rested = Offset.Unspecified
+
+    /** A key chose a row, or changed what is listed. */
+    fun byKeys() {
+        chooses = false
+        rested = last
+    }
+
+    /** The pointer's wheel, a press, a drag. */
+    fun byPointer() {
+        chooses = true
+    }
+
+    /** The pointer is at [at] with nothing pressed: whether it chooses, which it does once it is away from where it rested. */
+    fun hover(at: Offset): Boolean {
+        last = at
+        if (!chooses) {
+            if (rested.isUnspecified) rested = at else if ((at - rested).getDistance() > MOVED_PX) chooses = true
+        }
+        return chooses
+    }
+
+    private companion object {
+        /** A move given again comes back at its place, to a rounding; a pointer that moved is a pixel away or more. */
+        const val MOVED_PX = 0.5f
     }
 }
 

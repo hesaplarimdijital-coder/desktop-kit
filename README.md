@@ -65,7 +65,7 @@ Uygulama modülünün `build.gradle.kts` dosyası:
 
 ```kotlin
 dependencies {
-    implementation("com.github.hesaplarimdijital-coder:desktop-kit:2.4.1")
+    implementation("com.github.hesaplarimdijital-coder:desktop-kit:2.5.0")
     implementation("androidx.activity:activity-compose:1.13.0")
 }
 ```
@@ -600,9 +600,12 @@ DesktopShell(…, navController = navController, onSearch = { palet.open() }, ov
 })
 ```
 
-Arama Türkçe harfleri katlar ("sarki" "Şarkı"yı bulur), eşleşen harfleri vurgular ve sonuçları gruplar. Klavye
+Arama Türkçe harfleri katlar ("sarki" "Şarkı"yı bulur), eşleşen harfleri vurgular ve sonuçları gruplar. Her grup en
+iyi altı eşleşmesini gösterir; daha çoğu varsa altındaki satır kaç tane olduğunu yazar ("9 sonucun hepsini göster") ve
+seçilince grubun hepsini gösterir (2.5.0). Klavye
 odağı alanda kalır: ↑/↓, Enter, Ctrl+Enter (`onOpenInNewWindow` varsa yeni pencerede), Tab ile grup süzgeçleri,
-Esc. Palet kapanınca odak açılmadan önceki yerine döner. Kısayolları etkinlikten yönlendiriyorsan paletin
+Esc. Fare, üzerinde hareket ettiği satırı seçer; oklar listeyi duran imlecin altında kaydırırken seçim okların kalır
+(2.5.0). Palet kapanınca odak açılmadan önceki yerine döner. Kısayolları etkinlikten yönlendiriyorsan paletin
 durumunu etkinlikte tut (`private val palet = CommandPaletteState()`) ve palet açıkken yönlendirmeyi atla
 (yukarıdaki Klavye kısayolları bölümü).
 
@@ -665,9 +668,9 @@ uçarken de yuvarlak kalsın diye biçimini ver: `detailSharedElement("kapak-$id
 ## Sürüm yayınlamak
 
 1. `CHANGELOG.md` dosyasına ne değiştiğini yaz, `gradle.properties` içindeki `VERSION_NAME`'i güncelle.
-2. Önce PR'ı birleştir, sonra GitHub'da **Releases → Draft a new release** ile etiketi (`2.4.1`) `main` üzerinde
-   oluştur; ya da `git tag 2.4.1 && git push origin 2.4.1`. Etiket birleştirmeden önce açılırsa eski kodu gösterir.
-3. JitPack ilk istekte derler (`jitpack.yml`, Java 17). Uygulamada sürümü `2.4.1` yapman yeterli.
+2. Önce PR'ı birleştir, sonra GitHub'da **Releases → Draft a new release** ile etiketi (`2.5.0`) `main` üzerinde
+   oluştur; ya da `git tag 2.5.0 && git push origin 2.5.0`. Etiket birleştirmeden önce açılırsa eski kodu gösterir.
+3. JitPack ilk istekte derler (`jitpack.yml`, Java 17). Uygulamada sürümü `2.5.0` yapman yeterli.
 
 Sürüm numaraları [SemVer](https://semver.org/lang/tr/) kuralına uyar: uyumu bozan değişiklik
 ana sürümü, yeni özellik ikinci sayıyı, düzeltme üçüncüyü artırır.
