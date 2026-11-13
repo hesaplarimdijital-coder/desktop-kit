@@ -47,6 +47,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -79,6 +80,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import desktopkit.R
+import desktopkit.input.TabNavigation
 import desktopkit.input.contextMenuGesture
 import desktopkit.shell.LocalSharedElementShape
 import desktopkit.theme.DeskMotion
@@ -176,6 +178,22 @@ fun <T> DeskGrid(
     val columns = {
         state.layoutInfo.visibleItemsInfo.maxOfOrNull { it.column }?.plus(1) ?: 1
     }
+    // the grid is one stop of the Tab key: the cell last focused, else the selected one, when in view, else
+    // the first cell in view; the arrows move among the cells (read when the focus moves, not composed)
+    val lastFocused = remember { RovingMemory() }
+    val latestItems by rememberUpdatedState(items)
+    val latestKey by rememberUpdatedState(key)
+    val latestSelected by rememberUpdatedState(selectedKey)
+    val latestSelection by rememberUpdatedState(selection)
+    val rovingKey: () -> Any? = remember(state) {
+        {
+            val keys = latestItems.mapTo(HashSet()) { latestKey(it) }
+            val active = tracker.focused ?: lastFocused.key ?: tracker.anchor ?: latestSelected ?: latestSelection.firstOrNull()
+            val visible = state.layoutInfo.visibleItemsInfo
+            if (active != null && active in keys && visible.any { it.key == active }) active
+            else visible.firstOrNull { it.key in keys }?.key
+        }
+    }
     val gridModifier = if (!multi) Modifier else Modifier
         .pointerInput(Unit) {
             // remembers the keys held at each press; the cell's click comes after it
@@ -269,7 +287,15 @@ fun <T> DeskGrid(
                 menuLabel = itemMenuLabel,
                 // the menu acts on the selection: a cover outside it becomes the selection
                 onMenuOpen = if (!multi) null else ({ update(TableSelection.menu(selection, tracker.anchor, itemKey)) }),
-                onFocused = { focused -> if (focused) tracker.focused = itemKey else if (tracker.focused == itemKey) tracker.focused = null },
+                onFocused = { focused ->
+                    if (focused) {
+                        tracker.focused = itemKey
+                        lastFocused.key = itemKey
+                    } else if (tracker.focused == itemKey) {
+                        tracker.focused = null
+                    }
+                },
+                tabStop = { !TabNavigation.active || itemKey == rovingKey() },
                 onClick = {
                     // the press's pointer when there was one; TalkBack's double tap follows the layout
                     val finger = tracker.finger ?: touch
@@ -301,6 +327,7 @@ private fun GridItem(
     menuLabel: String?,
     onMenuOpen: (() -> Unit)?,
     onFocused: (Boolean) -> Unit,
+    tabStop: () -> Boolean,
     onClick: () -> Unit,
     content: @Composable GridCellScope.() -> Unit,
 ) {
@@ -325,6 +352,7 @@ private fun GridItem(
         modifier
             .onSizeChanged { height = it.height }
             .onFocusChanged { onFocused(it.isFocused) }
+            .focusProperties { canFocus = tabStop() }
             .contextMenuGesture(menu != null) { at -> open(IntOffset(at.x.roundToInt(), at.y.roundToInt())) }
             .onKeyEvent { event ->
                 val opens = event.type == KeyEventType.KeyDown && menu != null &&
@@ -478,4 +506,9 @@ private fun SkeletonCover(pulse: androidx.compose.runtime.State<Float>) {
         Spacer(Modifier.height(6.dp))
         SkeletonBlock(Modifier.fillMaxWidth(0.45f).height(8.dp), pulse)
     }
+}
+
+/** The key of the cell a grid last had the keyboard focus on; nothing redraws from it. */
+private class RovingMemory {
+    var key: Any? = null
 }

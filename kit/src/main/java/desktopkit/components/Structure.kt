@@ -1,5 +1,16 @@
 package desktopkit.components
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInWindow
+import desktopkit.input.TabNavigation
 import desktopkit.theme.rememberDeskHaptics
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -419,6 +430,10 @@ fun IconMenuButton(
 /**
  * A row of [DeskTab]s over a rule, scrolling sideways when they do not fit (search results,
  * conversations, the sections of a screen).
+ *
+ * The strip is one stop of the Tab key, at the selected tab (and its close button); the arrow keys
+ * move among the tabs, Home and End to the first and the last one, Enter or Space opens the one
+ * focused.
  */
 @Composable
 fun TabStrip(
@@ -428,19 +443,68 @@ fun TabStrip(
 ) {
     val rule = DeskTheme.colors.border
     val label = stringResource(R.string.dk_tabs)
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .drawBehind { drawRect(rule, topLeft = Offset(0f, size.height - 1.dp.toPx()), size = Size(size.width, 1.dp.toPx())) }
-            .horizontalScroll(rememberScrollState())
-            .padding(contentPadding)
-            .selectableGroup()
-            .semantics { paneTitle = label },
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-        content = content,
-    )
+    val strip = remember { TabStripState() }
+    CompositionLocalProvider(LocalTabStrip provides strip) {
+        Row(
+            modifier = modifier
+                .fillMaxWidth()
+                .drawBehind { drawRect(rule, topLeft = Offset(0f, size.height - 1.dp.toPx()), size = Size(size.width, 1.dp.toPx())) }
+                .onKeyEvent { event -> event.type == KeyEventType.KeyDown && strip.move(event.key) }
+                .horizontalScroll(rememberScrollState())
+                .padding(contentPadding)
+                .selectableGroup()
+                .semantics { paneTitle = label },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            content = content,
+        )
+    }
 }
+
+/** The tabs of a [TabStrip], to move the keyboard focus among them. */
+@Stable
+internal class TabStripState {
+    class Tab(val focus: FocusRequester) {
+        var selected = false
+        var focused = false
+
+        /** Where the tab lies along the strip, in the window; the order the arrows follow. */
+        var x = 0f
+    }
+
+    val tabs = mutableListOf<Tab>()
+
+    /**
+     * Whether Tab stops at [tab]: the focused tab while the focus is in the strip (so Tab leaves it), else the
+     * selected one, else the first.
+     */
+    fun stopsAt(tab: Tab): Boolean {
+        val focused = tabs.firstOrNull { it.focused }
+        return when {
+            focused != null -> tab === focused
+            tabs.any { it.selected } -> tab.selected
+            else -> tab === tabs.minByOrNull { it.x }
+        }
+    }
+
+    /** Moves the focus to the tab beside the focused one ([key] Left, Right, Home, End); false for another key. */
+    fun move(key: Key): Boolean {
+        val ordered = tabs.sortedBy { it.x }
+        val at = ordered.indexOfFirst { it.focused }
+        if (at < 0) return false
+        val target = when (key) {
+            Key.DirectionLeft -> ordered.getOrNull(at - 1)
+            Key.DirectionRight -> ordered.getOrNull(at + 1)
+            Key.MoveHome -> ordered.firstOrNull()
+            Key.MoveEnd -> ordered.lastOrNull()
+            else -> return false
+        }
+        target?.let { runCatching { it.focus.requestFocus() } }
+        return true
+    }
+}
+
+internal val LocalTabStrip = staticCompositionLocalOf<TabStripState?> { null }
 
 /**
  * One tab: an optional [icon], the [label], a [badge] count and a [busy] dot; the selected tab gets
@@ -478,8 +542,21 @@ fun DeskTab(
     val haptics = rememberDeskHaptics()
     val latestClose by rememberUpdatedState(onClose)
     val closeByMiddleClick: () -> Unit = remember { { latestClose?.invoke() } }
+    // one Tab stop for the strip: the selected tab; the arrows reach the others (TabStrip)
+    val strip = LocalTabStrip.current
+    val focus = remember { FocusRequester() }
+    val entry = remember(strip) { strip?.let { TabStripState.Tab(focus) } }
+    SideEffect { entry?.selected = selected }
+    DisposableEffect(strip, entry) {
+        if (strip != null && entry != null) strip.tabs.add(entry)
+        onDispose { if (strip != null && entry != null) strip.tabs.remove(entry) }
+    }
+    val tabStop: () -> Boolean = { strip == null || entry == null || !TabNavigation.active || strip.stopsAt(entry) }
     Row(
         modifier = modifier
+            .onPlaced { entry?.x = it.positionInWindow().x }
+            .focusRequester(focus)
+            .focusProperties { canFocus = tabStop() }
             .heightIn(min = if (touch) dimens.minTarget else 30.dp)
             .focusRing(state, shape)
             .background(background, shape)
@@ -499,7 +576,10 @@ fun DeskTab(
             }
             .middleClick(onClose != null, closeByMiddleClick)
             .dragSource(enabled = drag != null) { drag?.invoke() }
-            .onFocusChanged { focusWithin = it.hasFocus }
+            .onFocusChanged {
+                focusWithin = it.hasFocus
+                entry?.focused = it.hasFocus
+            }
             .deskClickable(interaction, {
                 if (!selected) haptics.tick()
                 onClick()
@@ -521,7 +601,10 @@ fun DeskTab(
         if (onClose != null) {
             Box(Modifier.size(if (touch) 32.dp else 24.dp), contentAlignment = Alignment.Center) {
                 if (showClose) {
-                    DeskIconButton(DeskIcons.Close, closeLabel, onClose, size = if (touch) 32.dp else 24.dp, iconSize = if (touch) 16.dp else 12.dp)
+                    // a tab's close button is a Tab stop with its tab only
+                    Box(Modifier.focusProperties { canFocus = tabStop() }) {
+                        DeskIconButton(DeskIcons.Close, closeLabel, onClose, size = if (touch) 32.dp else 24.dp, iconSize = if (touch) 16.dp else 12.dp)
+                    }
                 }
             }
         }
