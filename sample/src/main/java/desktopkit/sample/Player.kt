@@ -19,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -69,8 +70,20 @@ fun MiniPlayer(index: Int) {
             Text(track.title, Modifier.playerSharedElement("title"), style = DeskTheme.type.bodyStrong, color = DeskTheme.colors.text, maxLines = 1)
             Text(track.artist, style = DeskTheme.type.labelSmall, color = DeskTheme.colors.textSecondary, maxLines = 1)
         }
-        DeskIconButton(DeskIcons.Pause, "Pause", {})
+        PlayPauseButton()
     }
+}
+
+/** Whether the sample's one player is playing; the mini player, the full player and the transport bar share it. */
+private var playing by mutableStateOf(true)
+
+/** Play or pause: the icon and the name say what a press does. */
+@Composable
+private fun PlayPauseButton(size: androidx.compose.ui.unit.Dp = androidx.compose.ui.unit.Dp.Unspecified, iconSize: androidx.compose.ui.unit.Dp = DeskTheme.dimens.icon) {
+    val label = stringResource(if (playing) R.string.action_pause else R.string.action_play)
+    val icon = if (playing) DeskIcons.Pause else DeskIcons.Play
+    if (size == androidx.compose.ui.unit.Dp.Unspecified) DeskIconButton(icon, label, { playing = !playing }, iconSize = iconSize)
+    else DeskIconButton(icon, label, { playing = !playing }, size = size, iconSize = iconSize)
 }
 
 @Composable
@@ -89,11 +102,11 @@ fun FullPlayer(index: Int, onCollapse: () -> Unit, onPrevious: () -> Unit, onNex
         Text(track.title, Modifier.playerSharedElement("title"), style = DeskTheme.type.headline, color = DeskTheme.colors.text)
         Text(track.artist, style = DeskTheme.type.body, color = DeskTheme.colors.textSecondary)
         Spacer(Modifier.height(16.dp))
-        DeskSlider(position, { position = it }, Modifier.fillMaxWidth(), label = "Position", valueText = { positionText(track, it) })
+        DeskSlider(position, { position = it }, Modifier.fillMaxWidth(), label = stringResource(R.string.player_position), valueText = { positionText(track, it) })
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            DeskIconButton(DeskIcons.Previous, "Previous", onPrevious)
-            DeskIconButton(DeskIcons.Pause, "Pause", {}, size = 64.dp, iconSize = 28.dp)
-            DeskIconButton(DeskIcons.Next, "Next", onNext)
+            DeskIconButton(DeskIcons.Previous, stringResource(R.string.action_previous), onPrevious)
+            PlayPauseButton(size = 64.dp, iconSize = 28.dp)
+            DeskIconButton(DeskIcons.Next, stringResource(R.string.action_next), onNext)
         }
     }
 }
@@ -110,10 +123,10 @@ fun TransportBar(index: Int, onPrevious: () -> Unit, onNext: () -> Unit) {
             Text(track.title, style = DeskTheme.type.bodyStrong, color = DeskTheme.colors.text, maxLines = 1)
             Text(track.artist, style = DeskTheme.type.labelSmall, color = DeskTheme.colors.textSecondary, maxLines = 1)
         }
-        DeskIconButton(DeskIcons.Previous, "Previous", onPrevious)
-        DeskIconButton(DeskIcons.Pause, "Pause", {})
-        DeskIconButton(DeskIcons.Next, "Next", onNext)
-        DeskSlider(position, { position = it }, Modifier.weight(1f).padding(start = 12.dp), label = "Position",
+        DeskIconButton(DeskIcons.Previous, stringResource(R.string.action_previous), onPrevious)
+        PlayPauseButton()
+        DeskIconButton(DeskIcons.Next, stringResource(R.string.action_next), onNext)
+        DeskSlider(position, { position = it }, Modifier.weight(1f).padding(start = 12.dp), label = stringResource(R.string.player_position),
             valueText = { positionText(track, it) })
     }
 }

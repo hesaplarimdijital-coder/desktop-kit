@@ -12,11 +12,13 @@ android {
         minSdk = 34
         targetSdk = 36
         versionCode = 2
-        versionName = "2.0"
+        // the kit's version (gradle.properties), shown in the About dialog
+        versionName = providers.gradleProperty("VERSION_NAME").getOrElse("dev")
     }
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     compileOptions {

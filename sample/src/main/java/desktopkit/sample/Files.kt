@@ -1,6 +1,5 @@
 package desktopkit.sample
 
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,7 +20,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import desktopkit.components.ToastResult
+import desktopkit.components.ToastState
+import kotlinx.coroutines.launch
 import androidx.compose.ui.unit.dp
 import desktopkit.components.ChipOption
 import desktopkit.components.ColumnWidth
@@ -67,15 +72,15 @@ import desktopkit.theme.InputMode
  * out. With a mouse, rows can be dragged onto "Bin" in the sidebar.
  */
 @Composable
-fun FilesScreen(prefs: DeskPreferences, library: LibraryState) {
+fun FilesScreen(prefs: DeskPreferences, library: LibraryState, toasts: ToastState) {
     // tablet and DeX: files | inspector with four tabs; the inspector's width is kept in the preferences
     val inspector = rememberInspectorState(prefs)
     WorkstationLayout(
         state = inspector,
-        main = { FilesList(prefs, library, inspectorToggle = { InspectorToggleButton(inspector) }) },
+        main = { FilesList(prefs, library, toasts, inspectorToggle = { InspectorToggleButton(inspector) }) },
         inspector = {
             InspectorPane(
-                tabs = inspectorTabs,
+                tabs = inspectorTabs(),
                 selected = inspector.selectedTab,
                 onSelect = { inspector.selectedTab = it },
                 onCollapse = inspector::toggle,
@@ -84,19 +89,26 @@ fun FilesScreen(prefs: DeskPreferences, library: LibraryState) {
     )
 }
 
-private val inspectorTabs = listOf(
-    InspectorTab("tags", "Tags", DeskIcons.Info),
-    InspectorTab("signal", "Signal path", DeskIcons.Waveform),
-    InspectorTab("lyrics", "Lyrics", DeskIcons.Lyrics),
-    InspectorTab("queue", "Queue", DeskIcons.Queue),
+@Composable
+private fun inspectorTabs() = listOf(
+    InspectorTab("tags", stringResource(R.string.tab_tags), DeskIcons.Info),
+    InspectorTab("signal", stringResource(R.string.tab_signal), DeskIcons.Waveform),
+    InspectorTab("lyrics", stringResource(R.string.tab_lyrics), DeskIcons.Lyrics),
+    InspectorTab("queue", stringResource(R.string.tab_queue), DeskIcons.Queue),
 )
 
 @Composable
 private fun InspectorTabContent(tab: InspectorTab) {
     val rows = when (tab.id) {
-        "tags" -> listOf("Format" to "FLAC 24/96", "Channels" to "Stereo", "ReplayGain" to "−6.2 dB", "Peak" to "0.98")
-        "signal" -> listOf("Decoder" to "FLAC", "Resampler" to "Off", "Output" to "AAudio · 96 kHz", "Volume" to "Bit-perfect")
-        "lyrics" -> listOf("Source" to "Embedded", "Lines" to "32")
+        "tags" -> listOf(
+            stringResource(R.string.tag_format) to "FLAC 24/96", stringResource(R.string.tag_channels) to stringResource(R.string.value_stereo),
+            stringResource(R.string.tag_replaygain) to "−6.2 dB", stringResource(R.string.tag_peak) to "0.98",
+        )
+        "signal" -> listOf(
+            stringResource(R.string.tag_decoder) to "FLAC", stringResource(R.string.tag_resampler) to stringResource(R.string.value_off),
+            stringResource(R.string.tag_output) to "AAudio · 96 kHz", stringResource(R.string.tag_volume) to stringResource(R.string.value_bit_perfect),
+        )
+        "lyrics" -> listOf(stringResource(R.string.tag_source) to stringResource(R.string.value_embedded), stringResource(R.string.tag_lines) to "32")
         else -> tracks.mapIndexed { i, t -> "${i + 1}" to t.title }
     }
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = DeskTheme.dimens.gapL, vertical = DeskTheme.dimens.gapS)) {
@@ -107,7 +119,7 @@ private fun InspectorTabContent(tab: InspectorTab) {
 }
 
 @Composable
-private fun FilesList(prefs: DeskPreferences, library: LibraryState, inspectorToggle: @Composable () -> Unit) {
+private fun FilesList(prefs: DeskPreferences, library: LibraryState, toasts: ToastState, inspectorToggle: @Composable () -> Unit) {
     var filter by remember { mutableStateOf("") }
     var kinds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var selected by remember { mutableStateOf<Set<Any>>(emptySet()) }
@@ -119,6 +131,21 @@ private fun FilesList(prefs: DeskPreferences, library: LibraryState, inspectorTo
     // and "Open" is in the menu
     val openOnTap = compact || DeskTheme.inputMode == InputMode.Touch
     val files = sampleFiles.filter { it.name !in library.binned }
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    // Delete moves the files to the bin, and the toast can bring them back
+    val delete: (List<String>) -> Unit = { names ->
+        val moved = names.filter { it !in library.binned }
+        library.binned.addAll(moved)
+        selected = selected - moved.toSet()
+        if (opened in moved) opened = null
+        val label = if (moved.size == 1) moved[0] else context.resources.getQuantityString(R.plurals.files_dragged, moved.size, moved.size)
+        scope.launch {
+            val result = toasts.show(context.getString(R.string.moved_to_bin, label), actionLabel = context.getString(R.string.action_undo),
+                shortcut = "Ctrl+Z")
+            if (result == ToastResult.ActionPerformed) library.binned.removeAll(moved)
+        }
+    }
     DetailTransition(
         detail = files.firstOrNull { it.name == opened },
         onBack = { opened = null },
@@ -129,16 +156,17 @@ private fun FilesList(prefs: DeskPreferences, library: LibraryState, inspectorTo
             // under the phone's glass bars: the header clears the top bar, the grid and the table pad their ends
             val shell = rememberShellContentPadding()
             Column(Modifier.fillMaxSize().padding(top = shell.calculateTopPadding())) {
-                val subtitle = if (selected.isEmpty()) "${files.size} items" else "${selected.size} of ${files.size} selected"
-                PageHeader("Files", subtitle = subtitle) {
-                    DeskButton(if (selectMode) "Done" else "Select", { selectMode = !selectMode })
-                    DeskIconButton(DeskIcons.Grid, "Grid", { grid = true }, selected = grid)
-                    DeskIconButton(DeskIcons.ListView, "List", { grid = false }, selected = !grid)
+                val subtitle = if (selected.isEmpty()) pluralStringResource(R.plurals.files_count, files.size, files.size)
+                else pluralStringResource(R.plurals.files_selected, selected.size, selected.size, files.size)
+                PageHeader(stringResource(R.string.files_title), subtitle = subtitle) {
+                    DeskButton(stringResource(if (selectMode) R.string.action_done else R.string.action_select), { selectMode = !selectMode })
+                    DeskIconButton(DeskIcons.Grid, stringResource(R.string.view_grid), { grid = true }, selected = grid)
+                    DeskIconButton(DeskIcons.ListView, stringResource(R.string.view_list), { grid = false }, selected = !grid)
                     if (!compact) inspectorToggle()
                 }
                 DeskSearchField(filter, { filter = it },
                     Modifier.padding(horizontal = DeskTheme.dimens.pagePadding).padding(bottom = DeskTheme.dimens.gapS).fillMaxWidth(),
-                    hint = "Filter files")
+                    hint = stringResource(R.string.filter_files))
                 FilterChips(
                     options = files.map { it.kind }.distinct().map { kind ->
                         ChipOption(kind, kind, count = files.count { it.kind == kind }.toString())
@@ -169,6 +197,7 @@ private fun FilesList(prefs: DeskPreferences, library: LibraryState, inspectorTo
                         onSelectionChange = { selected = it },
                         toggleOnClick = selectMode,
                         onOpen = { opened = it.name },
+                        onDelete = delete,
                         openOnClick = openOnTap,
                         bottomPadding = shell.calculateBottomPadding(),
                     )
@@ -176,7 +205,7 @@ private fun FilesList(prefs: DeskPreferences, library: LibraryState, inspectorTo
             }
         },
     ) { file ->
-        FileDetails(file, onClose = { opened = null })
+        FileDetails(file, onClose = { opened = null }, onDelete = { delete(listOf(file.name)) }, toasts = toasts)
     }
 }
 
@@ -198,8 +227,10 @@ private fun FilesGrid(
         .filter { kinds.isEmpty() || it.kind in kinds }
         .sortedBy { it.name }
     val dimens = DeskTheme.dimens
-    // the files arrive in turn when the grid is new, or when a filter leaves a new set
+    // the files arrive in turn when a filter leaves a new set (opened again, the grid is simply there)
     val appear = rememberListAppear(filter, kinds)
+    val openLabel = stringResource(R.string.action_open)
+    val resources = LocalContext.current.resources
     DeskGrid(
         items = shown,
         key = { it.name },
@@ -209,11 +240,11 @@ private fun FilesGrid(
         selectedKeys = selectedKeys,
         onSelectionChange = onSelectionChange,
         toggleOnClick = toggleOnClick,
-        itemMenu = { file, _ -> listOf(MenuEntry.Item("Open", { onOpen(file) }, shortcut = "Enter", icon = DeskIcons.OpenWindow)) },
-        itemMenuLabel = "More actions",
+        itemMenu = { file, _ -> listOf(MenuEntry.Item(openLabel, { onOpen(file) }, shortcut = "Enter", icon = DeskIcons.OpenWindow)) },
+        itemMenuLabel = stringResource(R.string.more_actions),
         itemDrag = { file, _ ->
             val names = if (file.name in selectedKeys) selectedKeys.map { it as String } else listOf(file.name)
-            DeskDragPayload(DragKinds.FILE, names, if (names.size == 1) names[0] else "${names.size} files")
+            DeskDragPayload(DragKinds.FILE, names, if (names.size == 1) names[0] else resources.getQuantityString(R.plurals.files_dragged, names.size, names.size))
         },
     ) { file ->
         CoverCell(file.name, modifier = Modifier.listAppear(appear, shown.indexOf(file)), subtitle = "${file.kind} · ${file.size}") {
@@ -239,28 +270,34 @@ private fun kindIcon(kind: String) = when (kind) {
  * the system Back gesture closes the details too. Wider windows keep their own header.
  */
 @Composable
-private fun FileDetails(file: SampleFile, onClose: () -> Unit) {
+private fun FileDetails(file: SampleFile, onClose: () -> Unit, onDelete: () -> Unit, toasts: ToastState) {
     val context = LocalContext.current
-    val toast = { text: String -> Toast.makeText(context, text, Toast.LENGTH_SHORT).show() }
+    val scope = rememberCoroutineScope()
+    // what a real app would do here is not part of the sample: the toast says so, by the action's name
+    val notInSample = { label: String -> scope.launch { toasts.show(context.getString(R.string.not_in_sample, label)) }; Unit }
+    val open = stringResource(R.string.action_open)
+    val addToList = stringResource(R.string.action_add_to_list)
+    val properties = stringResource(R.string.action_properties)
+    val location = stringResource(R.string.field_location)
     // DetailTransition takes the Back gesture (with its predictive animation) on every window size
     CompactTopBar(
         title = file.name,
         onBack = onClose,
         actions = listOf(
-            TopBarAction(DeskIcons.OpenWindow, "Open", { toast("Open") }, primary = true),
-            TopBarAction(DeskIcons.PlaylistAdd, "Add to list", { toast("Add to list") }),
-            TopBarAction(DeskIcons.Info, "Properties", { toast("Properties") }),
-            TopBarAction(DeskIcons.Delete, "Delete", { toast("Delete") }),
+            TopBarAction(DeskIcons.OpenWindow, open, { notInSample(open) }, primary = true),
+            TopBarAction(DeskIcons.PlaylistAdd, addToList, { notInSample(addToList) }),
+            TopBarAction(DeskIcons.Info, properties, { notInSample(properties) }),
+            TopBarAction(DeskIcons.Delete, stringResource(R.string.action_delete), onDelete),
         ),
     )
     Column(Modifier.fillMaxSize().shellContentPadding()) {
         PageHeader(file.name, subtitle = "${file.kind} · ${file.size}") {
-            if (currentWidthClass() != WidthClass.Compact) DeskButton("Back", onClose, icon = DeskIcons.ArrowLeft)
+            if (currentWidthClass() != WidthClass.Compact) DeskButton(stringResource(R.string.action_back), onClose, icon = DeskIcons.ArrowLeft)
         }
         Column(Modifier.padding(horizontal = DeskTheme.dimens.pagePadding)) {
-            listOf("Kind" to file.kind, "Size" to file.size, "Location" to "/storage/emulated/0/Files/${file.name}").forEach { (label, value) ->
-                KeyValueRow(label, value, Modifier.padding(vertical = 8.dp), mono = label == "Location", selectable = label == "Location")
-            }
+            KeyValueRow(stringResource(R.string.column_kind), file.kind, Modifier.padding(vertical = 8.dp))
+            KeyValueRow(stringResource(R.string.column_size), file.size, Modifier.padding(vertical = 8.dp))
+            KeyValueRow(location, "/storage/emulated/0/Files/${file.name}", Modifier.padding(vertical = 8.dp), mono = true, selectable = true)
         }
     }
 }
@@ -280,16 +317,21 @@ fun FilesTable(
     onSelectionChange: ((Set<Any>) -> Unit)? = null,
     toggleOnClick: Boolean = false,
     onOpen: (SampleFile) -> Unit = {},
+    onDelete: ((List<String>) -> Unit)? = null,
     openOnClick: Boolean = false,
     loading: Boolean = false,
     bottomPadding: Dp = 0.dp,
 ) {
+    val resources = LocalContext.current.resources
+    val openLabel = stringResource(R.string.action_open)
+    val deleteLabel = stringResource(R.string.action_delete)
     var selected by remember { mutableStateOf<String?>(null) }
     var sort by remember { mutableStateOf(TableSort(0, true)) }
     val rows = remember(files, sort, filter, kinds) {
         val sorted = when (sort.column) {
             1 -> files.sortedBy { it.kind }
-            2 -> files.sortedBy { it.size }
+            // by the size itself: as text "1.2 GB" sorted before "12 KB"
+            2 -> files.sortedBy { it.bytes }
             else -> files.sortedBy { it.name }
         }.filter { filter.isBlank() || it.name.contains(filter.trim(), ignoreCase = true) }
             .filter { kinds.isEmpty() || it.kind in kinds }
@@ -297,10 +339,12 @@ fun FilesTable(
     }
     DenseTable(
         columns = listOf(
-            TableColumn<SampleFile>("Name", ColumnWidth.Weight(1f), id = "name") { it.name },
+            // a long name keeps its extension: cut in the middle
+            TableColumn<SampleFile>(stringResource(R.string.column_name), ColumnWidth.Weight(1f), id = "name",
+                ellipsis = androidx.compose.ui.text.style.TextOverflow.MiddleEllipsis) { it.name },
             // phones show name and size; the kind returns from tablet width up
-            TableColumn<SampleFile>("Kind", ColumnWidth.Fixed(120.dp), hideBelow = WidthClass.Medium, id = "kind") { it.kind },
-            TableColumn<SampleFile>("Size", ColumnWidth.Fixed(90.dp), alignEnd = true, mono = true, id = "size") { it.size },
+            TableColumn<SampleFile>(stringResource(R.string.column_kind), ColumnWidth.Fixed(120.dp), hideBelow = WidthClass.Medium, id = "kind") { it.kind },
+            TableColumn<SampleFile>(stringResource(R.string.column_size), ColumnWidth.Fixed(90.dp), alignEnd = true, mono = true, id = "size") { it.size },
         ),
         rows = if (loading) emptyList() else rows,
         key = { it.name },
@@ -316,20 +360,21 @@ fun FilesTable(
         },
         rowMenu = { file, _ ->
             // the table has already selected the row (or kept a selection that contains it)
-            val count = selectedKeys?.size?.coerceAtLeast(1) ?: 1
-            listOf(
-                MenuEntry.Item("Open", { onOpen(file) }, shortcut = "Enter", icon = DeskIcons.OpenWindow),
-                MenuEntry.Item("Rename", {}, shortcut = "F2", enabled = count == 1),
-                MenuEntry.Separator,
-                MenuEntry.Item(if (count > 1) "Delete $count items" else "Delete", {}, shortcut = "Del", icon = DeskIcons.Delete,
-                    destructive = true),
+            val names = if (selectedKeys != null && file.name in selectedKeys) selectedKeys.map { it as String } else listOf(file.name)
+            listOfNotNull(
+                MenuEntry.Item(openLabel, { onOpen(file) }, shortcut = "Enter", icon = DeskIcons.OpenWindow),
+                if (onDelete == null) null else MenuEntry.Separator,
+                if (onDelete == null) null else MenuEntry.Item(
+                    if (names.size > 1) resources.getQuantityString(R.plurals.delete_items, names.size, names.size) else deleteLabel,
+                    { onDelete(names) }, shortcut = "Del", icon = DeskIcons.Delete, destructive = true,
+                ),
             )
         },
-        rowMenuLabel = "More actions",
+        rowMenuLabel = stringResource(R.string.more_actions),
         rowDrag = { file, _ ->
             // a row inside the selection drags the whole selection
             val names = if (selectedKeys != null && file.name in selectedKeys) selectedKeys.map { it as String } else listOf(file.name)
-            DeskDragPayload(DragKinds.FILE, names, if (names.size == 1) names[0] else "${names.size} files")
+            DeskDragPayload(DragKinds.FILE, names, if (names.size == 1) names[0] else resources.getQuantityString(R.plurals.files_dragged, names.size, names.size))
         },
         loading = loading,
         columnsState = if (prefs == null) null else rememberTableColumnsState("files", prefs),

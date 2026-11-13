@@ -20,6 +20,14 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- The window a desktop (DeX, desktop windowing) opens it in, and the smallest it may be made:
+                 386 x 352 dp is Android's own minimum for a desktop window, which the kit's layouts are tested at -->
+            <layout
+                android:defaultWidth="1100dp"
+                android:defaultHeight="720dp"
+                android:gravity="center"
+                android:minWidth="386dp"
+                android:minHeight="352dp" />
             <!-- Android 15+: the system's window menus (DeX, desktop windowing, the taskbar) offer "New window" -->
             <property
                 android:name="android.window.PROPERTY_SUPPORTS_MULTI_INSTANCE_SYSTEM_UI"

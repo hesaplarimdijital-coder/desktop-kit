@@ -37,15 +37,19 @@ val albums: List<Album> = albumTitles.mapIndexed { i, title ->
 
 // ------------------------------------------------------------------ files
 
-data class SampleFile(val name: String, val kind: String, val size: String)
+/** A file: [size] as shown, [bytes] for sorting by size (the text would sort "1.2 GB" before "12 KB"). */
+data class SampleFile(val name: String, val kind: String, val size: String, val bytes: Long)
+
+private const val KB = 1024L
+private const val MB = 1024L * KB
 
 val sampleFiles = listOf(
-    SampleFile("Budget 2026.ods", "Spreadsheet", "84 KB"),
-    SampleFile("Holiday photos", "Folder", "1.2 GB"),
-    SampleFile("Talk draft.odp", "Presentation", "3.4 MB"),
-    SampleFile("Notes.md", "Text", "12 KB"),
-    SampleFile("Recording 14.flac", "Audio", "38 MB"),
-    SampleFile("Backup.zip", "Archive", "640 MB"),
+    SampleFile("Budget 2026.ods", "Spreadsheet", "84 KB", 84 * KB),
+    SampleFile("Holiday photos", "Folder", "1.2 GB", 1229 * MB),
+    SampleFile("Talk draft.odp", "Presentation", "3.4 MB", 3482 * KB),
+    SampleFile("Notes.md", "Text", "12 KB", 12 * KB),
+    SampleFile("Recording 14.flac", "Audio", "38 MB", 38 * MB),
+    SampleFile("Backup.zip", "Archive", "640 MB", 640 * MB),
 )
 
 // ------------------------------------------------------------------ what drags and drops change
