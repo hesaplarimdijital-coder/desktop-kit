@@ -51,4 +51,66 @@ class TextInputRequestsTest {
         assertEquals("Merhaba\nŞablon İmza", value.text)
         assertEquals(TextRange(15), value.selection)
     }
+
+    private var tokens by mutableStateOf(listOf<String>())
+
+    private fun tokenField() {
+        compose.setContent {
+            DesktopKitTheme(themeMode = ThemeMode.Dark, inputMode = InputMode.Pointer) {
+                Column {
+                    TokenField(
+                        tokens = tokens,
+                        onTokensChange = { tokens = it },
+                        label = "Kime",
+                        isValid = { "@" in it },
+                        suggestions = { typed ->
+                            listOf(TokenSuggestion("ayse@ornek.org", "Ayşe Yılmaz", "ayse@ornek.org"))
+                                .filter { it.title.startsWith(typed, ignoreCase = true) || it.value.startsWith(typed) }
+                        },
+                    )
+                }
+            }
+        }
+        compose.waitForIdle()
+    }
+
+    @Test
+    fun separatorsMakeChipsAndAPastedListSplits() {
+        tokenField()
+        val field = compose.onNode(hasSetTextAction())
+        field.performTextInput("mehmet@ornek.org,")
+        compose.waitForIdle()
+        assertEquals(listOf("mehmet@ornek.org"), tokens)
+        field.performTextInput("a@x.org; b@y.org, yarım")
+        compose.waitForIdle()
+        assertEquals(listOf("mehmet@ornek.org", "a@x.org", "b@y.org"), tokens)
+        compose.onNodeWithText("yarım").assertExists()
+    }
+
+    @Test
+    fun backspaceInAnEmptyFieldRemovesTheLastChip() {
+        tokens = listOf("a@x.org", "geçersiz")
+        tokenField()
+        compose.onNode(hasSetTextAction()).performClick()
+        compose.onNode(hasSetTextAction()).performKeyInput { pressKey(androidx.compose.ui.input.key.Key.Backspace) }
+        compose.waitForIdle()
+        assertEquals(listOf("a@x.org"), tokens)
+    }
+
+    @Test
+    fun aSuggestionIsTakenWithTheKeyboardOrATap() {
+        tokenField()
+        val field = compose.onNode(hasSetTextAction())
+        field.performClick()
+        field.performTextInput("Ay")
+        compose.waitForIdle()
+        compose.onNodeWithText("Ayşe Yılmaz").assertExists()
+        field.performKeyInput { pressKey(androidx.compose.ui.input.key.Key.Enter) }
+        compose.waitForIdle()
+        assertEquals(listOf("ayse@ornek.org"), tokens)
+        // the chip's own × removes it
+        compose.onNodeWithContentDescription("Remove: ayse@ornek.org").performClick()
+        compose.waitForIdle()
+        assertEquals(emptyList<String>(), tokens)
+    }
 }
