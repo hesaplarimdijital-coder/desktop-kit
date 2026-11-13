@@ -47,6 +47,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import desktopkit.settings.DeskPreferences
 import desktopkit.shell.CaptionArea
 import desktopkit.shell.CaptionElements
+import desktopkit.shell.HeightClass
+import desktopkit.shell.LocalHeightClass
 import desktopkit.shell.LocalWidthClass
 import desktopkit.shell.WidthClass
 import desktopkit.theme.Accent
@@ -163,10 +165,12 @@ fun DesktopKitRoot(
                 .windowInsetsPadding(padding),
         ) {
             val widthClass = WidthClass.fromWidth(maxWidth.value)
+            val heightClass = HeightClass.fromHeight(maxHeight.value)
             val reduced = rememberReducedMotion()
             CompositionLocalProvider(
                 LocalWidthClass provides widthClass,
-                LocalMotionTier provides DeskMotion.tier(widthClass, reduced),
+                LocalHeightClass provides heightClass,
+                LocalMotionTier provides DeskMotion.tier(widthClass, reduced, heightClass),
                 LocalRootInsets provides rootInsets,
             ) { content(widthClass) }
         }
