@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.components.CommandPaletteTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-11-13T15:10:14.188Z" hostname="runnervmwuk1x" time="2.372">
+  <properties/>
+  <testcase name="keyboardChoosesAndRuns" classname="desktopkit.components.CommandPaletteTest" time="0.838"/>
+  <testcase name="aGroupShowsSixOfItsMatches" classname="desktopkit.components.CommandPaletteTest" time="0.045"/>
+  <testcase name="aTappedLineShowsTheRestWhereItWas" classname="desktopkit.components.CommandPaletteTest" time="0.293"/>
+  <testcase name="aRestingPointerLeavesTheChoiceToTheArrows" classname="desktopkit.components.CommandPaletteTest" time="0.527"/>
+  <testcase name="startsBeatWordsBeatInsidesBeatLetters" classname="desktopkit.components.CommandPaletteTest" time="0.044"/>
+  <testcase name="aGroupThatShowsItsBestCountsItsMatchesAndShowsThemAll" classname="desktopkit.components.CommandPaletteTest" time="0.054"/>
+  <testcase name="bestMatchFirstThenGroups" classname="desktopkit.components.CommandPaletteTest" time="0.036"/>
+  <testcase name="turkishLettersFold" classname="desktopkit.components.CommandPaletteTest" time="0.038"/>
+  <testcase name="theLineUnderAGroupShowsItWholeAndThePaletteStaysOpen" classname="desktopkit.components.CommandPaletteTest" time="0.489"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

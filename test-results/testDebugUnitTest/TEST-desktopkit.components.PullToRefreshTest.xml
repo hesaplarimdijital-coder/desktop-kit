@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.components.PullToRefreshTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-13T15:10:27.118Z" hostname="runnervmwuk1x" time="0.523">
+  <properties/>
+  <testcase name="theMouseAndTheKeyboardLeaveItAlone" classname="desktopkit.components.PullToRefreshTest" time="0.066"/>
+  <testcase name="aLongPullRefreshesAndTheDiscStaysWhileItDoes" classname="desktopkit.components.PullToRefreshTest" time="0.13"/>
+  <testcase name="inAShellTheDiscComesOutUnderTheBarOrAtTheListsOwnTop" classname="desktopkit.components.PullToRefreshTest" time="0.11"/>
+  <testcase name="withReducedMotionTheDiscJumpsToItsPlace" classname="desktopkit.components.PullToRefreshTest" time="0.131"/>
+  <testcase name="aShortPullDoesNot" classname="desktopkit.components.PullToRefreshTest" time="0.082"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

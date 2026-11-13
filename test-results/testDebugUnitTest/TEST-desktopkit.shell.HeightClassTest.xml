@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.shell.HeightClassTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-13T15:10:49.633Z" hostname="runnervmwuk1x" time="0.094">
+  <properties/>
+  <testcase name="thresholds" classname="desktopkit.shell.HeightClassTest" time="0.02"/>
+  <testcase name="theKeyboardDoesNotMakeAPhoneShort" classname="desktopkit.shell.HeightClassTest" time="0.027"/>
+  <testcase name="aShortWindowKeepsThePhonesTextAndMotion" classname="desktopkit.shell.HeightClassTest" time="0.044"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

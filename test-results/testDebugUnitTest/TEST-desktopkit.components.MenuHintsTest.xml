@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.components.MenuHintsTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-13T15:10:23.956Z" hostname="runnervmwuk1x" time="0.394">
+  <properties/>
+  <testcase name="aMovedMenuGrowsFromThePointItWasAskedFor" classname="desktopkit.components.MenuHintsTest" time="0.05"/>
+  <testcase name="hintsFollowAMouseOrAKeyboard" classname="desktopkit.components.MenuHintsTest" time="0.042"/>
+  <testcase name="aPhoneInTheHandShowsNoShortcuts" classname="desktopkit.components.MenuHintsTest" time="0.087"/>
+  <testcase name="aKeyboardBringsTheShortcutsBack" classname="desktopkit.components.MenuHintsTest" time="0.075"/>
+  <testcase name="aMenuThatFitsOpensUnderItsButton" classname="desktopkit.components.MenuHintsTest" time="0.031"/>
+  <testcase name="aDropDownNearTheBottomOpensAboveItsButton" classname="desktopkit.components.MenuHintsTest" time="0.032"/>
+  <testcase name="aMenuAtAPointNearTheBottomOpensAboveThePoint" classname="desktopkit.components.MenuHintsTest" time="0.029"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
