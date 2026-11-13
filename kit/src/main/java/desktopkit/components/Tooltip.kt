@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
@@ -23,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
@@ -53,7 +55,8 @@ enum class TooltipPlacement { Below, End }
  * keyboard shortcut (so menus, buttons and the shortcut list agree). Moving on to a neighbour while
  * one is showing, or within a second of it closing, shows the next one at once (100 ms), as on a
  * desktop. Touch input never opens it; long press is the context menu. A press, or focus that came
- * with a pointer's press, closes it.
+ * with a pointer's press, closes it. With [enabled] false it never opens, and [content] stays the
+ * same in the composition either way (a sidebar entry named only while the sidebar is collapsed).
  */
 @Composable
 fun TooltipArea(
@@ -63,14 +66,19 @@ fun TooltipArea(
     delayMillis: Long = TooltipTiming.DELAY_MS,
     placement: TooltipPlacement = TooltipPlacement.Below,
     showOnFocus: Boolean = true,
+    enabled: Boolean = true,
     content: @Composable () -> Unit,
 ) {
-    val tooltip = rememberTooltipState(delayMillis, showOnFocus)
+    val tooltip = rememberTooltipState(delayMillis, showOnFocus, enabled)
     Box(modifier = modifier.tooltipTrigger(tooltip)) {
-        content()
+        // an icon button inside names itself with this tooltip only, not with one of its own as well
+        CompositionLocalProvider(LocalInTooltipArea provides enabled) { content() }
         TooltipPopup(tooltip, text, shortcut, placement)
     }
 }
+
+/** Whether the content is inside a [TooltipArea]: a [DeskIconButton] there leaves its own tooltip out. */
+internal val LocalInTooltipArea = staticCompositionLocalOf { false }
 
 /** Whether a tooltip is up, and what brings it: the mouse resting on its element, the keyboard's focus in it. */
 @Stable
@@ -84,13 +92,16 @@ internal class TooltipState {
     var pressedAt = Long.MIN_VALUE / 2
 }
 
-/** A [TooltipState] that opens after [delayMillis] of rest (less while a neighbour's is up; see [TooltipTiming]). */
+/**
+ * A [TooltipState] that opens after [delayMillis] of rest (less while a neighbour's is up; see [TooltipTiming]); never
+ * while not [enabled].
+ */
 @Composable
-internal fun rememberTooltipState(delayMillis: Long = TooltipTiming.DELAY_MS, showOnFocus: Boolean = true): TooltipState {
+internal fun rememberTooltipState(delayMillis: Long = TooltipTiming.DELAY_MS, showOnFocus: Boolean = true, enabled: Boolean = true): TooltipState {
     val state = remember { TooltipState() }
     state.showOnFocus = showOnFocus
-    LaunchedEffect(state.hovering, state.focused) {
-        if (state.hovering || state.focused) {
+    LaunchedEffect(state.hovering, state.focused, enabled) {
+        if (enabled && (state.hovering || state.focused)) {
             delay(TooltipTiming.delayFor(delayMillis))
             if (!state.visible) TooltipTiming.opened()
             state.visible = true

@@ -603,8 +603,9 @@ private fun SidebarItem(item: NavItem, selected: Boolean, collapsed: Boolean, ba
             }
         }
     }
-    // collapsed, the entry is a bare icon: its name shows beside it (mouse rest, keyboard focus)
-    if (collapsed) TooltipArea(item.label, placement = TooltipPlacement.End) { row() } else row()
+    // collapsed, the entry is a bare icon: its name shows beside it (mouse rest, keyboard focus). The same tree either way,
+    // so the entry keeps its focus and its state while the sidebar opens or shuts
+    TooltipArea(item.label, placement = TooltipPlacement.End, enabled = collapsed) { row() }
 }
 
 // ---------------------------------------------------------------- top bars
