@@ -38,7 +38,12 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.core.view.WindowCompat
 import desktopkit.input.rememberInputModeState
+import desktopkit.input.TabNavigation
 import desktopkit.input.trackInputMode
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import desktopkit.settings.DeskPreferences
 import desktopkit.shell.CaptionArea
 import desktopkit.shell.CaptionElements
@@ -146,6 +151,15 @@ fun DesktopKitRoot(
                 .fillMaxSize()
                 .background(DeskTheme.colors.background)
                 .trackInputMode(inputMode)
+                // which keys move the focus: a table is one Tab stop (TabNavigation)
+                .onPreviewKeyEvent { TabNavigation.see(it); false }
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            if (awaitPointerEvent(PointerEventPass.Initial).type == PointerEventType.Press) TabNavigation.reset()
+                        }
+                    }
+                }
                 .windowInsetsPadding(padding),
         ) {
             val widthClass = WidthClass.fromWidth(maxWidth.value)
