@@ -56,6 +56,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.isUnspecified
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
@@ -66,6 +68,7 @@ import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
@@ -353,8 +356,9 @@ fun rememberCommandPaletteState(): CommandPaletteState = remember { CommandPalet
  *   a back arrow.
  * - The keyboard focus stays in the field: Up and Down choose, Enter runs, Ctrl+Enter opens in a
  *   new window (when the item can), Tab and Shift+Tab move between the [filters] (group names; "All"
- *   comes first), Esc, Back or a click on the scrim closes. The mouse chooses by hovering. Inside
- *   the shell, the focus goes back where it was when the palette closes.
+ *   comes first), Esc, Back or a click on the scrim closes. The mouse chooses the row it moves over
+ *   (2.5.0: by a move of its own: a row the list brings under a resting pointer is not chosen, the
+ *   arrows keep theirs). Inside the shell, the focus goes back where it was when the palette closes.
  * - [hint] is the grey text of the empty field.
  *
  * Inside [desktopkit.shell.DesktopShell] put it in the shell's `overlays`, so it is drawn over the
@@ -465,8 +469,15 @@ private fun PalettePanel(
     val listState = rememberLazyListState()
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-    // keeps the chosen row in view while the keyboard moves through the list
+    // 2.5.0: whether the pointer chooses: after a move of its own, not when the list moved under it
+    val pointer = remember { PointerChoice() }
+    val shownRows by rememberUpdatedState(rows)
+    val shownResults by rememberUpdatedState(results)
+    LaunchedEffect(state.query, state.filter) { pointer.byKeys() }
+    // keeps the chosen row in view while the keyboard moves through the list; not one the pointer chose: the list would
+    // move under it
     LaunchedEffect(selected, rows) {
+        if (pointer.chooses) return@LaunchedEffect
         val target = results.getOrNull(current()) ?: return@LaunchedEffect
         val index = rows.indexOf(target)
         val info = listState.layoutInfo
@@ -500,8 +511,16 @@ private fun PalettePanel(
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 when (event.key) {
-                    Key.DirectionDown -> { if (results.isNotEmpty()) selected = (current() + 1) % results.size; true }
-                    Key.DirectionUp -> { if (results.isNotEmpty()) selected = (current() - 1 + results.size) % results.size; true }
+                    Key.DirectionDown -> {
+                        pointer.byKeys()
+                        if (results.isNotEmpty()) selected = (current() + 1) % results.size
+                        true
+                    }
+                    Key.DirectionUp -> {
+                        pointer.byKeys()
+                        if (results.isNotEmpty()) selected = (current() - 1 + results.size) % results.size
+                        true
+                    }
                     Key.Enter, Key.NumPadEnter -> {
                         // 2.5.0: a held Enter runs once: on "show all" its repeats ran the result that took the line's place
                         if (event.nativeKeyEvent.repeatCount == 0) run(event.isCtrlPressed || event.isMetaPressed)
@@ -569,7 +588,32 @@ private fun PalettePanel(
         }
         LazyColumn(
             state = listState,
-            modifier = (if (compact) Modifier.weight(1f) else Modifier.heightIn(max = 440.dp)).fillMaxWidth(),
+            modifier = (if (compact) Modifier.weight(1f) else Modifier.heightIn(max = 440.dp)).fillMaxWidth()
+                // 2.5.0: the row under the pointer is chosen here, for the whole list, by where the pointer is in it (each row
+                // chose itself when the pointer came over it, also when the list brought it there under a resting pointer)
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull() ?: continue
+                            val hovers = (event.type == PointerEventType.Enter || event.type == PointerEventType.Move) && !change.pressed
+                            when {
+                                event.type == PointerEventType.Exit -> Unit
+                                // its wheel, a press, a drag: the pointer's own doing
+                                !hovers -> pointer.byPointer()
+                                pointer.hover(change.position) -> {
+                                    val info = listState.layoutInfo
+                                    // the lines' places are counted from under the list's padding
+                                    val at = change.position.y - info.beforeContentPadding
+                                    val line = info.visibleItemsInfo.firstOrNull { at >= it.offset && at < it.offset + it.size }
+                                        ?.let { shownRows.getOrNull(it.index) }
+                                    val index = if (line == null) -1 else shownResults.indexOf(line)
+                                    if (index >= 0) selected = index
+                                }
+                            }
+                        }
+                    }
+                },
             contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 6.dp, end = 6.dp, bottom = 8.dp),
         ) {
             itemsIndexed(rows) { _, line ->
@@ -579,7 +623,7 @@ private fun PalettePanel(
                         modifier = Modifier.padding(start = 12.dp, top = 10.dp, bottom = 4.dp))
                     row is PaletteRow.Result -> {
                         val index = results.indexOf(line)
-                        PaletteResultRow(row, chosen = index == chosenIndex, onHover = { selected = index }, onClick = {
+                        PaletteResultRow(row, chosen = index == chosenIndex, onClick = {
                             selected = index
                             run(false)
                         })
@@ -587,7 +631,7 @@ private fun PalettePanel(
                     line is PaletteLine.More -> {
                         val index = results.indexOf(line)
                         // chosen as it is shown whole: the list stays where it is (a tap left the choice above, and the list went back to it)
-                        PaletteMoreRow(line, chosen = index == chosenIndex, onHover = { selected = index }, onClick = {
+                        PaletteMoreRow(line, chosen = index == chosenIndex, onClick = {
                             selected = index
                             showAll(line.group)
                         })
@@ -603,7 +647,7 @@ private fun PalettePanel(
 }
 
 @Composable
-private fun PaletteResultRow(row: PaletteRow.Result, chosen: Boolean, onHover: () -> Unit, onClick: () -> Unit) {
+private fun PaletteResultRow(row: PaletteRow.Result, chosen: Boolean, onClick: () -> Unit) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
     val touch = DeskTheme.inputMode == InputMode.Touch
@@ -611,8 +655,6 @@ private fun PaletteResultRow(row: PaletteRow.Result, chosen: Boolean, onHover: (
     val keys = showShortcutHints()
     val interaction = remember { MutableInteractionSource() }
     val state = interaction.collectState()
-    val latestHover by rememberUpdatedState(onHover)
-    LaunchedEffect(state.hovered) { if (state.hovered) latestHover() }
     val item = row.item
     val shape = RoundedCornerShape(dimens.radiusControl)
     val textColor = if (chosen) colors.onSelection else colors.text
@@ -666,14 +708,12 @@ private fun PaletteResultRow(row: PaletteRow.Result, chosen: Boolean, onHover: (
  * click or a tap shows them all; the palette stays open.
  */
 @Composable
-private fun PaletteMoreRow(line: PaletteLine.More, chosen: Boolean, onHover: () -> Unit, onClick: () -> Unit) {
+private fun PaletteMoreRow(line: PaletteLine.More, chosen: Boolean, onClick: () -> Unit) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
     val touch = DeskTheme.inputMode == InputMode.Touch
     val interaction = remember { MutableInteractionSource() }
     val state = interaction.collectState()
-    val latestHover by rememberUpdatedState(onHover)
-    LaunchedEffect(state.hovered) { if (state.hovered) latestHover() }
     val shape = RoundedCornerShape(dimens.radiusControl)
     Row(
         Modifier
@@ -691,6 +731,44 @@ private fun PaletteMoreRow(line: PaletteLine.More, chosen: Boolean, onHover: () 
     ) {
         Text(stringResource(R.string.dk_palette_show_all, line.total), style = DeskTheme.type.body.copy(fontWeight = FontWeight.Medium),
             color = if (chosen) colors.onSelection else colors.accentText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/**
+ * 2.5.0: whether the pointer chooses the palette's row. After a layout Compose gives the pointer's last move again to
+ * what is under it now (for the hover states under a resting pointer), so each row the arrows scrolled under a resting
+ * pointer took the choice back: the arrows never got past the list's edge. The pointer chooses by a move of its own (or
+ * its wheel, a press); after a key chose a row or changed what is listed, not until it moves again.
+ */
+private class PointerChoice {
+    var chooses = false
+        private set
+    private var last = Offset.Unspecified
+    private var rested = Offset.Unspecified
+
+    /** A key chose a row, or changed what is listed. */
+    fun byKeys() {
+        chooses = false
+        rested = last
+    }
+
+    /** The pointer's wheel, a press, a drag. */
+    fun byPointer() {
+        chooses = true
+    }
+
+    /** The pointer is at [at] with nothing pressed: whether it chooses, which it does once it is away from where it rested. */
+    fun hover(at: Offset): Boolean {
+        last = at
+        if (!chooses) {
+            if (rested.isUnspecified) rested = at else if ((at - rested).getDistance() > MOVED_PX) chooses = true
+        }
+        return chooses
+    }
+
+    private companion object {
+        /** A move given again comes back at its place, to a rounding; a pointer that moved is a pixel away or more. */
+        const val MOVED_PX = 0.5f
     }
 }
 

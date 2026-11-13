@@ -4,8 +4,11 @@ import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.hasText
@@ -14,6 +17,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.pressKey
@@ -36,7 +40,7 @@ import org.robolectric.annotation.Config
  *
  * 2.5.0: a group that shows its best six ends with a line that counts its matches and shows them all. In 2.4.1 the
  * seventh match of a group was not shown, nothing said there was one, and without filter chips nothing led to it
- * (the commit before this one has that as a test).
+ * (the commit before this one has that as a test). A pointer resting over the list leaves the choice to the arrows.
  */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
@@ -219,6 +223,49 @@ class CommandPaletteTest {
         compose.onNodeWithText("10 sonucun hepsini göster").assertDoesNotExist()
         // the seventh track has the line's place, in sight
         compose.onNodeWithText("Gece şarkısı 7").assertIsDisplayed()
+    }
+
+    /**
+     * 2.5.0: a pointer resting over the list leaves the choice to the arrows while they scroll the list under it (each
+     * row that came under it took the choice back, so the arrows never got past the list's edge); a move of its own and
+     * the pointer chooses again, and the list stays where it is.
+     */
+    @Test
+    fun aRestingPointerLeavesTheChoiceToTheArrows() {
+        val state = CommandPaletteState()
+        // five groups of six: thirty rows and no line, nothing typed
+        val items = (1..30).map { n -> item("s$n", "Satır %02d".format(n), "Grup ${(n + 5) / 6}") }
+        compose.setContent {
+            DesktopKitTheme(inputMode = InputMode.Pointer) {
+                Box(Modifier.fillMaxSize()) { CommandPalette(state, items = { items }) }
+            }
+        }
+        compose.runOnIdle { state.open() }
+        compose.waitForIdle()
+        val field = compose.onNode(hasSetTextAction())
+        val origin = field.fetchSemanticsNode().boundsInRoot.topLeft
+        fun chosen(): String = compose.onAllNodes(SemanticsMatcher.expectValue(SemanticsProperties.Selected, true)).fetchSemanticsNodes()
+            .single().config[SemanticsProperties.Text].first().text
+        // the pointer comes to the third row and rests there: it chose the row
+        val rest = compose.onNodeWithText("Satır 03").fetchSemanticsNode().boundsInRoot.center - origin
+        field.performMouseInput {
+            moveTo(rest - Offset(24f, 0f))
+            moveTo(rest)
+        }
+        compose.waitForIdle()
+        assertEquals("Satır 03", chosen())
+        // twenty rows down, the list moving under the pointer
+        repeat(20) {
+            field.performKeyInput { pressKey(Key.DirectionDown) }
+            compose.waitForIdle()
+        }
+        assertEquals("Satır 23", chosen())
+        // the pointer moves to the next row: it is chosen, and the list stays where it is
+        val next = compose.onNodeWithText("Satır 24").fetchSemanticsNode().boundsInRoot
+        field.performMouseInput { moveTo(next.center - origin) }
+        compose.waitForIdle()
+        assertEquals("Satır 24", chosen())
+        assertEquals(next, compose.onNodeWithText("Satır 24").fetchSemanticsNode().boundsInRoot)
     }
 
     @Test
