@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.motion.MotionStripsTest" tests="21" skipped="0" failures="0" errors="0" timestamp="2026-11-13T01:44:15.793Z" hostname="runnervmwuk1x" time="6.566">
+  <properties/>
+  <testcase name="detailClose" classname="desktopkit.motion.MotionStripsTest" time="0.679"/>
+  <testcase name="sheetClose" classname="desktopkit.motion.MotionStripsTest" time="0.321"/>
+  <testcase name="detailTurnAround" classname="desktopkit.motion.MotionStripsTest" time="0.403"/>
+  <testcase name="tabBack" classname="desktopkit.motion.MotionStripsTest" time="0.388"/>
+  <testcase name="playerTapWithBarsHidden" classname="desktopkit.motion.MotionStripsTest" time="0.412"/>
+  <testcase name="detailBackCancelled" classname="desktopkit.motion.MotionStripsTest" time="0.272"/>
+  <testcase name="detailBack" classname="desktopkit.motion.MotionStripsTest" time="0.286"/>
+  <testcase name="detailOpen" classname="desktopkit.motion.MotionStripsTest" time="0.334"/>
+  <testcase name="playerExpand" classname="desktopkit.motion.MotionStripsTest" time="0.459"/>
+  <testcase name="tabBackButton" classname="desktopkit.motion.MotionStripsTest" time="0.334"/>
+  <testcase name="listAppear" classname="desktopkit.motion.MotionStripsTest" time="0.204"/>
+  <testcase name="playerCollapse" classname="desktopkit.motion.MotionStripsTest" time="0.307"/>
+  <testcase name="playerCollapseWithBarsHidden" classname="desktopkit.motion.MotionStripsTest" time="0.337"/>
+  <testcase name="plainDetailClose" classname="desktopkit.motion.MotionStripsTest" time="0.257"/>
+  <testcase name="timedDetailClose" classname="desktopkit.motion.MotionStripsTest" time="0.207"/>
+  <testcase name="plainDetailBack" classname="desktopkit.motion.MotionStripsTest" time="0.218"/>
+  <testcase name="plainDetailOpen" classname="desktopkit.motion.MotionStripsTest" time="0.252"/>
+  <testcase name="timedDetailOpen" classname="desktopkit.motion.MotionStripsTest" time="0.204"/>
+  <testcase name="tabSwitch" classname="desktopkit.motion.MotionStripsTest" time="0.236"/>
+  <testcase name="sheetOpen" classname="desktopkit.motion.MotionStripsTest" time="0.21"/>
+  <testcase name="playerBack" classname="desktopkit.motion.MotionStripsTest" time="0.239"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

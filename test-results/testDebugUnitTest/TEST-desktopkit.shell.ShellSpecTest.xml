@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.shell.ShellSpecTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-13T01:44:35.965Z" hostname="runnervmwuk1x" time="0.026">
+  <properties/>
+  <testcase name="widthThresholds" classname="desktopkit.shell.ShellSpecTest" time="0.0"/>
+  <testcase name="invalidSpecsAreRejected" classname="desktopkit.shell.ShellSpecTest" time="0.02"/>
+  <testcase name="everyItemIsReachableFromEveryChrome" classname="desktopkit.shell.ShellSpecTest" time="0.005"/>
+  <testcase name="defaults" classname="desktopkit.shell.ShellSpecTest" time="0.0"/>
+  <testcase name="navigationChrome" classname="desktopkit.shell.ShellSpecTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
