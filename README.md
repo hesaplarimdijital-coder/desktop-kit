@@ -65,7 +65,7 @@ Uygulama modülünün `build.gradle.kts` dosyası:
 
 ```kotlin
 dependencies {
-    implementation("com.github.hesaplarimdijital-coder:desktop-kit:2.5.0")
+    implementation("com.github.hesaplarimdijital-coder:desktop-kit:2.6.0")
     implementation("androidx.activity:activity-compose:1.13.0")
 }
 ```
@@ -166,6 +166,10 @@ val shortcuts = ShortcutRegistry(
   o zaman yazar.
 - Bir birim testinde `assertTrue(shortcuts.conflicts().isEmpty())` ile aynı tuşa iki iş bağlanmadığını denetle.
 
+
+Noktalama kısayolları (`/ , . - = + [ ]`) yazdıkları karakterle de eşleşir: Türkçe Q klavyede "/" Shift+7'dir ve
+hiçbir tuş `Key.Slash` göndermez; Ctrl+/ yine çalışır (2.6.0). Başka bir tuşa karakter vermek için
+`KeyChord(Key.X, ctrl = true, char = '?')`.
 ## Görünümü uygulamaya göre değiştirmek
 
 | Ne | Nasıl |
@@ -263,12 +267,17 @@ fun Sarkilar() {
 - `rememberShellContentPadding()` çağırmayan ekranlar eskisi gibi çubukların arasına yerleşir; 0.2.0 ekranları
   değiştirmeden aynı görünür (yalnızca onlar çubuk kayarken yeniden ölçülür).
 - Tablet ve DeX'te boşluk sıfırdır; yalnızca `DesktopShell(floatingPlayer = true)` iken altta yüzen oynatıcının yeri gelir.
+- Ekran, düzenini `BoxWithConstraints` ya da başka bir alt bileşimde seçip boşluğu onun içinden isteyebilir (2.6.0'dan
+  önce boşluk o zaman iki kez ekleniyordu).
+- İçinde WebView, video (`SurfaceView`, `TextureView`) ya da harita olan ekran `PauseGlassBlur()` çağırır: o ekran
+  açıkken cam bulanıklaştırmak yerine yarı saydam tonunu çizer. Bulanıklık içeriği her cam yüzey için bir kez daha
+  çizer; WebView her çizimi yeni bir görüntü alanı sanıp karolarını atar ve kaydırırken yanıp söner.
 
 ### Hareket katmanları
 
 | Pencere | Yer değiştiren, sürüklenen | Solma, renk |
 | --- | --- | --- |
-| Telefon (`WidthClass.Compact`) | `DeskMotion.gesture()`: 0,92 sönümlü 600 yay, görünür sekmesi yok; kesilebilir, fırlatma hızını alır, 300 ms'de yerleşir. `DeskMotion.open()`: dokunuşun açtıkları için Android'in standart yayı (0,9; 700) | Kısa, süreli |
+| Telefon (`WidthClass.Compact`) | `DeskMotion.gesture()`: 0,92 sönümlü 600 yay, görünür sekmesi yok; kesilebilir, fırlatma hızını alır, 300 ms'de yerleşir. `DeskMotion.open()`: dokunuşun açtıkları için Android'in standart yayı (0,9; 700). `DeskMotion.page()`: tam sayfa (ayrıntı) için yerini geçmeyen yay (1,0; 800) | Kısa, süreli |
 | Tablet ve DeX | 0.2.0 süreleri: 90 ms solma, 210 ms %98→%100 büyüme, DeX'te 150 ms geçiş, 300 ms panel | Aynı |
 | "Animasyonları kaldır" | Anında | Anında |
 
@@ -277,10 +286,12 @@ verilen süre, azaltılmış harekette atlama) ve `DeskMotion.fade(tier, tween(1
 (piksellerde `DeskMotion.PIXEL`, konumda `IntOffset.VisibilityThreshold`, kesirde `0.001f`): Compose eşiksiz yayı
 hedefin 0,01 yakınına gelince durdurur, bu da 300 ms'de yerleşmiş görünen yayı 300 ms daha çalıştırır.
 
-Telefonda bir listenin satırları sırayla gelir: `val gelis = rememberListAppear(yuklendi)` ve her satıra
-`Modifier.listAppear(gelis, index)`. Yerinde olan ilk sekiz satır 15 ms arayla solup 12 dp yükselerek gelir, sonra
-gelenler (kaydırılan, eklenen) olduğu gibi yerindedir; anahtar listenin ne zaman yeni sayılacağını söyler. Genişte
-ve azaltılmış harekette hiçbir şey oynamaz. View kodunda
+Telefonda bir listenin satırları, verisi liste göründükten sonra gelince sırayla gelir:
+`val gelis = rememberListAppear(yuklendi)` ve her satıra `Modifier.listAppear(gelis, index)`. Anahtar değişince
+(iskeletten sonra veri, bir aramanın sonuçları) yerinde olan ilk sekiz satır 15 ms arayla solup 12 dp yükselerek gelir,
+sonra gelenler (kaydırılan, eklenen) olduğu gibi yerindedir. Satırlarıyla birlikte görünen liste (yeniden açılan
+sekme, geri dönülen ekran, anahtarsız liste) satırlarını hemen gösterir (2.6.0). Genişte ve azaltılmış harekette
+hiçbir şey oynamaz. View kodunda
 `ViewAnimators.bind(view).start(animator)`, Compose'da `rememberViewAnimators()`: ekran kapanınca ve yapılandırma
 değişince animatör durur ve son değerine atlar.
 
@@ -352,7 +363,11 @@ WorkstationLayout(
 ```
 
 Ayırıcı sürüklenir ya da odaktayken ←/→ ile taşınır. Telefonda yalnızca `main` görünür. Paneli araç çubuğundan
-açıp kapatmak için `InspectorToggleButton(panel)`.
+açıp kapatmak için `InspectorToggleButton(panel)`. Panel kapalı başlasın istersen `rememberInspectorState(prefs, defaultCollapsed = true)`:
+kullanıcı bir kez açınca onun seçimi saklanır.
+
+`HorizontalSplitPane`'in ayırıcısı bölmelerin sınırında durur, geri sürüklenince hemen kıpırdar. Yerini pencereler
+ve açılışlar arasında saklamak için `rememberSplitState(360.dp, prefs, "posta")`.
 
 ### Tablo sütunları
 
@@ -362,6 +377,25 @@ DenseTable(…, columnsState = rememberTableColumnsState("sarkilar", prefs))
 
 Başlığa sağ tık, uzun basma ya da Menu tuşu: sütunları göster/gizle, sola/sağa taşı, sıfırla. Seçim saklanır;
 sütunlar `TableColumn(id = "sure")` ile tanınır. Satırlar başlığın altından geçerken başlık cama döner.
+
+```kotlin
+DenseTable(
+    columns = listOf(
+        TableColumn("Yıldız", ColumnWidth.Fixed(40.dp), sortable = false,
+            cell = { ileti -> Icon(if (ileti.yildizli) Ikonlar.Dolu else Ikonlar.Bos, null) },  // kendi hücren
+            onCellClick = { ileti -> yildizla(ileti) },             // satırı açmadan kendi düğmesi
+            cellClickLabel = { "Yıldızı değiştir" },
+        ) { if (it.yildizli) "★" else "" },                        // sıralama ve TalkBack için
+        TableColumn("Kimden", ColumnWidth.Weight(1f)) { it.kimden },
+        TableColumn("Ek", ColumnWidth.Weight(2f), ellipsis = TextOverflow.MiddleEllipsis) { it.ekAdi },  // uzantı kalır
+    ),
+    rows = iletiler, key = { it.id }, onRowClick = { i, _ -> ac(i) },
+    rowEmphasis = { !it.okundu },                                  // okunmamış: kalın
+    emptyContent = { MessageScreen("Bu klasörde ileti yok", DeskIcons.Folder) },
+)
+```
+
+Sıralanan sütunun başlığı TalkBack'e yönünü söyler ("Artan sırada"). `DeskGrid(emptyContent = …)` ızgarada da aynı.
 
 ### İletişim kutusu
 
@@ -489,6 +523,38 @@ DeskButton("Gönder", ::gönder, Modifier.keepsKeyboardOpen())   // desktopkit.s
 Fare tıklamasını Compose kendisi yönetir: varsayılan olarak odaktaki öğenin dışına tıklamak odağı alır
 (`ComposeView.autoClearFocusBehavior`).
 
+### Gezinmede rozet ve yeniden dokunma
+
+```kotlin
+DesktopShell(…,
+    badges = mapOf("gelen" to "4"),                                     // açık kenar çubuğunda yazı
+    iconBadges = mapOf("gelen" to NavIconBadge(4, "4 okunmamış")),       // alt çubuk, ray, kapalı kenar çubuğu
+)
+```
+
+Simgenin köşesinde vurgu renginde küçük bir sayı (99'dan sonra "99+") ya da sayı 0 ise nokta; "Daha fazla"
+içindeki bir ekranın rozeti varsa "Daha fazla"da nokta. TalkBack girişin adını ve rozeti birlikte okur.
+
+Gösterilen ekranın girişine yeniden dokunulunca ekran bunu duyar, Android'in kendi uygulamalarındaki gibi başa döner:
+
+```kotlin
+val liste = rememberLazyListState()
+OnReselect { liste.animateScrollToItem(0) }
+```
+
+### Satırlar, ayarlar, düğmeler
+
+- `DeskListRow(subtitle = konu, preview = önizleme, previewMaxLines = 2)`: konunun altında önizleme;
+  `subtitleMaxLines` alt başlığı sardırır. `moreButton = true` satırın sonuna menüyü açan "⋯" koyar: dokunmatikte
+  uzun basmayı herkes bulmaz.
+- `SettingRow("ayse@ornek.com", subtitle = "Gmail", onClick = { hesabiAc() })`: satırın tamamı bir düğme, sonunda
+  ok; denetim (`control`) artık isteğe bağlı.
+- `DeskButton("Hesabı kaldır", ::kaldir, danger = true)`: geri alınamayan eylem; yazı, simge ve kenar tehlike
+  renginde, hiçbir zaman dolu değil.
+- `MessageScreen(…, actionPrimary = true)`: boş ekranın tek yolu olan düğme vurgu renginde dolu.
+- `GlassBottomSheet`'in tutamağı aynı zamanda kapatma düğmesidir (TalkBack, Anahtar Erişimi, Tab); kabuğun içinde
+  aynı anda tek sayfa açık kalır.
+
 ### Ekran geçişleri
 
 `DesktopShell(transitions = ShellTransitions.Default)` (varsayılan): telefonda (alt çubuklu düzen)
@@ -543,6 +609,11 @@ CompactTopBar(
 - Sistemin Geri hareketi `onBack`'i çağırır; uygulamanın ayrıca `BackHandler` yazması gerekmez.
 - Ekranın hangi düzende olduğu: `currentWidthClass()` ya da `LocalWidthClass.current`
   (`DesktopShell` ve `DesktopKitRoot` sağlar).
+- `CompactTopBar(showOnRail = true)`: tablette (ray düzeninde) de geçerli olur. Ayarların üstüne açılan bir sayfa
+  ("Hesap ekle") başlığını ve geri yolunu orada da gösterir. Kenar çubuklu düzen (DeX) hiç almaz.
+- Bırakılan ekranın çubuğu hemen çekilir: ekran değişirken başlık, geri düğmesi ve eylemler tek adımda değişir (2.6.0
+  öncesi başlık önce, düğmeler ekranın çıkışı bitince değişiyordu). Başlık yalnızca sözcükleri değişince solar; geri
+  düğmesi gelip giderken başlık yana kayar.
 
 ### Sayfa başlığı: `PageHeader`
 
@@ -583,7 +654,12 @@ scope.launch {
 ```
 
 Yeni bildirim ekrandakinin yerini hemen alır (yerine gelinenin `show` çağrısı `ToastResult.Dismissed` döner);
-telefonda alt çubuğun ve oynatıcının, tablet ve DeX'te oynatıcının üstünde çıkar.
+telefonda alt çubuğun ve oynatıcının, tablet ve DeX'te oynatıcının üstünde çıkar. Süresini kendin vermek için `show(…, durationMillis = 15_000)` ("gönderimi geri al" süresi); TalkBack
+kullanan biri için o da uzar. İmleç bildirimin üstünde durdukça ya da odak içindeyken süre durur, sonra kaldığı yerden
+sayar: DeX'te fare "Geri al"a ulaşmadan bildirim gitmez.
+
+`StatusBanner(…, secondaryActionLabel = "Bu gönderenden hep göster", onSecondaryAction = …)` şeride ikinci bir eylem
+ekler; telefonda ikisi metnin altında durur.
 
 ### Komut paleti
 
@@ -659,6 +735,10 @@ uçarken de yuvarlak kalsın diye biçimini ver: `detailSharedElement("kapak-$id
 
 - `./gradlew :kit:testDebugUnitTest`: kontrast, boyut, kabuk durumu, kısayol ve erişilebilirlik testleri ile
   ekran görüntüleri (Robolectric, API 36; Java 21 gerekir). Görüntüler `kit/build/outputs/screenshots` altına yazılır.
+- Tasarım dilinin değerleri [DESIGN.md](DESIGN.md)'de, kitle ya da kitte çalışan yapay zekâ yardımcıları için
+  kurallar [AGENTS.md](AGENTS.md)'de. CI önce `tools/design_check.py`'ı çalıştırır: yeni bir ham renk, platform
+  `Toast`'u, boş `onClick`, sonsuz animasyon, 4 dp ızgarasının dışında bir ölçü ya da "!" ile biten bir metin derlemeyi
+  durdurur (bugün olanlar `tools/design_baseline.json`'da).
 - CI her gönderimde derler, testleri çalıştırır ve görüntüleri `kit/src/test/screenshots`
   ile karşılaştırır. `main` dalında görüntüler `ci/screenshots` dalına konur; örnek APK de
   Actions çıktısı olarak indirilebilir. Çekme isteklerinde görüntüler `ci/screenshots-pr-<numara>`, derleme çıktısı
@@ -668,9 +748,9 @@ uçarken de yuvarlak kalsın diye biçimini ver: `detailSharedElement("kapak-$id
 ## Sürüm yayınlamak
 
 1. `CHANGELOG.md` dosyasına ne değiştiğini yaz, `gradle.properties` içindeki `VERSION_NAME`'i güncelle.
-2. Önce PR'ı birleştir, sonra GitHub'da **Releases → Draft a new release** ile etiketi (`2.5.0`) `main` üzerinde
-   oluştur; ya da `git tag 2.5.0 && git push origin 2.5.0`. Etiket birleştirmeden önce açılırsa eski kodu gösterir.
-3. JitPack ilk istekte derler (`jitpack.yml`, Java 17). Uygulamada sürümü `2.5.0` yapman yeterli.
+2. Önce PR'ı birleştir, sonra GitHub'da **Releases → Draft a new release** ile etiketi (`2.6.0`) `main` üzerinde
+   oluştur; ya da `git tag 2.6.0 && git push origin 2.6.0`. Etiket birleştirmeden önce açılırsa eski kodu gösterir.
+3. JitPack ilk istekte derler (`jitpack.yml`, Java 17). Uygulamada sürümü `2.6.0` yapman yeterli.
 
 Sürüm numaraları [SemVer](https://semver.org/lang/tr/) kuralına uyar: uyumu bozan değişiklik
 ana sürümü, yeni özellik ikinci sayıyı, düzeltme üçüncüyü artırır.

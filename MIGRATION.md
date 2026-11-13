@@ -1,12 +1,12 @@
-# 2.5.0'a geçiş
+# 2.6.0'a geçiş
 
-Bu rehber kiti kullanan uygulamaları en güncel sürüme, 2.5.0'a taşımak için. 0.1.3'ten gelenler baştan
+Bu rehber kiti kullanan uygulamaları en güncel sürüme, 2.6.0'a taşımak için. 0.1.3'ten gelenler baştan
 başlar; adımlardan sonra [görünümde fark edecekleri](#013ten-gelince-görünümde-fark-edecekleriniz) ayrıca
 yazılı. 1.0.0'dan geçenler 1. adımdan sonra doğrudan [1.0'dan 2.0'a](#10dan-20a) bölümüne atlayabilir. 2.0.0,
-2.1.0, 2.2.0, 2.3.0, 2.4.0 ya da 2.4.1 kullananlar [2.0.0'dan 2.1.0'a](#200dan-210a),
+2.1.0, 2.2.0, 2.3.0, 2.4.0, 2.4.1 ya da 2.5.0 kullananlar [2.0.0'dan 2.1.0'a](#200dan-210a),
 [2.1.0'dan 2.2.0'a](#210dan-220a), [2.2.0'dan 2.3.0'a](#220dan-230a), [2.3.0'dan 2.4.0'a](#230dan-240a),
-[2.4.0'dan 2.4.1'e](#240dan-241e) ve [2.4.1'den 2.5.0'a](#241den-250a) bölümlerinden yalnızca kendi sürümünden
-sonrakilere bakar.
+[2.4.0'dan 2.4.1'e](#240dan-241e), [2.4.1'den 2.5.0'a](#241den-250a) ve [2.5.0'dan 2.6.0'a](#250den-260a)
+bölümlerinden yalnızca kendi sürümünden sonrakilere bakar.
 
 Sıra şöyle: önce derleme ortamı (kitin kendisi aynı adımları `7845eb5` gönderisinde attı, örnek olarak
 oraya bakılabilir), sonra uygulamanın kendi yazdığı bileşenler kitinkilerle değiştirilir, en son yeni
@@ -14,7 +14,7 @@ oraya bakılabilir), sonra uygulamanın kendi yazdığı bileşenler kitinkilerl
 
 ## 1. Derleme ortamı
 
-| | 0.1.3 uygulamaları | 2.5.0 |
+| | 0.1.3 uygulamaları | 2.6.0 |
 | --- | --- | --- |
 | Android Gradle eklentisi (AGP) | 8.7.3 | 9.4.1 (en az 9.1.1) |
 | Gradle | 8.11.1 | 9.8.2 |
@@ -33,7 +33,7 @@ cihazlar uygulamayı kuramaz. Uygulamalar Play'de olmadığı için başka bir e
 Adımlar:
 
 1. `gradle/wrapper/gradle-wrapper.properties`: `distributionUrl=https\://services.gradle.org/distributions/gradle-9.8.2-bin.zip`
-2. `gradle/libs.versions.toml`: yukarıdaki sürümler ve `desktopKit = "2.5.0"`. En kolayı kitin kendi
+2. `gradle/libs.versions.toml`: yukarıdaki sürümler ve `desktopKit = "2.6.0"`. En kolayı kitin kendi
    `gradle/libs.versions.toml` dosyasındaki sürümleri almak.
 3. AGP 9 Kotlin'i kendisi derler (yerleşik Kotlin). Modüllerden `alias(libs.plugins.kotlin.android)`
    satırını sil, `kotlin.compose` kalsın. Kökteki `build.gradle.kts` dosyasında eklentiyi uygulamadan
@@ -360,3 +360,49 @@ kendi hareket edince seçer; oklar listeyi duran imlecin altında kaydırırken 
 - **Ekran görüntüsü testleri:** palette altıdan çok eşleşmesi olan bir grup varsa görüntüye bir satır eklenir.
 - **Kitin paletini kendi koduna kopyalayıp uyarlayan uygulama** (Nağmedar'ın paleti kendi kodudur) değişikliği kitten
   almaz.
+
+## 2.5.0'dan 2.6.0'a
+
+Kod değişmeden derlenir; sürümü `2.6.0` yapmak yeter. Herkese açık her eklenti varsayılan değerli bir parametre ya da
+yeni bir fonksiyon. 2.5.0'a karşı derlenmiş bir kitaplık (başka bir modül) yeniden derlenmelidir: bazı bileşenlerin
+parametre listesi uzadı. Ne değiştiği [CHANGELOG](CHANGELOG.md#260-2026-11-13)'da; uygulamanın bakması gerekenler:
+
+- **Hareket (görünür):** telefonda ayrıntı sayfası yerine taşmadan oturur; basılan denetim bırakınca dinlenme
+  boyunu geçmez; gezinme hapı ve sekme çizgisi sekmez (`DeskMotion.spatial()` 0,85 yerine 0,9). Kendi
+  animasyonunda `spatial()` kullanan uygulama da bunu alır.
+- **`rememberListAppear`:** satırlar artık yalnızca anahtar değişince (veri liste göründükten sonra gelince) sırayla
+  gelir. Anahtarsız `rememberListAppear()` hiç oynatmaz; ekran her açıldığında satırların yükselmesini isteyen uygulama
+  yükleme durumunu anahtar verir: `rememberListAppear(yuklendi)`. İskeletten sonra gelen veride hareket eskisi gibi.
+- **Telefonun üst çubuğu:** ekran değişirken çubuk tek adımda değişir. Bırakılan ekranın `CompactTopBar` çağrısı
+  geçiş başlar başlamaz sayılmaz; uygulamanın yapacağı bir şey yok. DeskMail'in "Şimdilik" yolu (rota kümesi
+  değişince ekrana geri dönmek) etkilenmez.
+- **`rememberShellContentPadding`:** `BoxWithConstraints` ya da başka bir alt bileşimde çağrılabilir. Bu yüzden
+  dolguyu ekranın kendi bileşiminde isteyip aşağıya parametre olarak geçen uygulama (DeskMail'in `MailScreen`'i)
+  isterse bunu kaldırabilir; kalması da doğru çalışır.
+- **`DetailTransition`:** liste, ayrıntı onu kaplarken `rememberSaveable` durumunu saklar ve geri gelince bulur.
+  Durumu `DetailTransition`'ın dışında tutan uygulama (kaydırma konumu, süzgeçler) bunu isterse içeri alabilir.
+- **Cam ve WebView:** içinde WebView ya da video olan ekran `PauseGlassBlur()` çağırır. DeskMail'in WebView'ı kendi
+  donanım katmanına çizme yolu (`webLayerFor`) bunun yerine bırakılabilir; uzun iletide de çalışır.
+- **`HorizontalSplitPane`:** `dividerLabel` artık `String?`; verilmezse "Bölmeleri boyutlandır". Sürükleme
+  bölmelerin sınırında durur. Konumu saklamak için `rememberSplitState(genislik, prefs, "anahtar")`.
+- **`GlassBottomSheet`:** kabuğun içinde bir sayfa açılırken açık olan başka sayfa kapanır (onun `onDismiss`'i
+  çağrılır). İki sayfayı üst üste açan uygulama ikincisini açmadan önce birincisini kapatırdı zaten; açmıyorsa
+  davranış değişti demektir.
+- **`SettingRow`:** `control` artık isteğe bağlı ve önünde yeni bir `onClick` parametresi var. Denetimi sondaki
+  lambda ile veren çağrılar aynen derlenir.
+- **`TableColumn`:** `value`'nun önüne `ellipsis`, `cell`, `onCellClick` ve `cellClickLabel` geldi. `value`'yu sondaki
+  lambda ya da adıyla veren çağrılar aynen derlenir; `id`'den sonra `value`'yu sırasıyla veren bir çağrı varsa adını
+  yaz.
+- **`KeyChord`:** `char` parametresi eklendi (veri sınıfı). Noktalama kısayolları yazılan karakterle de eşleşir;
+  DeskMail'in tek tuşlu "/" için yazdığı `KeyRouter.typesSlash` artık gerekmez.
+- **Bildirimler:** imleç üstündeyken ya da odak içindeyken süre durur; uygulamanın yapacağı bir şey yok. Süreyi
+  kendisi sayan uygulama (DeskMail'in "gönderimi geri al"ı: `Indefinite` + `withTimeoutOrNull`) bunun yerine
+  `show(…, durationMillis = …)` verebilir; o zaman TalkBack kullanan biri için süre de uzar.
+- **Türkçe metin:** ayarların görünüm bölümü "Görünüş" (menü çubuğundaki "Görünüm" ile karışıyordu); İngilizce
+  "Close the player" "Collapse the player" oldu. Bu metinleri ekran görüntüsünde arayan test varsa güncellenir.
+- **Ekran görüntüsü testleri:** telefonun üst çubuğunda başlık bir karede ötekinden farklı olabilir (geri düğmesi
+  kayarak geliyor), hareket şeritlerinde satırlar ve ayrıntı farklı oynar.
+
+DeskMail'in `docs/KIT-ISTEKLERI.md` listesinden bu sürümde gelenler: 1, 2, 6, 8, 9, 10, 11, 12, 13, 15, 16, 17, 18,
+19, 20, 21. "Şimdilik" yolları kaldırılabilir; hangisinin neyle değiştiği CHANGELOG'da. Kalanlar (3, 4, 5, 7, 14, 22,
+23) sonraki sürümde.
