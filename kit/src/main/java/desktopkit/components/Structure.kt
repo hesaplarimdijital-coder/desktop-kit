@@ -10,6 +10,8 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import desktopkit.input.TabNavigation
 import desktopkit.theme.rememberDeskHaptics
 import androidx.compose.animation.core.animateFloatAsState
@@ -444,6 +446,7 @@ fun TabStrip(
     val rule = DeskTheme.colors.border
     val label = stringResource(R.string.dk_tabs)
     val strip = remember { TabStripState() }
+    strip.rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     CompositionLocalProvider(LocalTabStrip provides strip) {
         Row(
             modifier = modifier
@@ -474,6 +477,9 @@ internal class TabStripState {
 
     val tabs = mutableListOf<Tab>()
 
+    /** Whether the strip runs right to left (Arabic, Hebrew): its first tab is the rightmost. */
+    var rtl = false
+
     /**
      * Whether Tab stops at [tab]: the focused tab while the focus is in the strip (so Tab leaves it), else the
      * selected one, else the first.
@@ -483,11 +489,14 @@ internal class TabStripState {
         return when {
             focused != null -> tab === focused
             tabs.any { it.selected } -> tab.selected
-            else -> tab === tabs.minByOrNull { it.x }
+            else -> tab === (if (rtl) tabs.maxByOrNull { it.x } else tabs.minByOrNull { it.x })
         }
     }
 
-    /** Moves the focus to the tab beside the focused one ([key] Left, Right, Home, End); false for another key. */
+    /**
+     * Moves the focus to the tab beside the focused one ([key] Left, Right: the one on that side; Home, End: the first
+     * and the last, which right to left are the rightmost and the leftmost); false for another key.
+     */
     fun move(key: Key): Boolean {
         val ordered = tabs.sortedBy { it.x }
         val at = ordered.indexOfFirst { it.focused }
@@ -495,8 +504,8 @@ internal class TabStripState {
         val target = when (key) {
             Key.DirectionLeft -> ordered.getOrNull(at - 1)
             Key.DirectionRight -> ordered.getOrNull(at + 1)
-            Key.MoveHome -> ordered.firstOrNull()
-            Key.MoveEnd -> ordered.lastOrNull()
+            Key.MoveHome -> if (rtl) ordered.lastOrNull() else ordered.firstOrNull()
+            Key.MoveEnd -> if (rtl) ordered.firstOrNull() else ordered.lastOrNull()
             else -> return false
         }
         target?.let { runCatching { it.focus.requestFocus() } }

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -16,14 +17,19 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.InputModeManager
 import androidx.compose.ui.platform.LocalInputModeManager
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.requestFocus
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import desktopkit.DesktopKitRoot
@@ -37,6 +43,7 @@ import desktopkit.theme.InputMode
 import desktopkit.theme.ThemeMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -116,6 +123,35 @@ class FocusStopsTest {
     }
 
     @Test
+    fun rightToLeftHomeIsTheFirstTab() {
+        var selected by mutableStateOf(1)
+        root {
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                Column {
+                    DeskButton("Önce", {})
+                    TabStrip {
+                        listOf("Birinci", "İkinci", "Üçüncü").forEachIndexed { i, name ->
+                            DeskTab(name, selected = i == selected, onClick = { selected = i })
+                        }
+                    }
+                    DeskButton("Sonra", {})
+                }
+            }
+        }
+        compose.onNodeWithText("Önce").requestFocus()
+        press(KeyEvent.KEYCODE_TAB)
+        assertEquals("İkinci", focusedText())
+        // the first tab is the rightmost: Home goes there, End to the leftmost
+        press(KeyEvent.KEYCODE_MOVE_HOME)
+        assertEquals("Birinci", focusedText())
+        press(KeyEvent.KEYCODE_MOVE_END)
+        assertEquals("Üçüncü", focusedText())
+        // and the arrows go the way they point: right, toward the first
+        press(KeyEvent.KEYCODE_DPAD_RIGHT)
+        assertEquals("İkinci", focusedText())
+    }
+
+    @Test
     fun aCoverGridIsOneStop() {
         val albums = (1..24).map { "Albüm $it" }
         root {
@@ -134,16 +170,14 @@ class FocusStopsTest {
         press(KeyEvent.KEYCODE_DPAD_RIGHT)
         assertNotEquals(first, focusedText())
         assertEquals(true, focusedText()?.contains("Albüm 2"))
-        // Tab goes through the focused cover's own buttons (Play, "⋯"), then out of the grid: no other cover
-        val reached = mutableListOf<String?>()
-        repeat(4) {
-            if (focusedText() != "Sonra") {
-                press(KeyEvent.KEYCODE_TAB)
-                reached += focusedText()
-            }
-        }
-        assertEquals("Tab left the grid: $reached", "Sonra", focusedText())
-        assertEquals("no other cover on the way: $reached", emptyList<String>(), reached.filterNotNull().filter { "Albüm" in it })
+        // Tab leaves the grid at once: not through the cover's own buttons (Play, "⋯": Enter and the menu key do
+        // their work), not through another cover
+        press(KeyEvent.KEYCODE_TAB)
+        assertEquals("Tab left the grid", "Sonra", focusedText())
+        press(KeyEvent.KEYCODE_TAB, shift = true)
+        assertEquals("and comes back at the cover it left", true, focusedText()?.contains("Albüm 2"))
+        press(KeyEvent.KEYCODE_TAB, shift = true)
+        assertEquals("Shift+Tab leaves at once too", "Önce", focusedText())
     }
 
     @Test
@@ -158,7 +192,7 @@ class FocusStopsTest {
                         DeskButton("Arkada", {})
                         Text("ekran")
                     }
-                    GlassBottomSheet(visible = open, onDismiss = { open = false }, title = "Sayfa") {
+                    GlassBottomSheet(visible = open, onDismiss = { open = false }, title = "Sayfa", modifier = Modifier.testTag("sheet")) {
                         DeskButton("Bir", {})
                         DeskButton("İki", {})
                     }
@@ -167,11 +201,28 @@ class FocusStopsTest {
         }
         compose.waitForIdle()
         compose.runOnIdle { inputModeManager.requestInputMode(ComposeInputMode.Keyboard) }
+        compose.onNodeWithText("Arkada").requestFocus()
         open = true
         compose.waitForIdle()
+        // at once, from the sheet itself (it takes the focus as it opens), and then from its buttons
+        press(KeyEvent.KEYCODE_TAB, shift = true)
+        assertTrue("Shift+Tab stays in the sheet", focusInSheet())
         repeat(6) {
             press(KeyEvent.KEYCODE_TAB)
-            assertNotEquals("Tab stays in the sheet", "Arkada", focusedText())
+            assertTrue("Tab stays in the sheet", focusInSheet())
         }
+        repeat(6) {
+            press(KeyEvent.KEYCODE_TAB, shift = true)
+            assertTrue("Shift+Tab stays in the sheet", focusInSheet())
+        }
+        // closed: the focus goes back where it was, the sheet holds it no longer
+        open = false
+        compose.waitForIdle()
+        assertEquals("Arkada", focusedText())
     }
+
+    /** Whether the keyboard's focus is on the sheet (tagged "sheet") or on something in it. */
+    private fun focusInSheet(): Boolean =
+        compose.onAllNodes(isFocused() and (hasTestTag("sheet") or hasAnyAncestor(hasTestTag("sheet"))), useUnmergedTree = true)
+            .fetchSemanticsNodes().isNotEmpty()
 }

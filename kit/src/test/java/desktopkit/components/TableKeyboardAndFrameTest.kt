@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -29,6 +30,7 @@ import desktopkit.DesktopKitRoot
 import desktopkit.input.TabNavigation
 import desktopkit.settings.rememberDeskPreferences
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -117,6 +119,58 @@ class TableKeyboardAndFrameTest {
         // and Tab leaves the table at once
         press(KeyEvent.KEYCODE_TAB)
         assertEquals("Sonra", focusedText())
+    }
+
+    @Test
+    fun tabLeavesALongTableAtOnceAndItsStarsAreNoStops() {
+        // a star column of buttons and many rows: Tab used to search the rows after the focused one, laying each out in
+        // turn (a freeze in a long table), and to stop at every star on the way
+        val many = List(400) { "Kayıt %03d".format(it + 1) }
+        val laidOut = mutableSetOf<String>()
+        var starred by mutableStateOf(setOf<String>())
+        compose.runOnUiThread { compose.activity.actionBar?.hide() }
+        compose.setContent {
+            view = LocalView.current
+            inputModeManager = LocalInputModeManager.current
+            DesktopKitRoot(rememberDeskPreferences()) {
+                Column {
+                    DeskButton("Önce", {})
+                    DenseTable(
+                        columns = listOf(
+                            TableColumn<String>("Ad", ColumnWidth.Weight(1f)) { it },
+                            TableColumn<String>(
+                                "Yıldız", ColumnWidth.Fixed(40.dp), sortable = false,
+                                cell = { item ->
+                                    laidOut += item
+                                    Text(if (item in starred) "★" else "☆")
+                                },
+                                onCellClick = { item -> starred = starred + item },
+                                cellClickLabel = { "Yıldızla" },
+                            ) { if (it in starred) "1" else "0" },
+                        ),
+                        rows = many,
+                        key = { it },
+                        onRowClick = { _, _ -> },
+                        modifier = Modifier.fillMaxWidth().height(320.dp),
+                    )
+                    DeskButton("Sonra", {})
+                }
+            }
+        }
+        compose.waitForIdle()
+        compose.runOnIdle { inputModeManager.requestInputMode(ComposeInputMode.Keyboard) }
+        compose.onNodeWithText("Önce").requestFocus()
+        press(KeyEvent.KEYCODE_TAB)
+        val row = focusedText()
+        assertTrue("Tab came into the table: $row", row?.contains("Kayıt 001") == true)
+        laidOut.clear()
+        press(KeyEvent.KEYCODE_TAB)
+        assertEquals("Tab left the table at once, past the stars", "Sonra", focusedText())
+        assertTrue("no rows laid out to look for a stop: ${laidOut.size}", laidOut.size < 40)
+        press(KeyEvent.KEYCODE_TAB, shift = true)
+        assertEquals("Shift+Tab comes back at the row", row, focusedText())
+        press(KeyEvent.KEYCODE_TAB, shift = true)
+        assertEquals("and leaves at once the other way", "Önce", focusedText())
     }
 
     @Test
