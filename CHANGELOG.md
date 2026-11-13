@@ -14,17 +14,33 @@ sayıyı artırır.
   sonuç verir; başlıkta sayı yok.
 - **Satır:** "9 sonucun hepsini göster" (İngilizce arayüzde "Show all 9"). Oklar onda durur; Enter, tıklama ya da
   dokunuş grubun hepsini gösterir, palet açık kalır. Seçim satırın olduğu yerde kalır: orası artık grubun sıradaki
-  sonucudur. Grup, açıldığı sorgu ve süzgeç için bütün kalır; palet yeniden açılınca gruplar yine en iyi altılarıyla
-  başlar.
+  sonucudur; liste kımıldamaz. Basılı tutulan Enter bir kez çalışır (tekrarları satırın yerine gelen sonucu
+  çalıştırırdı). Grup, açıldığı sorgu ve süzgeç için bütün kalır; palet yeniden açılınca gruplar yine en iyi
+  altılarıyla başlar.
+- **Duran fare:** fare listenin üzerinde dururken oklar listeyi kaydırınca, altına gelen her satır seçimi oklardan
+  geri alıyordu; oklar listenin kenarını geçemiyordu. Compose bir yerleşimden sonra imlecin son hareketini o an altında
+  olana yeniden verir (duran imlecin altındaki üzerine gelme durumları için), palet de satırı üzerine gelinince
+  seçiyordu. 2.4.1'in kodu da böyleydi; "hepsini göster" ile listeler uzadı. Satırı artık liste seçer, imlecin
+  listedeki yerine göre ve yalnız imleç kendi hareket edince (tekerleği, basılması da sayılır); bir tuş satır seçince
+  ya da sorgu değişince imleç yeniden hareket edene kadar seçmez. İmlecin seçtiği satır için liste kaymaz.
 - **Sayı:** grubun eşleşmelerinin hepsi, gösterilen altı dahil. "En iyi eşleşme" olarak yukarı alınan sonuç sayılmaz.
 - **Değişmeyenler:** süzgeç seçilince grup eskisi gibi bütün gelir, satır çıkmaz. Altı ya da daha az eşleşmesi olan
-  grupta satır yoktur. `PaletteSearch.rows` aynı satırları verir (en iyi altı; başlık ve sonuçtan başka tür yok);
-  palet artık kit içi bir listeden çizer. `PaletteRow`, `PaletteItem`, `CommandPaletteState` ve `CommandPalette`
+  grupta satır yoktur. `PaletteSearch.rows` aynı satırları verir (en iyi altı; başlık ve sonuçtan başka tür yok;
+  `perGroup = 0` ile grupların başlığı da yok); palet artık kit içi bir listeden çizer. `PaletteRow`, `PaletteItem`, `CommandPaletteState` ve `CommandPalette`
   aynıdır.
 - **Testler:** PR'ın ilk gönderisi 2.4.1'in davranışını kaydeder (yedinci eşleşme görünmez; oklar yedinci satırdan
   sonra başa döner). İkincisi düzeltip testi çevirir: satır dokuzu sayar, üzerinde Enter grubu açar ve palet açık
   kalır, seçim sekizinci albümdedir ve Enter onu çalıştırır; tıklama da açar; başka bir sorguda satır yeniden
-  hesaplanır.
+  hesaplanır. Üçüncüsü PR'ın bağımsız incelemesinin bulduklarını düzeltir: dokunuşla açılan grupta liste, dokunuştan
+  önce seçili olan sonuca geri kayıyordu (satır dokunuşla seçilmiyordu); `rows(perGroup = 0)` altı boş grup başlıkları
+  veriyordu; basılı Enter; küçülen listede seçimin sonun ötesinde kalabilmesi. Testi iki grupla (ikisi de altıdan
+  çok), Enter basılı tutularak yeniden yazıldı; "başka bir sorgu" kısmı hiç kırmızı olamıyordu (" 1" ile altıdan çok
+  eşleşen grup kalmıyordu), artık "gec" ile açılan grup "e" yazılınca yine en iyi altısına döner. Dokunuş testi
+  (Touch): liste parçaların satırına inmiş, satıra dokunulur, yedinci parça görünürdür. Dördüncüsü duran fareyi
+  düzeltir; testi: imleç otuz satırın üçüncüsünde durur, yirmi kez aşağı ok, liste imlecin altında kayar ve seçim
+  yirmi üçüncüdedir; imleç bir alt satıra gidince o seçilir, liste yerinde kalır. Bu iki yeni test düzeltmesiz kodla
+  çalıştırılmadı; duran farenin nedeni Compose'un kaynağından okundu (`AndroidComposeView`,
+  `resendMotionEventOnLayout`).
 - **Doğrulama, neyi kapsıyor:** kitin testleri (Robolectric). Kitin örnek uygulaması hiçbir cihazda ya da emülatörde
   çalıştırılmadı. Nağmedar'ın kendi paletindeki benzer satır Android emülatöründe denendi (Nağmedar 1.0.7'nin `search`
   geçişi); bu, kitin paletinin bir cihazda denenmesi değildir.

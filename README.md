@@ -604,7 +604,8 @@ Arama Türkçe harfleri katlar ("sarki" "Şarkı"yı bulur), eşleşen harfleri 
 iyi altı eşleşmesini gösterir; daha çoğu varsa altındaki satır kaç tane olduğunu yazar ("9 sonucun hepsini göster") ve
 seçilince grubun hepsini gösterir (2.5.0). Klavye
 odağı alanda kalır: ↑/↓, Enter, Ctrl+Enter (`onOpenInNewWindow` varsa yeni pencerede), Tab ile grup süzgeçleri,
-Esc. Palet kapanınca odak açılmadan önceki yerine döner. Kısayolları etkinlikten yönlendiriyorsan paletin
+Esc. Fare, üzerinde hareket ettiği satırı seçer; oklar listeyi duran imlecin altında kaydırırken seçim okların kalır
+(2.5.0). Palet kapanınca odak açılmadan önceki yerine döner. Kısayolları etkinlikten yönlendiriyorsan paletin
 durumunu etkinlikte tut (`private val palet = CommandPaletteState()`) ve palet açıkken yönlendirmeyi atla
 (yukarıdaki Klavye kısayolları bölümü).
 

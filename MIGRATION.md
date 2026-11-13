@@ -350,7 +350,8 @@ sayfa bırakıldığı yerde kalmaz; bildirim gider ya da yerine döner, sayfa k
 
 Kod değişmeden derlenir (2.4.1'e karşı derlenmiş kod da bağlanır, API aynı); sürümü `2.5.0` yapmak yeter. Görünür bir
 değişiklik var ([CHANGELOG](CHANGELOG.md#250-2026-11-13)): komut paletinde altıdan çok eşleşmesi olan bir grubun
-altında "N sonucun hepsini göster" satırı çıkar; seçilince grup bütün gösterilir.
+altında "N sonucun hepsini göster" satırı çıkar; seçilince grup bütün gösterilir. Bir de fareyle: palet satırı imleç
+kendi hareket edince seçer; oklar listeyi duran imlecin altında kaydırırken seçim okların kalır.
 
 - **Paleti kitten kullanan uygulama:** yapacağın bir şey yok. Bir gruba çok öğe veriyorsan (albümler, parçalar) satır
   kendiliğinden çıkar. Süzgeç (`filters`) vermiyorsan yedinci eşleşmeye götüren tek yol artık bu satırdır.
