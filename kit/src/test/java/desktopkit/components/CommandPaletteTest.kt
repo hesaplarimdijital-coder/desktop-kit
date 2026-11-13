@@ -26,7 +26,12 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 
-/** The command palette (K4): Turkish-aware matching, ranking, and the keyboard. */
+/**
+ * The command palette (K4): Turkish-aware matching, ranking, and the keyboard.
+ *
+ * What 2.4.1 does with a group that has more than six matches (written down before it is changed): the seventh
+ * is not shown, nothing says there is one, and without filter chips nothing leads to it.
+ */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
 @Config(qualifiers = "tr-w1280dp-h800dp-mdpi")
@@ -80,6 +85,45 @@ class CommandPaletteTest {
         val albums = PaletteSearch.rows(items, "gece", filter = "Albümler", bestHeading = "En iyi eşleşme")
         assertEquals(2, albums.size)
         assertTrue(PaletteSearch.rows(items, "").none { it is PaletteRow.Heading && it.title == "En iyi eşleşme" })
+    }
+
+    private val bestHeading = "En iyi eşleşme"
+
+    @Test
+    fun aGroupShowsSixOfItsMatches() {
+        val albums = (1..10).map { item("a$it", "Gece $it", "Albümler") }
+        val rows = PaletteSearch.rows(albums, "gece", bestHeading = bestHeading)
+        // the best match, then six of the other nine: the two headings and seven results, and no other row
+        assertEquals(listOf("a1", "a2", "a3", "a4", "a5", "a6", "a7"), rows.filterIsInstance<PaletteRow.Result>().map { it.item.id })
+        assertEquals(2 + 7, rows.size)
+        // a filter keeps one group whole: the two headings, the best match and the other nine
+        assertEquals(2 + 1 + 9, PaletteSearch.rows(albums, "gece", filter = "Albümler", bestHeading = bestHeading).size)
+    }
+
+    @Test
+    fun in241NothingLeadsToAGroupsSeventhMatch() {
+        val state = CommandPaletteState()
+        var ran = ""
+        val items = (1..10).map { n -> item("a$n", "Gece $n", "Albümler", onSelect = { ran = "a$n" }) }
+        compose.setContent {
+            DesktopKitTheme(inputMode = InputMode.Pointer) {
+                // no filter chips, as an app that passes no groups to filter by
+                Box(Modifier.fillMaxSize()) { CommandPalette(state, items = { items }) }
+            }
+        }
+        compose.runOnIdle { state.open() }
+        compose.waitForIdle()
+        compose.onNode(hasSetTextAction()).performTextInput("gece")
+        compose.waitForIdle()
+        compose.onNodeWithText("Gece 7").assertExists()
+        compose.onNodeWithText("Gece 8").assertDoesNotExist()
+        // seven rows down from the first comes round to the first again: the list has seven rows and ends there
+        compose.onNode(hasSetTextAction()).performKeyInput { repeat(7) { pressKey(Key.DirectionDown) } }
+        compose.waitForIdle()
+        compose.onNodeWithText("Gece 8").assertDoesNotExist()
+        compose.onNode(hasSetTextAction()).performKeyInput { pressKey(Key.Enter) }
+        compose.waitForIdle()
+        assertEquals("the first row again", "a1", ran)
     }
 
     @Test
