@@ -69,6 +69,7 @@
     <string name="dk_tab_close">Sekmeyi kapat</string>
     <string name="dk_tabs">Sekmeler</string>
     <string name="dk_loading">Yükleniyor</string>
+    <string name="dk_refreshing">Yenileniyor</string>
     <string name="dk_accent_system">Duvar kâğıdı</string>
     <string name="dk_palette">Komut paleti</string>
     <string name="dk_palette_best">En iyi eşleşme</string>
