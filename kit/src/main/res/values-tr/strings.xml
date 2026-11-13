@@ -50,6 +50,7 @@
     <string name="dk_inspector_show">Ayrıntı panelini göster</string>
     <string name="dk_inspector_hide">Ayrıntı panelini gizle</string>
     <string name="dk_resize_inspector">Ayrıntı panelini boyutlandır</string>
+    <string name="dk_resize">Bölmeleri boyutlandır</string>
     <string name="dk_key_esc">Esc</string>
 
     <!-- 2.0: formlar, geri bildirim, yapı -->
