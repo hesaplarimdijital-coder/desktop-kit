@@ -115,11 +115,17 @@ fun TokenField(
     val invalidLabel = stringResource(R.string.dk_token_invalid)
     val removeLabel = stringResource(R.string.dk_token_remove)
 
-    val offered = if (text.text.isBlank() || dismissed || !focused) emptyList() else suggestions(text.text.trim())
+    // asked again only when the typed text changes (an app may look them up in a database); the rows shown are the
+    // rows the arrows go through and Enter takes
+    val latestSuggestions by rememberUpdatedState(suggestions)
+    val typed = text.text.trim()
+    val found = remember(typed) { if (typed.isEmpty()) emptyList() else latestSuggestions(typed).take(MAX_SUGGESTIONS) }
+    val offered = if (dismissed || !focused) emptyList() else found
     val shownIndex = highlighted.coerceIn(0, (offered.size - 1).coerceAtLeast(0))
 
     fun commit(values: List<String>, rest: String = "") {
-        val added = values.map { it.trim() }.filter { it.isNotEmpty() && it !in latestTokens }
+        // a pasted list with an address twice gives one chip
+        val added = values.map { it.trim() }.filter { it.isNotEmpty() && it !in latestTokens }.distinct()
         if (added.isNotEmpty()) onTokensChange(latestTokens + added)
         text = TextFieldValue(rest, TextRange(rest.length))
         highlighted = 0

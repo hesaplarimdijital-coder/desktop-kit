@@ -10,6 +10,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -146,10 +149,53 @@ class GridZoomTest {
     }
 
     @Test
+    fun theKeysGoByTheCharacterTheyType() {
+        // this machine's keyboard is a US one: Shift+− types "_", Shift+= types "+", Shift+0 types ")"
+        grid()
+        compose.runOnIdle { inputModeManager.requestInputMode(ComposeInputMode.Keyboard) }
+        compose.onNodeWithText("Albüm 1").requestFocus()
+        val cell = compose.onNodeWithText("Albüm 1")
+        cell.performKeyInput { withKeyDown(Key.CtrlLeft) { withKeyDown(Key.ShiftLeft) { pressKey(Key.Minus) } } }
+        compose.waitForIdle()
+        assertEquals("an underscore is not a minus", 136.dp, zoom.cellWidth)
+        cell.performKeyInput { withKeyDown(Key.CtrlLeft) { withKeyDown(Key.ShiftLeft) { pressKey(Key.Equals) } } }
+        compose.waitForIdle()
+        assertEquals("a plus, as typed", 172.dp, zoom.cellWidth)
+        cell.performKeyInput { withKeyDown(Key.CtrlLeft) { withKeyDown(Key.ShiftLeft) { pressKey(Key.Zero) } } }
+        compose.waitForIdle()
+        assertEquals("a bracket is not a zero", 172.dp, zoom.cellWidth)
+        cell.performKeyInput { withKeyDown(Key.CtrlLeft) { pressKey(Key.NumPadSubtract) } }
+        compose.waitForIdle()
+        assertEquals("the keypad's minus", 136.dp, zoom.cellWidth)
+    }
+
+    @Test
+    fun aChosenSizeOutlivesANewDefault() {
+        // the default is larger for a finger: touching the screen after the mouse changes it
+        var default by mutableStateOf(136.dp)
+        compose.setContent {
+            DesktopKitTheme {
+                zoom = rememberGridZoom(defaultCellWidth = default)
+            }
+        }
+        compose.runOnIdle { default = 152.dp }
+        compose.runOnIdle { assertEquals("nothing chosen: the default", 152.dp, zoom.cellWidth) }
+        compose.runOnIdle { zoom.zoomIn() }
+        compose.runOnIdle { assertEquals(192.dp, zoom.cellWidth) }
+        compose.runOnIdle { default = 136.dp }
+        compose.runOnIdle { assertEquals("the size the user chose stays", 192.dp, zoom.cellWidth) }
+        compose.runOnIdle { zoom.reset() }
+        compose.runOnIdle { assertEquals("and Ctrl+0 goes back to the default of now", 136.dp, zoom.cellWidth) }
+    }
+
+    @Test
     fun theChosenSizeIsKept() {
         val shared = ApplicationProvider.getApplicationContext<android.content.Context>().getSharedPreferences("zoom", 0)
         grid(prefs = DeskPreferences(shared))
         compose.runOnIdle { zoom.zoomIn() }
         assertEquals(172f, DeskPreferences(shared).gridCellWidth("albums"))
+        // back to the default: nothing is kept, and the grid follows the default again
+        compose.runOnIdle { zoom.reset() }
+        assertTrue(DeskPreferences(shared).gridCellWidth("albums").isNaN())
     }
 }
