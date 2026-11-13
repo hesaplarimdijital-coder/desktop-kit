@@ -161,6 +161,11 @@ fun KeyValueRow(
  * without it, opens [menu]; a right click and the Menu key open [menu] too. In [selectionMode] a
  * check box leads the row and shows [selected]. [drag] lets the row be dragged with a mouse to a
  * [dropZone].
+ *
+ * [subtitleMaxLines] lets the subtitle wrap; [preview] adds a third line under it (a message's first
+ * words under its subject), up to [previewMaxLines] lines. [moreButton] puts a "⋯" button at the
+ * row's end that opens [menu]: on touch the long press that opens it is not discovered by everyone,
+ * and the button says the row has actions.
  */
 @Composable
 fun DeskListRow(
@@ -189,6 +194,10 @@ fun DeskListRow(
     menu: (() -> List<MenuEntry>)? = null,
     drag: (() -> DeskDragPayload?)? = null,
     openMenuOnTap: Boolean = false,
+    subtitleMaxLines: Int = 1,
+    preview: String? = null,
+    previewMaxLines: Int = 2,
+    moreButton: Boolean = false,
 ) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
@@ -202,7 +211,7 @@ fun DeskListRow(
     val background by animatedStateBackground(state, selected)
     val moreLabel = stringResource(R.string.dk_more_options)
     val minHeight = when {
-        subtitle != null || progress != null -> if (touch) 56.dp else 44.dp
+        subtitle != null || progress != null || preview != null -> if (touch) 56.dp else 44.dp
         else -> dimens.rowHeight.coerceAtLeast(dimens.minTarget)
     }
     Box(modifier.fillMaxWidth().onSizeChanged { rowHeight = it.height }.dragSource(enabled = drag != null) { drag?.invoke() }) {
@@ -255,7 +264,12 @@ fun DeskListRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (!subtitle.isNullOrEmpty()) {
-                    Text(subtitle, style = DeskTheme.type.caption, color = subtitleColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(subtitle, style = DeskTheme.type.caption, color = subtitleColor, maxLines = subtitleMaxLines.coerceAtLeast(1),
+                        overflow = TextOverflow.Ellipsis)
+                }
+                if (!preview.isNullOrEmpty()) {
+                    Text(preview, style = DeskTheme.type.caption, color = colors.textTertiary, maxLines = previewMaxLines.coerceAtLeast(1),
+                        overflow = TextOverflow.Ellipsis)
                 }
                 if (progress != null) {
                     Spacer(Modifier.height(2.dp))
@@ -269,6 +283,9 @@ fun DeskListRow(
                 }
             }
             trailingContent?.invoke(this)
+            if (moreButton && menu != null && !selectionMode) {
+                DeskIconButton(DeskIcons.MoreHorizontal, moreLabel, onClick = { menuAt = IntOffset(0, rowHeight) }, enabled = enabled)
+            }
         }
         if (divider) HorizontalRule(Modifier.align(Alignment.BottomStart).padding(start = dimens.pagePadding + indent))
         if (menu != null) {

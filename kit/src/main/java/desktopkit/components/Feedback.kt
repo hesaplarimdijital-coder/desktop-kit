@@ -24,6 +24,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
@@ -178,9 +180,14 @@ val BannerTone.icon: ImageVector
 
 /**
  * A message strip in one of four tones: a tinted background, a border and an icon in the tone's
- * colour, the [text] (under a bold [title] when given), and optionally an action button and a close
- * button. On a phone the action sits under the text. TalkBack announces it when it appears.
+ * colour, the [text] (under a bold [title] when given), and optionally one or two action buttons
+ * and a close button. On a phone the actions sit under the text. TalkBack announces it when it
+ * appears.
+ *
+ * [secondaryActionLabel] adds a second action after the first ("Remote images blocked · Show ·
+ * Always show from this sender"); it shows only together with the first.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun StatusBanner(
     tone: BannerTone,
@@ -192,14 +199,21 @@ fun StatusBanner(
     onAction: (() -> Unit)? = null,
     closeLabel: String? = null,
     onClose: (() -> Unit)? = null,
+    secondaryActionLabel: String? = null,
+    onSecondaryAction: (() -> Unit)? = null,
 ) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
     val color = tone.color()
     val shape = RoundedCornerShape(if (title != null) dimens.radiusCard else dimens.radiusControl)
-    // on a phone the action goes under the text, which would otherwise squeeze into a narrow column
+    // on a phone the actions go under the text, which would otherwise squeeze into a narrow column
     val action = actionLabel != null && onAction != null
+    val secondary = action && secondaryActionLabel != null && onSecondaryAction != null
     val stacked = action && currentWidthClass() == WidthClass.Compact
+    val buttons: @Composable () -> Unit = {
+        DeskButton(actionLabel!!, onAction!!)
+        if (secondary) DeskButton(secondaryActionLabel!!, onSecondaryAction!!)
+    }
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -222,10 +236,13 @@ fun StatusBanner(
                 color = if (title != null) colors.textSecondary else colors.text)
             if (stacked) {
                 Spacer(Modifier.height(dimens.gapS))
-                DeskButton(actionLabel!!, onAction!!)
+                // two actions wrap onto two lines when they do not fit side by side
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(dimens.gapS), verticalArrangement = Arrangement.spacedBy(dimens.gapS)) {
+                    buttons()
+                }
             }
         }
-        if (action && !stacked) DeskButton(actionLabel!!, onAction!!)
+        if (action && !stacked) Row(horizontalArrangement = Arrangement.spacedBy(dimens.gapS)) { buttons() }
         if (closeLabel != null && onClose != null) DeskIconButton(DeskIcons.Close, closeLabel, onClose)
     }
 }
