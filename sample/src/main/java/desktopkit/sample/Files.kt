@@ -24,8 +24,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import desktopkit.components.PullToRefresh
 import desktopkit.components.ToastResult
 import desktopkit.components.ToastState
+import desktopkit.screens.MessageScreen
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.ui.unit.dp
 import desktopkit.components.ChipOption
@@ -54,7 +57,7 @@ import desktopkit.components.rememberTableColumnsState
 import desktopkit.screens.PageHeader
 import desktopkit.settings.DeskPreferences
 import desktopkit.shell.CompactTopBar
-import desktopkit.shell.DetailTransition
+import desktopkit.shell.ListDetailLayout
 import desktopkit.shell.TopBarAction
 import desktopkit.shell.WidthClass
 import desktopkit.shell.currentWidthClass
@@ -86,6 +89,8 @@ fun FilesScreen(prefs: DeskPreferences, library: LibraryState, toasts: ToastStat
                 onCollapse = inspector::toggle,
             ) { tab -> InspectorTabContent(tab) }
         },
+        // narrower than a tablet the inspector comes up as a sheet
+        sheetTitle = stringResource(R.string.inspector_title),
     )
 }
 
@@ -146,12 +151,18 @@ private fun FilesList(prefs: DeskPreferences, library: LibraryState, toasts: Toa
             if (result == ToastResult.ActionPerformed) library.binned.removeAll(moved)
         }
     }
-    DetailTransition(
+    var refreshing by remember { mutableStateOf(false) }
+    // the list and a file's details side by side from tablet width up (the divider's place is kept), one at a
+    // time on a phone
+    ListDetailLayout(
         detail = files.firstOrNull { it.name == opened },
         onBack = { opened = null },
         detailKey = { it.name },
         // nothing flies between the table and the details
         sharedElements = false,
+        prefs = prefs,
+        splitKey = "files",
+        placeholder = { MessageScreen(stringResource(R.string.files_pick), DeskIcons.Folder) },
         list = {
             // under the phone's glass bars: the header clears the top bar, the grid and the table pad their ends
             val shell = rememberShellContentPadding()
@@ -162,7 +173,7 @@ private fun FilesList(prefs: DeskPreferences, library: LibraryState, toasts: Toa
                     DeskButton(stringResource(if (selectMode) R.string.action_done else R.string.action_select), { selectMode = !selectMode })
                     DeskIconButton(DeskIcons.Grid, stringResource(R.string.view_grid), { grid = true }, selected = grid)
                     DeskIconButton(DeskIcons.ListView, stringResource(R.string.view_list), { grid = false }, selected = !grid)
-                    if (!compact) inspectorToggle()
+                    inspectorToggle()
                 }
                 DeskSearchField(filter, { filter = it },
                     Modifier.padding(horizontal = DeskTheme.dimens.pagePadding).padding(bottom = DeskTheme.dimens.gapS).fillMaxWidth(),
@@ -175,32 +186,41 @@ private fun FilesList(prefs: DeskPreferences, library: LibraryState, toasts: Toa
                     onToggle = { kind -> kinds = if (kind in kinds) kinds - kind else kinds + kind },
                     modifier = Modifier.padding(bottom = DeskTheme.dimens.gapS),
                 )
-                if (grid) {
-                    FilesGrid(
-                        files = files,
-                        filter = filter,
-                        kinds = kinds,
-                        selectedKeys = selected,
-                        onSelectionChange = { selected = it },
-                        toggleOnClick = selectMode,
-                        onOpen = { opened = it.name },
-                        openOnClick = openOnTap,
-                        bottomPadding = shell.calculateBottomPadding(),
-                    )
-                } else {
-                    FilesTable(
-                        files = files,
-                        prefs = prefs,
-                        filter = filter,
-                        kinds = kinds,
-                        selectedKeys = selected,
-                        onSelectionChange = { selected = it },
-                        toggleOnClick = selectMode,
-                        onOpen = { opened = it.name },
-                        onDelete = delete,
-                        openOnClick = openOnTap,
-                        bottomPadding = shell.calculateBottomPadding(),
-                    )
+                // a finger pulls the list down to look for new files (the sample only waits a moment)
+                PullToRefresh(refreshing, onRefresh = {
+                    scope.launch {
+                        refreshing = true
+                        delay(1200)
+                        refreshing = false
+                    }
+                }) {
+                    if (grid) {
+                        FilesGrid(
+                            files = files,
+                            filter = filter,
+                            kinds = kinds,
+                            selectedKeys = selected,
+                            onSelectionChange = { selected = it },
+                            toggleOnClick = selectMode,
+                            onOpen = { opened = it.name },
+                            openOnClick = openOnTap,
+                            bottomPadding = shell.calculateBottomPadding(),
+                        )
+                    } else {
+                        FilesTable(
+                            files = files,
+                            prefs = prefs,
+                            filter = filter,
+                            kinds = kinds,
+                            selectedKeys = selected,
+                            onSelectionChange = { selected = it },
+                            toggleOnClick = selectMode,
+                            onOpen = { opened = it.name },
+                            onDelete = delete,
+                            openOnClick = openOnTap,
+                            bottomPadding = shell.calculateBottomPadding(),
+                        )
+                    }
                 }
             }
         },
@@ -279,7 +299,8 @@ private fun FileDetails(file: SampleFile, onClose: () -> Unit, onDelete: () -> U
     val addToList = stringResource(R.string.action_add_to_list)
     val properties = stringResource(R.string.action_properties)
     val location = stringResource(R.string.field_location)
-    // DetailTransition takes the Back gesture (with its predictive animation) on every window size
+    // one pane at a time (a phone, a narrow window) the layout takes the Back gesture with its predictive animation;
+    // beside the list the details close with their own button
     CompactTopBar(
         title = file.name,
         onBack = onClose,
@@ -292,7 +313,11 @@ private fun FileDetails(file: SampleFile, onClose: () -> Unit, onDelete: () -> U
     )
     Column(Modifier.fillMaxSize().shellContentPadding()) {
         PageHeader(file.name, subtitle = "${file.kind} · ${file.size}") {
-            if (currentWidthClass() != WidthClass.Compact) DeskButton(stringResource(R.string.action_back), onClose, icon = DeskIcons.ArrowLeft)
+            when {
+                // beside the list: the details close
+                currentWidthClass() >= WidthClass.Expanded -> DeskButton(stringResource(R.string.action_close), onClose, icon = DeskIcons.Close)
+                currentWidthClass() != WidthClass.Compact -> DeskButton(stringResource(R.string.action_back), onClose, icon = DeskIcons.ArrowLeft)
+            }
         }
         Column(Modifier.padding(horizontal = DeskTheme.dimens.pagePadding)) {
             KeyValueRow(stringResource(R.string.column_kind), file.kind, Modifier.padding(vertical = 8.dp))
