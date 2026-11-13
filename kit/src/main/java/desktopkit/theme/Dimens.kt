@@ -111,3 +111,6 @@ fun DeskDimens.forCompactWindow(): DeskDimens =
         bottomBarHeight = bottomBarHeight.coerceAtMost(64.dp),
         rowHeight = rowHeight.coerceAtMost(52.dp).coerceAtLeast(minTarget),
     )
+
+/** The sizes of a window short as a phone on its side: a top bar 8 dp lower (never under a target). */
+fun DeskDimens.forShortWindow(): DeskDimens = copy(topBarHeight = (topBarHeight - 8.dp).coerceAtLeast(minTarget))

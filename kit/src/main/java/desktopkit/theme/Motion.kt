@@ -22,6 +22,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import desktopkit.shell.HeightClass
 import desktopkit.shell.WidthClass
 
 /**
@@ -115,9 +116,12 @@ object DeskMotion {
         spring(dampingRatio = 1f, stiffness = 800f, visibilityThreshold = visibilityThreshold)
 
     /** The tier for a window: springs on a phone, the timed curves from tablet width up, nothing with [reduced] motion. */
-    fun tier(widthClass: WidthClass, reduced: Boolean = false): MotionTier = when {
+    fun tier(widthClass: WidthClass, reduced: Boolean = false): MotionTier = tier(widthClass, reduced, HeightClass.Expanded)
+
+    /** [tier], and a window short as a phone on its side ([HeightClass.Compact]) moves as a phone does. */
+    fun tier(widthClass: WidthClass, reduced: Boolean, heightClass: HeightClass): MotionTier = when {
         reduced -> MotionTier.Reduced
-        widthClass == WidthClass.Compact -> MotionTier.Gesture
+        widthClass == WidthClass.Compact || heightClass == HeightClass.Compact -> MotionTier.Gesture
         else -> MotionTier.Timed
     }
 

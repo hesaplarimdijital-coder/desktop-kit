@@ -94,6 +94,7 @@ import desktopkit.theme.rememberReducedMotion
 import desktopkit.theme.rememberSystemGlassMode
 import dev.chrisbanes.haze.HazeState
 import desktopkit.theme.forCompactWindow
+import desktopkit.theme.forShortWindow
 import desktopkit.theme.grow
 import desktopkit.theme.toMaterialTypography
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -201,6 +202,8 @@ class ShellNavigator(private val navController: NavHostController) {
  * @param overlays drawn over the whole shell, bars included, with the shell's glass: the place for the
  *   [desktopkit.components.CommandPalette].
  * @param navDrop lets the sidebar's and the rail's entries take drops ([desktopkit.components.dragSource]).
+ * @param heightClass the window's height class, from [desktopkit.DesktopKitRoot] by default: a short window (a phone
+ *   on its side) keeps the phone's text sizes and motion, a lower top bar and a stacked player.
  * @param navMenu the menu of an entry of the sidebar, the rail or the bottom bar, by route ("Mark all as read",
  *   "Empty the bin"): a right click, a long press or the Menu key opens it, TalkBack offers it as an action. An
  *   empty list: no menu for that entry.
@@ -237,20 +240,24 @@ fun DesktopShell(
     overlays: @Composable () -> Unit = {},
     navDrop: NavDrop? = null,
     navMenu: ((route: String) -> List<MenuEntry>)? = null,
+    heightClass: HeightClass = LocalHeightClass.current,
     content: @Composable (route: String, navigator: ShellNavigator) -> Unit,
 ) {
-    // tablet and DeX read one size larger; phones get the tighter compact sizes
+    // tablet and DeX read one size larger; phones get the tighter compact sizes. A phone on its side (a short
+    // window) is wide enough for the rail but keeps the phone's text, a lower top bar and the phone's motion.
     val navKindForTheme = NavKind.forWidth(widthClass)
+    val short = heightClass == HeightClass.Compact
     val baseType = DeskTheme.type
     val baseDimens = DeskTheme.dimens
-    val windowType = remember(baseType, navKindForTheme, largeWindowTextStep) {
-        if (navKindForTheme == NavKind.BottomBar) baseType else baseType.grow(largeWindowTextStep)
+    val windowType = remember(baseType, navKindForTheme, largeWindowTextStep, short) {
+        if (navKindForTheme == NavKind.BottomBar || short) baseType else baseType.grow(largeWindowTextStep)
     }
-    val windowDimens = remember(baseDimens, navKindForTheme, compactSizes) {
-        if (compactSizes && navKindForTheme == NavKind.BottomBar) baseDimens.forCompactWindow() else baseDimens
+    val windowDimens = remember(baseDimens, navKindForTheme, compactSizes, short) {
+        val sized = if (compactSizes && navKindForTheme == NavKind.BottomBar) baseDimens.forCompactWindow() else baseDimens
+        if (short) sized.forShortWindow() else sized
     }
     val reduced = rememberReducedMotion()
-    val tier = DeskMotion.tier(widthClass, reduced)
+    val tier = DeskMotion.tier(widthClass, reduced, heightClass)
     val systemGlass = rememberSystemGlassMode()
     val glassMode = if (!glass) GlassMode.Solid else LocalGlassMode.current ?: systemGlass
     CompositionLocalProvider(
@@ -279,7 +286,8 @@ fun DesktopShell(
                 transitions = transitions,
                 hideBarsOnScroll = hideBarsOnScroll,
                 moreActions = moreActions,
-                floatingPlayer = floatingPlayer,
+                // too short for a bar floating over the content: the player is stacked under it
+                floatingPlayer = floatingPlayer && !short,
                 tier = tier,
                 glassMode = glassMode,
                 toasts = toasts,
