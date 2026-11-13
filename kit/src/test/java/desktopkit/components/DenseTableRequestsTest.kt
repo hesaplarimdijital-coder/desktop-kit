@@ -95,4 +95,16 @@ class DenseTableRequestsTest {
         table()
         compose.onNodeWithText("Bu klasörde ileti yok").assertExists()
     }
+
+    @Test
+    fun anEmptyGridSaysWhyToo() {
+        compose.setContent {
+            DesktopKitTheme(themeMode = ThemeMode.Dark, inputMode = InputMode.Pointer) {
+                DeskGrid(items = emptyList<Mail>(), key = { it.id }, onItemClick = { _, _ -> },
+                    emptyContent = { Text("Albüm bulunamadı") }) { mail -> Text(mail.subject) }
+            }
+        }
+        compose.waitForIdle()
+        compose.onNodeWithText("Albüm bulunamadı").assertExists()
+    }
 }

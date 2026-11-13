@@ -21,7 +21,7 @@
     <string name="dk_shortcut_list">Klavye kısayolları</string>
 
     <!-- Ayar bölümleri -->
-    <string name="dk_settings_appearance">Görünüm</string>
+    <string name="dk_settings_appearance">Görünüş</string>
     <string name="dk_settings_theme">Tema</string>
     <string name="dk_theme_system">Sistem</string>
     <string name="dk_theme_light">Açık</string>

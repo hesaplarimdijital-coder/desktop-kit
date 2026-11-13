@@ -14,11 +14,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -129,6 +131,8 @@ private class CellScope(
  *
  * Columns are as many as fit [minCellWidth]. Draw each cell with [cell], usually a [CoverCell].
  * [itemDrag] lets covers be dragged with a mouse to a [dropZone], as [DenseTable]'s rowDrag.
+ * [emptyContent] is shown across the grid when there are no items and nothing loads, usually a
+ * [desktopkit.screens.MessageScreen] saying why and what to do.
  */
 @Composable
 fun <T> DeskGrid(
@@ -148,6 +152,7 @@ fun <T> DeskGrid(
     loading: Boolean = false,
     itemDrag: ((T, Int) -> DeskDragPayload?)? = null,
     clearSelectionOnBack: Boolean = true,
+    emptyContent: (@Composable () -> Unit)? = null,
     cell: @Composable GridCellScope.(item: T) -> Unit,
 ) {
     val multi = onSelectionChange != null
@@ -237,6 +242,11 @@ fun <T> DeskGrid(
     ) {
         if (pulse != null) {
             items(12) { SkeletonCover(pulse) }
+        }
+        if (items.isEmpty() && !skeleton && emptyContent != null) {
+            item(key = "desktopkit.empty", span = { GridItemSpan(maxLineSpan) }) {
+                Box(Modifier.fillMaxWidth().heightIn(min = 320.dp), contentAlignment = Alignment.Center) { emptyContent() }
+            }
         }
         itemsIndexed(items, key = { _, item -> key(item) }) { index, item ->
             val itemKey = key(item)

@@ -41,7 +41,7 @@
     <!-- 1.0: player, sheets, tables, workstation, dialogs -->
     <string name="dk_player">Player</string>
     <string name="dk_player_expand">Open the player</string>
-    <string name="dk_player_collapse">Close the player</string>
+    <string name="dk_player_collapse">Collapse the player</string>
     <string name="dk_columns">Columns</string>
     <string name="dk_columns_move_left">Move left</string>
     <string name="dk_columns_move_right">Move right</string>

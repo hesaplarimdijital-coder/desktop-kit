@@ -616,7 +616,16 @@ private fun PalettePanel(
                 },
             contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 6.dp, end = 6.dp, bottom = 8.dp),
         ) {
-            itemsIndexed(rows) { _, line ->
+            // headings, results and "show all" rows each reuse their own kind of composition while the list
+            // changes with every typed letter (the same item can be listed twice, as the best match and in its
+            // group, so the lines have no keys)
+            itemsIndexed(rows, contentType = { _, line ->
+                when ((line as? PaletteLine.Row)?.row) {
+                    is PaletteRow.Heading -> 0
+                    is PaletteRow.Result -> 1
+                    else -> 2
+                }
+            }) { _, line ->
                 val row = (line as? PaletteLine.Row)?.row
                 when {
                     row is PaletteRow.Heading -> Text(row.title, style = DeskTheme.type.labelSmall, color = colors.textTertiary,
