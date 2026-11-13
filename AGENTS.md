@@ -41,8 +41,9 @@ Standardı" belgesinde, sürümler arası geçiş [MIGRATION.md](MIGRATION.md)'d
 - Birleştirme ve etiket depo sahibinindir. Gönderilmiş geçmiş yeniden yazılmaz, zorla gönderilmez.
 - Gönderi yazarı: hesaplarim.dijital@gmail.com. CHANGELOG, README, MIGRATION ve PR açıklamaları
   Türkçe; kod ve yorumlar İngilizce.
-- Tabletin ve DeX'in görünüşü ve zamanlamaları sahibinin onayı olmadan değişmez. Görünüşü değiştiren
-  bir iş ayrı bir PR'da, ekran görüntüsü farklarıyla sunulur (`ci/screenshots-pr-<numara>` dalı).
+- Tabletin ve DeX'in görünüşü ve zamanlamaları sahibinin onayı olmadan değişmez. Onaylanmış görünüş
+  değişiklikleri sürümün kendi PR'ında, CHANGELOG'da "görünür" diye işaretlenip ekran görüntüsü farklarıyla
+  sunulur (`ci/screenshots-pr-<numara>` dalı); bir iş sürümlere bölünmez, sahibi istemedikçe.
 - Herkese açık bir API'ye parametre eklerken varsayılanlı ve sona eklenir; konumla çağıran kod
   bozulmaz. Bileşen dışı fonksiyonlarda `@JvmOverloads`.
 - Davranışı değişen her şeyin testi olur; bir hata önce onu gösteren bir testle kaydedilir.
