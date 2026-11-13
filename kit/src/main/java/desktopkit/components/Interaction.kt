@@ -6,6 +6,7 @@ import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -84,6 +85,30 @@ fun Modifier.deskClickable(
         enabled = enabled,
         onClickLabel = onClickLabel,
         role = role,
+        onClick = onClick,
+    )
+
+/** [deskClickable] with a long press as well: a finger held on it, or TalkBack's double tap and hold. */
+fun Modifier.deskClickable(
+    interactionSource: MutableInteractionSource,
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)?,
+    enabled: Boolean = true,
+    role: Role? = Role.Button,
+    onClickLabel: String? = null,
+    onLongClickLabel: String? = null,
+): Modifier = if (onLongClick == null) deskClickable(interactionSource, onClick, enabled, role, onClickLabel) else this
+    .pointerHoverIcon(PointerIcon.Hand)
+    .hoverable(interactionSource, enabled)
+    .focusMemory()
+    .combinedClickable(
+        interactionSource = interactionSource,
+        indication = null,
+        enabled = enabled,
+        onClickLabel = onClickLabel,
+        role = role,
+        onLongClickLabel = onLongClickLabel,
+        onLongClick = onLongClick,
         onClick = onClick,
     )
 
