@@ -64,7 +64,7 @@ class SplitPaneTest {
         compose.waitForIdle()
         assertEquals(240f, stored.startWidthDp, 0.5f)
         assertEquals("the drag's end stores the width", 240f, committed, 0.5f)
-        val atMin = compose.onNodeWithTag("start").getBoundsInRoot().width
+        val atMin = compose.onNodeWithTag("start").getBoundsInRoot().let { it.right - it.left }
         assertEquals(240f, atMin.value, 1f)
         // 40 dp back to the right: the divider moves at once
         divider.performTouchInput {
@@ -74,7 +74,7 @@ class SplitPaneTest {
             up()
         }
         compose.waitForIdle()
-        val after = compose.onNodeWithTag("start").getBoundsInRoot().width
+        val after = compose.onNodeWithTag("start").getBoundsInRoot().let { it.right - it.left }
         assertTrue("the divider did not move back: $atMin → $after", after.value > atMin.value + 30f)
     }
 }
