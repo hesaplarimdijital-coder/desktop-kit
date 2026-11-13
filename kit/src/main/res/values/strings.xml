@@ -17,6 +17,7 @@
     <string name="dk_key_space">Space</string>
     <string name="dk_menu_view">View</string>
     <string name="dk_menu_help">Help</string>
+    <string name="dk_menus">Menus</string>
     <string name="dk_toggle_sidebar">Show or hide the sidebar</string>
     <string name="dk_shortcut_list">Keyboard shortcuts</string>
 

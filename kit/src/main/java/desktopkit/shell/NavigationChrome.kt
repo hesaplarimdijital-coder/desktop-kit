@@ -95,6 +95,7 @@ import desktopkit.R
 import desktopkit.components.DeskIconButton
 import desktopkit.components.MenuEntry
 import desktopkit.components.MenuPopup
+import desktopkit.components.MenuSpec
 import desktopkit.components.TooltipArea
 import desktopkit.components.TooltipPlacement
 import desktopkit.components.DeskDragPayload
@@ -625,6 +626,7 @@ fun PageTopBar(
     actions: List<TopBarAction> = emptyList(),
     scrolled: Boolean = false,
     glass: Boolean = false,
+    menus: List<MenuSpec> = emptyList(),
 ) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
@@ -716,6 +718,7 @@ fun PageTopBar(
             }
             if (overflow.isNotEmpty()) TopBarOverflow(overflow)
             if (onSearch != null) DeskIconButton(DeskIcons.Search, stringResource(R.string.dk_search), onSearch)
+            if (menus.isNotEmpty()) TopBarMenus(menus)
         }
     }
 }
