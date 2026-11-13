@@ -76,4 +76,9 @@
     <string name="dk_palette_show_all">Show all %1$d</string>
     <string name="dk_new_window">New window</string>
     <string name="dk_play">Play</string>
+    <plurals name="dk_badge_new">
+        <item quantity="one">%d new</item>
+        <item quantity="other">%d new</item>
+    </plurals>
+    <string name="dk_badge_dot">New</string>
 </resources>

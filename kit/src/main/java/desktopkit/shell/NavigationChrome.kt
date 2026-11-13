@@ -18,6 +18,13 @@ import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -94,6 +101,67 @@ import desktopkit.input.showShortcutHints
 typealias NavBadges = Map<String, String>
 
 /**
+ * A mark on a navigation entry's icon in the phone's bottom bar, the rail and the collapsed sidebar:
+ * a count of new things ([count] above 0; "99+" past 99) or, with a [count] of 0, a dot. TalkBack
+ * reads [description] after the entry's name ("Inbox, 4 unread"); without one it says the count
+ * ("4 new") or "new". In the open sidebar the entry's text badge ([NavBadges]) says it instead.
+ */
+@Immutable
+data class NavIconBadge(val count: Int = 0, val description: String? = null)
+
+/** [NavIconBadge]s by route. */
+typealias NavIconBadges = Map<String, NavIconBadge>
+
+/** [item]'s badge; "More" gets a dot when a screen it holds has one. */
+private fun badgeOf(item: NavItem, badges: NavIconBadges, spec: ShellSpec, kind: NavKind): NavIconBadge? =
+    badges[item.route] ?: if (item.route == ShellSpec.MORE_ROUTE && spec.overflow(kind).any { badges[it.route] != null }) NavIconBadge() else null
+
+/** What TalkBack says after an entry's name for [badge]. */
+@Composable
+private fun badgeDescription(badge: NavIconBadge): String = badge.description
+    ?: if (badge.count > 0) pluralStringResource(R.plurals.dk_badge_new, badge.count, badge.count) else stringResource(R.string.dk_badge_dot)
+
+/**
+ * The [badge] at the top end corner of a navigation icon of [iconSize]: a small accent pill with
+ * the count, or a dot. Drawn over the icon (it takes no room), outlined in [ring] so it stands
+ * apart from the icon under it.
+ */
+@Composable
+private fun BoxScope.IconBadge(badge: NavIconBadge?, iconSize: Dp, ring: Color) {
+    if (badge == null) return
+    val colors = DeskTheme.colors
+    val half = iconSize / 2
+    if (badge.count > 0) {
+        val text = if (badge.count > 99) "99+" else badge.count.toString()
+        Box(
+            Modifier
+                .align(Alignment.Center)
+                // its start edge a little inside the icon's end, its middle at the icon's top
+                .offset(x = half + 4.dp, y = -half)
+                .wrapContentSize(unbounded = true)
+                .heightIn(min = 16.dp)
+                .defaultMinSize(minWidth = 16.dp)
+                .border(1.5.dp, ring, RoundedCornerShape(50))
+                .background(colors.accent, RoundedCornerShape(50))
+                .padding(horizontal = 4.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(text, style = DeskTheme.type.caption.copy(fontSize = 10.sp, lineHeight = 14.sp, fontWeight = FontWeight.SemiBold),
+                color = colors.onAccent, maxLines = 1)
+        }
+    } else {
+        Box(
+            Modifier
+                .align(Alignment.Center)
+                .offset(x = half, y = -half + 1.dp)
+                .size(9.dp)
+                .border(1.5.dp, ring, CircleShape)
+                .background(colors.accent, CircleShape),
+        )
+    }
+}
+
+/**
  * Lets the sidebar's and the rail's entries take drops: tracks and albums dragged onto
  * "Playlists", files onto "Bin". [kinds] says which drag kinds ([desktopkit.components.DeskDragPayload.kind])
  * each entry takes, by route; entries left out take none. [onDrop] gets the route and what was
@@ -136,6 +204,7 @@ fun BottomNavBar(
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
     hasMoreActions: Boolean = false,
+    iconBadges: NavIconBadges = emptyMap(),
 ) {
     val colors = DeskTheme.colors
     val label = stringResource(R.string.dk_main_navigation)
@@ -155,14 +224,15 @@ fun BottomNavBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             items.forEach { item ->
-                BottomBarItem(item, selected = isSelected(item, currentRoute, items), onClick = { onSelect(item.route) })
+                BottomBarItem(item, selected = isSelected(item, currentRoute, items), badge = badgeOf(item, iconBadges, spec, NavKind.BottomBar),
+                    onClick = { onSelect(item.route) })
             }
         }
     }
 }
 
 @Composable
-private fun RowScope.BottomBarItem(item: NavItem, selected: Boolean, onClick: () -> Unit) {
+private fun RowScope.BottomBarItem(item: NavItem, selected: Boolean, badge: NavIconBadge?, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val state = interaction.collectState()
     val colors = DeskTheme.colors
@@ -182,6 +252,7 @@ private fun RowScope.BottomBarItem(item: NavItem, selected: Boolean, onClick: ()
     ) {
         NavIndicator(selected, state, pill, Modifier.width(56.dp).height(30.dp)) {
             Icon(item.icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(dimens.icon))
+            IconBadge(badge, dimens.icon, ring = colors.chrome)
         }
         Spacer(Modifier.height(4.dp))
         Text(
@@ -190,6 +261,7 @@ private fun RowScope.BottomBarItem(item: NavItem, selected: Boolean, onClick: ()
             color = labelColor,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.badgeSemantics(item.shortLabel, badge),
         )
     }
 }
@@ -205,7 +277,7 @@ private fun NavIndicator(
     state: desktopkit.components.InteractionState,
     shape: RoundedCornerShape,
     modifier: Modifier,
-    content: @Composable () -> Unit,
+    content: @Composable BoxScope.() -> Unit,
 ) {
     val colors = DeskTheme.colors
     val fraction by animateFloatAsState(if (selected) 1f else 0f, DeskMotion.fade(LocalMotionTier.current, DeskMotion.spatial()), label = "navIndicator")
@@ -244,6 +316,7 @@ fun NavRail(
     modifier: Modifier = Modifier,
     brand: (@Composable (Modifier) -> Unit)? = null,
     navDrop: NavDrop? = null,
+    iconBadges: NavIconBadges = emptyMap(),
 ) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
@@ -266,16 +339,16 @@ fun NavRail(
                 modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).selectableGroup(),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                main.forEach { item -> RailItem(item, isSelected(item, currentRoute, all), navDrop) { onSelect(item.route) } }
+                main.forEach { item -> RailItem(item, isSelected(item, currentRoute, all), navDrop, badgeOf(item, iconBadges, spec, NavKind.Rail)) { onSelect(item.route) } }
             }
-            footer.forEach { item -> RailItem(item, isSelected(item, currentRoute, all), navDrop) { onSelect(item.route) } }
+            footer.forEach { item -> RailItem(item, isSelected(item, currentRoute, all), navDrop, badgeOf(item, iconBadges, spec, NavKind.Rail)) { onSelect(item.route) } }
         }
         VerticalRule(Modifier.fillMaxHeight())
     }
 }
 
 @Composable
-private fun RailItem(item: NavItem, selected: Boolean, navDrop: NavDrop?, onClick: () -> Unit) {
+private fun RailItem(item: NavItem, selected: Boolean, navDrop: NavDrop?, badge: NavIconBadge?, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val state = interaction.collectState()
     val colors = DeskTheme.colors
@@ -296,6 +369,7 @@ private fun RailItem(item: NavItem, selected: Boolean, navDrop: NavDrop?, onClic
     ) {
         NavIndicator(selected, state, pill, Modifier.width(48.dp).height(28.dp)) {
             Icon(item.icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(dimens.icon))
+            IconBadge(badge, dimens.icon, ring = colors.chrome)
         }
         Spacer(Modifier.height(2.dp))
         Text(
@@ -305,7 +379,7 @@ private fun RailItem(item: NavItem, selected: Boolean, navDrop: NavDrop?, onClic
             textAlign = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 4.dp),
+            modifier = Modifier.padding(horizontal = 4.dp).badgeSemantics(item.shortLabel, badge),
         )
     }
 }
@@ -322,6 +396,7 @@ fun Sidebar(
     badges: NavBadges,
     modifier: Modifier = Modifier,
     navDrop: NavDrop? = null,
+    iconBadges: NavIconBadges = emptyMap(),
 ) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
@@ -360,7 +435,7 @@ fun Sidebar(
                         Spacer(Modifier.height(dimens.gapS))
                     }
                     section.items.forEach { item ->
-                        SidebarItem(item, item.route == currentRoute, collapsed, badges[item.route], open, navDrop) { onSelect(item.route) }
+                        SidebarItem(item, item.route == currentRoute, collapsed, badges[item.route], open, navDrop, iconBadges[item.route]) { onSelect(item.route) }
                     }
                 }
             }
@@ -373,7 +448,7 @@ fun Sidebar(
                     Box(Modifier.weight(1f)) {
                         if (footer != null) {
                             SidebarItem(footer, currentRoute == footer.route, collapsed = false, badge = badges[footer.route], open = open,
-                                navDrop = navDrop) { onSelect(footer.route) }
+                                navDrop = navDrop, iconBadge = iconBadges[footer.route]) { onSelect(footer.route) }
                         }
                     }
                 }
@@ -386,7 +461,7 @@ fun Sidebar(
             if (collapsed && footer != null) {
                 Box(Modifier.padding(start = 6.dp, end = 6.dp, bottom = 6.dp)) {
                     SidebarItem(footer, currentRoute == footer.route, collapsed = true, badge = badges[footer.route], open = open,
-                        navDrop = navDrop) { onSelect(footer.route) }
+                        navDrop = navDrop, iconBadge = iconBadges[footer.route]) { onSelect(footer.route) }
                 }
             }
         }
@@ -403,7 +478,7 @@ private fun labelAlpha(open: Float): Float = ((open - 0.5f) * 2f).coerceIn(0f, 1
  */
 @Composable
 private fun SidebarItem(item: NavItem, selected: Boolean, collapsed: Boolean, badge: String?, open: Float = if (collapsed) 0f else 1f,
-                        navDrop: NavDrop? = null, onClick: () -> Unit) {
+                        navDrop: NavDrop? = null, iconBadge: NavIconBadge? = null, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val state = interaction.collectState()
     val colors = DeskTheme.colors
@@ -415,6 +490,9 @@ private fun SidebarItem(item: NavItem, selected: Boolean, collapsed: Boolean, ba
     // a collapsed item centres its icon; the same start padding keeps it still while the panel opens
     val collapsedStart: Dp = ((dimens.sidebarCollapsedWidth - 12.dp - dimens.icon) / 2).coerceAtLeast(0.dp)
     val showLabel = !collapsed && open > 0.5f
+    // the icon's mark only while the sidebar is collapsed: open, the entry's text badge says it
+    val shownIconBadge = if (collapsed) iconBadge else null
+    val iconBadgeText = shownIconBadge?.let { badgeDescription(it) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -425,14 +503,17 @@ private fun SidebarItem(item: NavItem, selected: Boolean, collapsed: Boolean, ba
             .background(indicator, shape)
             .semantics {
                 this.selected = selected
-                if (collapsed) contentDescription = item.label
+                if (collapsed) contentDescription = if (iconBadgeText != null) "${item.label}, $iconBadgeText" else item.label
             }
             .deskClickable(interaction, onClick, role = Role.Tab)
             .padding(start = lerp(collapsedStart, 10.dp, open), end = if (showLabel) 10.dp else 0.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Start,
     ) {
-        Icon(item.icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(dimens.icon))
+        Box(contentAlignment = Alignment.Center) {
+            Icon(item.icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(dimens.icon))
+            IconBadge(shownIconBadge, dimens.icon, ring = colors.chrome)
+        }
         if (showLabel) {
             Spacer(Modifier.width(10.dp))
             Row(Modifier.weight(1f).alpha(labelAlpha(open)), verticalAlignment = Alignment.CenterVertically) {
@@ -669,6 +750,17 @@ fun KeyCap(text: String, modifier: Modifier = Modifier) {
     ) {
         Text(text, style = DeskTheme.type.mono, color = colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
+}
+
+/**
+ * TalkBack reads an entry with a [badge] as its [label] and the badge ("Inbox, 4 unread"); the text
+ * stays as it is for everything else.
+ */
+@Composable
+private fun Modifier.badgeSemantics(label: String, badge: NavIconBadge?): Modifier {
+    if (badge == null) return this
+    val said = "$label, ${badgeDescription(badge)}"
+    return semantics { contentDescription = said }
 }
 
 /** "More" is selected while the current screen is one of those it lists. */

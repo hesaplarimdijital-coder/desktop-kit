@@ -76,4 +76,9 @@
     <string name="dk_palette_show_all">%1$d sonucun hepsini göster</string>
     <string name="dk_new_window">Yeni pencere</string>
     <string name="dk_play">Oynat</string>
+    <plurals name="dk_badge_new">
+        <item quantity="one">%d yeni</item>
+        <item quantity="other">%d yeni</item>
+    </plurals>
+    <string name="dk_badge_dot">Yeni</string>
 </resources>

@@ -153,6 +153,9 @@ class ShellNavigator(private val navController: NavHostController) {
  * Motion follows the window ([desktopkit.theme.MotionTier]): springs on a phone, the 0.2.0 timings
  * from tablet width up, none with reduced motion.
  *
+ * @param badges text next to the sidebar's entries ("4 812", "3 new"), by route.
+ * @param iconBadges a count or a dot on the entries' icons in the bottom bar, the rail and the collapsed
+ *   sidebar ([NavIconBadge]): unread mail on "Inbox" where there is no room for text.
  * @param bottomBar optional strip under the content (a player, a status bar); it receives the current
  *   [NavKind]. On a phone an [desktopkit.components.ExpandablePlayer] fits here.
  * @param hideNavigationWithKeyboard false keeps the bottom navigation bar above the open keyboard.
@@ -192,6 +195,7 @@ fun DesktopShell(
     sidebarCollapsed: Boolean = false,
     onSidebarCollapsedChange: (Boolean) -> Unit = {},
     badges: NavBadges = emptyMap(),
+    iconBadges: NavIconBadges = emptyMap(),
     brand: (@Composable (Modifier) -> Unit)? = null,
     menus: List<MenuSpec> = emptyList(),
     onSearch: (() -> Unit)? = null,
@@ -240,6 +244,7 @@ fun DesktopShell(
                 sidebarCollapsed = sidebarCollapsed,
                 onSidebarCollapsedChange = onSidebarCollapsedChange,
                 badges = badges,
+                iconBadges = iconBadges,
                 brand = brand,
                 menus = menus,
                 onSearch = onSearch,
@@ -272,6 +277,7 @@ private fun ShellContent(
     sidebarCollapsed: Boolean,
     onSidebarCollapsedChange: (Boolean) -> Unit,
     badges: NavBadges,
+    iconBadges: NavIconBadges,
     brand: (@Composable (Modifier) -> Unit)?,
     menus: List<MenuSpec>,
     onSearch: (() -> Unit)?,
@@ -428,6 +434,7 @@ private fun ShellContent(
                         BottomNavBar(
                             spec, currentRoute, select,
                             hasMoreActions = moreActions.isNotEmpty(),
+                            iconBadges = iconBadges,
                             modifier = Modifier
                                 .onSizeChanged {
                                     scroll.maxOffsetPx = it.height.toFloat()
@@ -437,7 +444,7 @@ private fun ShellContent(
                                 .graphicsLayer { translationY = overlayHost.expandProgress() * size.height },
                         )
                     }
-                    NavKind.Rail -> NavRail(spec, currentRoute, navigator::navigate, brand = brand, navDrop = navDrop)
+                    NavKind.Rail -> NavRail(spec, currentRoute, navigator::navigate, brand = brand, navDrop = navDrop, iconBadges = iconBadges)
                     NavKind.Sidebar -> Sidebar(
                         spec = spec,
                         currentRoute = currentRoute,
@@ -446,6 +453,7 @@ private fun ShellContent(
                         onToggleCollapsed = { onSidebarCollapsedChange(!sidebarCollapsed) },
                         badges = badges,
                         navDrop = navDrop,
+                        iconBadges = iconBadges,
                     )
                 }
             },
