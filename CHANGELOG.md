@@ -13,6 +13,21 @@
   `rememberShellContentPadding()` çubuğu saymaz. `enabled = false` ya da bileşimden çıkmak çubuğu geri getirir,
   bırakılan ekranın çağrısı hemen sayılmaz olur. Tablette ve DeX'te etkisi yok. Test: `HideBottomNavigationTest`.
 
+### Hatalar
+
+- **Telefonda çubukların altından içerik görünüyordu** (Kitap Bulucu, Galaxy S24, üç düğmeli gezinme): ekranın en
+  alt piksel satırında, sistemin düğmelerinin altında listenin sonraki satırı bulanıksız görünüyordu. Neden cam:
+  Haze bulanıklığı küçültülmüş bir kopya üstünde yapıp büyütür; tam piksele yuvarlanan kopya yüzeyin alt ya da sağ
+  kenarına 0,63 piksele kadar eksik kalabilir. Başka yerde kopya yüzeyden büyük çizilip kesildiği için eksik görünmez;
+  pencerenin kenarında biten bir yüzeyde (telefonun alt camı: S24'te 339 piksel) son satır ya da sütun alttakine
+  kalıyordu. Cam artık bulanıklığın altına kendi saydamsız rengini çizer: bulanıklık zaten bu rengin üstüne çizdiği
+  için görünüş aynı, yalnızca bulanıklığın erişmediği pikseller (ve kaynağı henüz kaydedilmemiş bir karede bütün
+  yüzey) içerik yerine bu rengi gösterir. Ayrıca sistemin alt kenardaki payları birbirini tutmazsa (bir kesik ya da
+  başka bir sistem çubuğu gezinme çubuğundan uzunsa) kabuğun alt şeridi en uzununu kaplar; kök altta kendi
+  zemininden bir şerit bırakmaz. Tabletin ve DeX'in görünüşü değişmedi. Test: `WindowEdgeTest` (donanım
+  çizimiyle, bulanıklık açık: üç düğme ve hareketle gezinme, çubuklar açık ve kaydırınca gizli, gizli alt gezinme,
+  1440 piksel genişlik, tutmayan paylar).
+
 ## 2.8.0 (2026-11-13)
 
 Tasarım standardının denetimi ("Desktop Kit Tasarım Standardı" belgesinin son bölümü) ve DeskMail'in kitten

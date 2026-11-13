@@ -121,8 +121,10 @@ fun DesktopKitRoot(
     ) {
         if (systemBarsAppearance) SystemBarsAppearance(dark = DeskTheme.colors.isDark)
         val safeDrawing = WindowInsets.safeDrawing
-        // the keyboard covers the navigation bar: what is left of the bar above it
-        val navigationBottom = WindowInsets.navigationBars.only(WindowInsetsSides.Bottom).exclude(WindowInsets.ime)
+        // everything the system lays over the window's bottom edge (the navigation bar, and any other system bar or
+        // cutout there, which a device can report taller than the navigation bar: the shell's chrome covers the
+        // tallest, so the root never pads a strip of its own background in under it), less the keyboard over it
+        val navigationBottom = safeDrawing.only(WindowInsetsSides.Bottom).exclude(WindowInsets.ime)
         val captionTop = WindowInsets.captionBar.only(WindowInsetsSides.Top)
         // safeDrawing without the caption bar, for a shell whose menu bar fills it
         val belowCaption = WindowInsets.statusBars.union(WindowInsets.navigationBars).union(WindowInsets.displayCutout)
@@ -183,7 +185,10 @@ fun DesktopKitRoot(
 /** Insets the root leaves to a [desktopkit.shell.DesktopShell] inside it. */
 @Stable
 internal class RootInsets(
-    /** The bottom navigation bar (three buttons or the gesture handle), less the keyboard covering it. */
+    /**
+     * What the system lays over the window's bottom edge: the navigation bar (three buttons or the gesture
+     * handle), or a taller system bar or cutout there; less the keyboard covering it.
+     */
     val navigationBottom: WindowInsets,
     /** The caption bar of a desktop window, as far as it reaches the app's content. */
     private val captionTop: WindowInsets = WindowInsets(0, 0, 0, 0),

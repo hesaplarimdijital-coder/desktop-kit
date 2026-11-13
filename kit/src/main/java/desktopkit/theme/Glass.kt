@@ -277,6 +277,15 @@ private fun Modifier.glassIn(
         val style = remember(material) { material.blurStyle() }
         val input = remember(source) { HazeInput.Sources(source) }
         this
+            // The blur draws the solid colour under the content it blurs, so it is opaque wherever it
+            // draws; this backing shows only where it does not. Haze blurs a scaled-down copy (0.79 of
+            // the size) and scales it back up: rounded to whole pixels, the copy can end up to 0.63 px
+            // short of the surface's bottom or right edge. Elsewhere the copy is larger than the surface
+            // and cut to it, but it cannot reach past the window's edge, so a surface that ends there can
+            // leave its last pixel row (or column) to whatever lies under it: on a Galaxy S24 (density 3)
+            // the phone's bottom glass, 339 px high, left the list's next row sharp under the system's
+            // buttons. The blur also draws nothing on a frame before its source is recorded.
+            .background(material.solid, shape)
             .clip(shape)
             .hazeBlur(input = input, style = style)
     }
