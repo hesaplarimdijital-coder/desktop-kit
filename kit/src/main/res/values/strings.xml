@@ -85,4 +85,6 @@
     <string name="dk_sorted_descending">Sorted descending</string>
     <string name="dk_sort_by">Sort by %1$s</string>
     <string name="dk_close_sheet">Close sheet</string>
+    <string name="dk_token_invalid">Not valid</string>
+    <string name="dk_token_remove">Remove</string>
 </resources>
