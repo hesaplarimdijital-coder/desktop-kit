@@ -85,4 +85,6 @@
     <string name="dk_sorted_descending">Azalan sırada</string>
     <string name="dk_sort_by">%1$s sütununa göre sırala</string>
     <string name="dk_close_sheet">Sayfayı kapat</string>
+    <string name="dk_token_invalid">Geçersiz</string>
+    <string name="dk_token_remove">Kaldır</string>
 </resources>
