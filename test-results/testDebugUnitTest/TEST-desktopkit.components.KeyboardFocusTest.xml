@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.components.KeyboardFocusTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-13T08:04:26.744Z" hostname="runnervmccnms" time="0.736">
+  <properties/>
+  <testcase name="thePaletteKeepsTheFocusAndGivesItBack" classname="desktopkit.components.KeyboardFocusTest" time="0.329"/>
+  <testcase name="aSheetGivesTheFocusBack" classname="desktopkit.components.KeyboardFocusTest" time="0.144"/>
+  <testcase name="talkBackPlaysACover" classname="desktopkit.components.KeyboardFocusTest" time="0.1"/>
+  <testcase name="talkBackClosesATabWhoseButtonIsHidden" classname="desktopkit.components.KeyboardFocusTest" time="0.045"/>
+  <testcase name="tabMovesIntoACloseButtonAndOnToTheNextTab" classname="desktopkit.components.KeyboardFocusTest" time="0.064"/>
+  <testcase name="aCoverCellsPlayHasADefaultName" classname="desktopkit.components.KeyboardFocusTest" time="0.05"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

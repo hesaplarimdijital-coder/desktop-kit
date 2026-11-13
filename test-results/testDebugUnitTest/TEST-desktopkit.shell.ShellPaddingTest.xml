@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.shell.ShellPaddingTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-13T08:04:55.041Z" hostname="runnervmccnms" time="0.159">
+  <properties/>
+  <testcase name="screensThatDoNotAskStayClearOfTheBars" classname="desktopkit.shell.ShellPaddingTest" time="0.042"/>
+  <testcase name="screenUnderTheBarsGetsTheWindowAndThePadding" classname="desktopkit.shell.ShellPaddingTest" time="0.038"/>
+  <testcase name="scrollingMovesTheBarsWithoutMeasuringTheScreen" classname="desktopkit.shell.ShellPaddingTest" time="0.077"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

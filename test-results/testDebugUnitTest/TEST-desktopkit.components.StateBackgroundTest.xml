@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.components.StateBackgroundTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-13T08:04:33.052Z" hostname="runnervmccnms" time="0.236">
+  <properties/>
+  <testcase name="pointerPressIsInstant" classname="desktopkit.components.StateBackgroundTest" time="0.05"/>
+  <testcase name="touchHoverEases" classname="desktopkit.components.StateBackgroundTest" time="0.049"/>
+  <testcase name="pointerSelectionStillEases" classname="desktopkit.components.StateBackgroundTest" time="0.046"/>
+  <testcase name="touchPressEases" classname="desktopkit.components.StateBackgroundTest" time="0.046"/>
+  <testcase name="pointerHoverEnterAndExitAreInstant" classname="desktopkit.components.StateBackgroundTest" time="0.041"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

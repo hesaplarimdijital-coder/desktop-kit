@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.screenshots.ComponentStatesTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-11-13T08:04:41.308Z" hostname="runnervmccnms" time="1.459">
+  <properties/>
+  <testcase name="darkStates" classname="desktopkit.screenshots.ComponentStatesTest" time="0.854"/>
+  <testcase name="lightStates" classname="desktopkit.screenshots.ComponentStatesTest" time="0.602"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
