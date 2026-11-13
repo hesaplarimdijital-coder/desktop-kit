@@ -2,6 +2,8 @@ package desktopkit.components
 
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Column
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -82,5 +84,22 @@ class AppRequestsTest {
         compose.onNodeWithText("Hesap ekle").performClick()
         assertEquals(listOf("account", "remove", "add"), used)
         compose.onNode(androidx.compose.ui.test.isHeading() and androidx.compose.ui.test.hasText("Henüz hesap yok")).assertExists()
+    }
+
+    /** The design audit's high finding 7: on touch a cover's menu has a button by its title; without a menu there is none. */
+    @Test
+    fun aTouchCoverHasItsMenuButton() {
+        var withMenu by androidx.compose.runtime.mutableStateOf(true)
+        content {
+            DeskGrid(
+                items = listOf("Kış Bahçesi"), key = { it }, onItemClick = { _, _ -> },
+                itemMenu = if (withMenu) ({ _, _ -> listOf(MenuEntry.Item("Sıraya ekle", {})) }) else null,
+            ) { title -> CoverCell(title) { } }
+        }
+        compose.onNodeWithContentDescription("More options").performClick()
+        compose.onNodeWithText("Sıraya ekle").assertIsDisplayed()
+        compose.runOnIdle { withMenu = false }
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("More options").assertDoesNotExist()
     }
 }
