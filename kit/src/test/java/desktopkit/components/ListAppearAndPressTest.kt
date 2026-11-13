@@ -69,6 +69,8 @@ class ListAppearAndPressTest {
         if (arrive) {
             frame()
             compose.runOnIdle { loaded = true }
+            // the recomposer wakes with the first frame, the rows are composed with the second
+            frame()
         }
     }
 
