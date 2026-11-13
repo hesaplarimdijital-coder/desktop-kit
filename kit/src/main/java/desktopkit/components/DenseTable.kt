@@ -240,8 +240,8 @@ fun <T> DenseTable(
 ) {
     // Another order starts the rows at the top. Keyed rows keep the one first in view in view, wherever the new order
     // puts it: a table at its top sorted the other way showed its end (found in Nağmedar 1.0.8: a drive sorted by size
-    // showed its smallest folders, the largest out of sight above them). Asked for before the rows are laid out in their
-    // new order, so no frame shows the other place.
+    // kept its first folder by name in view, last in that order, and showed the end of its list). Asked for before the
+    // rows are laid out in their new order, so no frame shows the other place.
     val seenOrder = remember { OrderSeen(order) }
     SideEffect {
         if (seenOrder.order != order) {
