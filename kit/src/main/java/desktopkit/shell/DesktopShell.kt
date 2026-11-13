@@ -70,7 +70,10 @@ import desktopkit.screens.OverflowScreen
 import desktopkit.theme.DeskGlass
 import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
+import desktopkit.theme.GlassHolds
 import desktopkit.theme.GlassMode
+import desktopkit.theme.LocalGlassHolds
+import desktopkit.theme.effectiveGlassMode
 import desktopkit.theme.GlassThickness
 import desktopkit.theme.LocalDeskDimens
 import desktopkit.theme.LocalDeskType
@@ -328,6 +331,7 @@ private fun ShellContent(
     val metrics = remember { ShellChromeMetrics() }
     val overlayHost = remember { ShellOverlayHost() }
     val glassSource = remember { HazeState() }
+    val glassHolds = remember { GlassHolds() }
     val padding = remember(metrics, density) { shellPaddingValues(metrics, density) }
     // the root leaves the system navigation bar at the bottom to the shell, which draws its chrome behind it
     val rootInsets = LocalRootInsets.current
@@ -384,6 +388,7 @@ private fun ShellContent(
         LocalWidthClass provides widthClass,
         LocalCompactTopBarHost provides topBarHost,
         LocalGlassSource provides glassSource,
+        LocalGlassHolds provides glassHolds,
         LocalShellOverlayHost provides overlayHost,
         LocalShellContentPadding provides padding,
         LocalShellBottomGlass provides sharedGlass,
@@ -461,7 +466,8 @@ private fun ShellContent(
                     Box(
                         Modifier
                             .fillMaxSize()
-                            .glassSource(glassSource, glassMode)
+                            // not recorded while a screen pauses the blur (PauseGlassBlur: a WebView, a video)
+                            .glassSource(glassSource, effectiveGlassMode(glassMode, paused = glassHolds.count > 0))
                             .background(colors.background)
                             .nestedScroll(scroll.connection)
                             .dismissKeyboardOnTouch(overlayHost.textFields, keyboardUp = { keyboardUp }),
