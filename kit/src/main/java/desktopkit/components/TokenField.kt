@@ -154,7 +154,7 @@ fun TokenField(
                 .onSizeChanged { fieldWidth = it.width }
                 .heightIn(min = dimens.controlHeight.coerceAtLeast(dimens.minTarget))
                 .background(if (enabled) colors.surface else androidx.compose.ui.graphics.Color.Transparent, shape)
-                .border(if (focused) 2.dp else 1.dp, if (focused) colors.accent else colors.borderStrong, shape)
+                .border(if (focused) 2.dp else 1.dp, if (focused) colors.accent else colors.controlBorder, shape)
                 .padding(horizontal = if (touch) 8.dp else 4.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(dimens.gapXs),
             verticalArrangement = Arrangement.spacedBy(dimens.gapXs, Alignment.CenterVertically),
