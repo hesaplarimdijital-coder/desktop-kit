@@ -48,6 +48,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -134,6 +135,9 @@ fun <T : Any> DetailTransition(
     val latestOnBack by rememberUpdatedState(onBack)
     val latestDetail by rememberUpdatedState(detail)
     val cards = remember { DetailSharedState() }
+    // the list leaves composition once a detail covers it; its remembered state (scroll position, open
+    // sections, a typed filter) waits here for its return, as Navigation keeps a screen's
+    val saveable = rememberSaveableStateHolder()
     val page = colors.background
     val behind = colors.pressed
     val scrim = colors.scrim
@@ -219,7 +223,7 @@ fun <T : Any> DetailTransition(
                                         scaleY = scale
                                     }
                                 },
-                        ) { list() }
+                        ) { saveable.SaveableStateProvider(LIST_STATE_KEY) { list() } }
                     }
                 } else {
                     // the detail as the app has it now: the transition holds the object it was opened with, and an
@@ -368,6 +372,9 @@ fun <T : Any> DetailTransition(
         }
     }
 }
+
+/** The key the list's saved state is kept under while a detail covers it. */
+private const val LIST_STATE_KEY = "desktopkit.DetailTransition.list"
 
 /** How far the finger seeks the closing; the rest ([1 - GESTURE_END]) is the detail's way out once let go. */
 private const val GESTURE_END = 0.85f
