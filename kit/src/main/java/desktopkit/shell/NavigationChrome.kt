@@ -485,7 +485,8 @@ fun Sidebar(
                     if (items.isEmpty()) return@forEach
                     val title = section.title
                     val foldable = section.collapsible && title != null
-                    val folded = section.collapsible && title != null && title in shut
+                    // shut only while the sidebar is open: collapsed it shows no header to open the section again
+                    val folded = !collapsed && section.collapsible && title != null && title in shut
                     if (!collapsed && title != null) {
                         if (foldable) {
                             SectionHeader(title, folded, Modifier.alpha(labelAlpha(open))) {

@@ -34,6 +34,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -99,6 +100,7 @@ import desktopkit.theme.grow
 import desktopkit.theme.toMaterialTypography
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlin.math.roundToInt
+import kotlinx.coroutines.flow.first
 
 /** Navigation chrome around the current screen; screens show their own title only in [NavKind.Sidebar]. */
 val LocalNavKind = compositionLocalOf { NavKind.Sidebar }
@@ -222,7 +224,6 @@ fun DesktopShell(
     sidebarCollapsed: Boolean = false,
     onSidebarCollapsedChange: (Boolean) -> Unit = {},
     badges: NavBadges = emptyMap(),
-    iconBadges: NavIconBadges = emptyMap(),
     brand: (@Composable (Modifier) -> Unit)? = null,
     menus: List<MenuSpec> = emptyList(),
     onSearch: (() -> Unit)? = null,
@@ -242,6 +243,7 @@ fun DesktopShell(
     navDrop: NavDrop? = null,
     navMenu: ((route: String) -> List<MenuEntry>)? = null,
     heightClass: HeightClass = LocalHeightClass.current,
+    iconBadges: NavIconBadges = emptyMap(),
     content: @Composable (route: String, navigator: ShellNavigator) -> Unit,
 ) {
     // tablet and DeX read one size larger; phones get the tighter compact sizes. A phone on its side (a short
@@ -380,17 +382,21 @@ private fun ShellContent(
     val glassSource = remember { HazeState() }
     val glassHolds = remember { GlassHolds() }
     val padding = remember(metrics, density) { shellPaddingValues(metrics, density) }
-    // One graph for the shell's life (a new start route aside): routes the spec gains are added to it and routes it
-    // loses are taken out, so a new folder or account keeps the open screen, the back stacks and their state
-    // (DeskMail's request 3). A new graph would send the shell back to its start and forget every screen's state.
+    // One graph for the shell's life (a new start route aside): routes the spec gains are added to it, so a new folder
+    // or account keeps the open screen, the back stacks and their state (DeskMail's request 3). A new graph would send
+    // the shell back to its start and forget every screen's state. Routes the spec loses stay in the graph: a back stack
+    // saved with one of them in it (a folder opened in the "Folders" tab, then another tab chosen) is restored without
+    // a crash, and the gone screen takes itself away as soon as it shows (GoneScreen).
     val tabPage = remember<@Composable AnimatedContentScope.(String) -> Unit> {
         { route ->
             TabPage(transition, leaving = { leavingTab(route) }, route = route) {
                 ShellScreenFrame(metrics, scroll) {
-                    if (route == ShellSpec.MORE_ROUTE) {
-                        OverflowSections(moreSections(currentSpec, currentKind), onSelect = navigator::navigate)
-                    } else {
-                        currentContent(route, navigator)
+                    when {
+                        route == ShellSpec.MORE_ROUTE -> OverflowSections(moreSections(currentSpec, currentKind), onSelect = navigator::navigate)
+                        currentSpec.item(route) == null -> GoneScreen(shown = { latestRoute == route }) {
+                            navController.popBackStack(route, inclusive = true)
+                        }
+                        else -> currentContent(route, navigator)
                     }
                 }
             }
@@ -411,17 +417,10 @@ private fun ShellContent(
         }
         routes
     }
+    // the back stacks saved under a gone route (a gone folder that was a tab of its own) are let go
     LaunchedEffect(graph, routes) {
         val kept = routes.toSet() + ShellSpec.MORE_ROUTE + spec.startRoute
-        val stale = graph.filter { it.route !in kept }
-        if (stale.isEmpty()) return@LaunchedEffect
-        val staleRoutes = stale.mapNotNull { it.route }.toSet()
-        // a screen that is gone: its tab goes to the start screen first
-        if (navController.currentBackStack.value.any { it.destination.route in staleRoutes }) navigator.navigate(spec.startRoute)
-        stale.forEach { node ->
-            node.route?.let { navController.clearBackStack(it) }
-            graph.remove(node)
-        }
+        graph.mapNotNull { it.route }.filter { it !in kept }.forEach { navController.clearBackStack(it) }
     }
     // the root leaves the system navigation bar at the bottom to the shell, which draws its chrome behind it
     val rootInsets = LocalRootInsets.current
@@ -699,6 +698,20 @@ private fun TabPage(transition: Transition<EnterExitState>, leaving: () -> Boole
         .background(page)
     Box(Modifier.fillMaxSize().then(surface)) {
         CompositionLocalProvider(LocalTabRoute provides route) { ProvideScreenLeaving(leaving, content) }
+    }
+}
+
+/**
+ * A screen whose route the spec no longer has (a folder deleted on the server): nothing of the app's is drawn for it, and
+ * once it is the screen shown (now, or when a saved back stack brings it back) it goes with [leave], uncovering the screen
+ * it was opened over.
+ */
+@Composable
+private fun GoneScreen(shown: () -> Boolean, leave: () -> Unit) {
+    val latestLeave by rememberUpdatedState(leave)
+    LaunchedEffect(Unit) {
+        snapshotFlow { shown() }.first { it }
+        latestLeave()
     }
 }
 
