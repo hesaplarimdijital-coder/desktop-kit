@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.components.SheetAccessTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-13T22:28:57.502Z" hostname="runnervmwuk1x" time="0.209">
+  <properties/>
+  <testcase name="aSheetOpenedFromAnothersContentLeavesItOpen" classname="desktopkit.components.SheetAccessTest" time="0.083"/>
+  <testcase name="theHandleClosesTheSheet" classname="desktopkit.components.SheetAccessTest" time="0.07"/>
+  <testcase name="aSheetOpenedOverAnotherClosesIt" classname="desktopkit.components.SheetAccessTest" time="0.054"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

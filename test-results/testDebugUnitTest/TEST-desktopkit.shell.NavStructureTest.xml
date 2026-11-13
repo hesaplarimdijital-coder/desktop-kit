@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.shell.NavStructureTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-11-13T22:29:17.049Z" hostname="runnervmwuk1x" time="0.483">
+  <properties/>
+  <testcase name="anEntrysMenuOpensWithARightClickAndForTalkBack" classname="desktopkit.shell.NavStructureTest" time="0.05"/>
+  <testcase name="aGoneFolderInASavedBackStackIsLeftOut" classname="desktopkit.shell.NavStructureTest" time="0.086"/>
+  <testcase name="aParentMustBeThereAndNotGoRound" classname="desktopkit.shell.NavStructureTest" time="0.022"/>
+  <testcase name="aNewFolderKeepsTheOpenScreenAndItsState" classname="desktopkit.shell.NavStructureTest" time="0.055"/>
+  <testcase name="anAccountShutsAndItsFoldersStepIn" classname="desktopkit.shell.NavStructureTest" time="0.036"/>
+  <testcase name="aShutAccountsFoldersShowOnTheCollapsedSidebar" classname="desktopkit.shell.NavStructureTest" time="0.052"/>
+  <testcase name="aFolderThatIsGoneTakesItsScreenAway" classname="desktopkit.shell.NavStructureTest" time="0.048"/>
+  <testcase name="whatEachChromeShowsAndMarks" classname="desktopkit.shell.NavStructureTest" time="0.019"/>
+  <testcase name="aFolderOpenedFromFoldersMarksFoldersAndBackComesBack" classname="desktopkit.shell.NavStructureTest" time="0.113"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

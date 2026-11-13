@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.theme.ReducedMotionTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-13T22:29:20.676Z" hostname="runnervmwuk1x" time="0.102">
+  <properties/>
+  <testcase name="thePressShrinkJumpsToItsSize" classname="desktopkit.theme.ReducedMotionTest" time="0.025"/>
+  <testcase name="theTopBarTurnsToGlassInOneFrame" classname="desktopkit.theme.ReducedMotionTest" time="0.03"/>
+  <testcase name="aMenuAppearsAtFullSize" classname="desktopkit.theme.ReducedMotionTest" time="0.045"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

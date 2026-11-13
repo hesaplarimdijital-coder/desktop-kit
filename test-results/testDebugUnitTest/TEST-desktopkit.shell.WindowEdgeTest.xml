@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.shell.WindowEdgeTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-13T22:29:19.006Z" hostname="runnervmwuk1x" time="1.269">
+  <properties/>
+  <testcase name="widerPhone" classname="desktopkit.shell.WindowEdgeTest" time="0.381"/>
+  <testcase name="threeButtonNavigation" classname="desktopkit.shell.WindowEdgeTest" time="0.38"/>
+  <testcase name="bottomNavigationHidden" classname="desktopkit.shell.WindowEdgeTest" time="0.148"/>
+  <testcase name="bottomInsetsThatDisagree" classname="desktopkit.shell.WindowEdgeTest" time="0.133"/>
+  <testcase name="gestureNavigation" classname="desktopkit.shell.WindowEdgeTest" time="0.224"/>
+  <system-out><![CDATA[1440 px wide, bars shown: rows 2787..3119, chrome #0E3F16, last row #0C0F12, right column #0C0F12
+three buttons, bars shown: rows 2007..2339, chrome #0E3F16, last row #0C0F12, right column #0E3B16
+three buttons, bars slid away: rows 2202..2339, chrome #0E3F16, last row #0E3F16, right column #0E3B16
+navigation hidden: rows 2202..2339, chrome #0E3F16, last row #0E3F16, right column #0E3B16
+cutout taller than the navigation bar: rows 2190..2339, chrome #0E3F16, last row #0E3F16, right column #0E3B16
+gesture handle, bars shown: rows 2103..2339, chrome #0E3F16, last row #0E3F16, right column #0E3B16
+gesture handle, bars slid away: rows 2298..2339, chrome #0E3F16, last row #0E3F16, right column #0E3B16
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

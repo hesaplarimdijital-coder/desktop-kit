@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.components.ChipWidthTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-11-13T22:28:43.210Z" hostname="runnervmwuk1x" time="3.394">
+  <properties/>
+  <testcase name="aPhonesChipWithAnIconKeepsItsWidthFrameByFrame" classname="desktopkit.components.ChipWidthTest" time="3.339"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

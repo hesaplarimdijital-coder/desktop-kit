@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.components.ScrollbarTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-13T22:28:57.339Z" hostname="runnervmwuk1x" time="0.16">
+  <properties/>
+  <testcase name="aPressOnTheTrackJumpsThere" classname="desktopkit.components.ScrollbarTest" time="0.062"/>
+  <testcase name="aFingerAtTheEdgeTapsTheRow" classname="desktopkit.components.ScrollbarTest" time="0.04"/>
+  <testcase name="aMouseDragsTheThumbToTheEndAndNoRowIsClicked" classname="desktopkit.components.ScrollbarTest" time="0.055"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

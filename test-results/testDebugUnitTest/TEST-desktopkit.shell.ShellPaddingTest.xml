@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.shell.ShellPaddingTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-13T22:29:18Z" hostname="runnervmwuk1x" time="0.172">
+  <properties/>
+  <testcase name="aScreenAskingFromASubcompositionIsNotPaddedTwice" classname="desktopkit.shell.ShellPaddingTest" time="0.033"/>
+  <testcase name="screensThatDoNotAskStayClearOfTheBars" classname="desktopkit.shell.ShellPaddingTest" time="0.038"/>
+  <testcase name="screenUnderTheBarsGetsTheWindowAndThePadding" classname="desktopkit.shell.ShellPaddingTest" time="0.041"/>
+  <testcase name="scrollingMovesTheBarsWithoutMeasuringTheScreen" classname="desktopkit.shell.ShellPaddingTest" time="0.058"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
