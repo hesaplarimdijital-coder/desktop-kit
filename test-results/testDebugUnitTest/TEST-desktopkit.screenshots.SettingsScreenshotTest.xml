@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.screenshots.SettingsScreenshotTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-11-13T17:57:32.450Z" hostname="runnervmccnms" time="0.211">
+  <properties/>
+  <testcase name="settingsCompact" classname="desktopkit.screenshots.SettingsScreenshotTest" time="0.098"/>
+  <testcase name="settingsSections" classname="desktopkit.screenshots.SettingsScreenshotTest" time="0.111"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.components.DenseTableSelectionTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-11-13T17:57:05.797Z" hostname="runnervmccnms" time="1.336">
+  <properties/>
+  <testcase name="columnChooserHidesAColumnAndRemembersIt" classname="desktopkit.components.DenseTableSelectionTest" time="0.208"/>
+  <testcase name="escapeClearsTheSelection" classname="desktopkit.components.DenseTableSelectionTest" time="0.102"/>
+  <testcase name="clickSelectsOnlyThatRow" classname="desktopkit.components.DenseTableSelectionTest" time="0.121"/>
+  <testcase name="screenshot" classname="desktopkit.components.DenseTableSelectionTest" time="0.119"/>
+  <testcase name="shiftArrowsExtendTheSelection" classname="desktopkit.components.DenseTableSelectionTest" time="0.115"/>
+  <testcase name="toggleOnClickAddsAndRemoves" classname="desktopkit.components.DenseTableSelectionTest" time="0.148"/>
+  <testcase name="menuOnAnotherRowSelectsJustThatRow" classname="desktopkit.components.DenseTableSelectionTest" time="0.189"/>
+  <testcase name="menuOnASelectedRowKeepsTheSelection" classname="desktopkit.components.DenseTableSelectionTest" time="0.215"/>
+  <testcase name="ctrlASelectsEveryRow" classname="desktopkit.components.DenseTableSelectionTest" time="0.11"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
