@@ -1,0 +1,7 @@
+# Desktop Kit's code compiled ahead of time on the user's device (a Baseline Profile; the design audit's
+# medium finding 9). An app built with the kit carries these rules: the shell, its bars, the theme, the
+# table, the grid, sheets, menus, the palette and the gestures run compiled from the first frame instead
+# of interpreted until the JIT warms up (a first scroll of a long table at 120 Hz, a first sheet, the first
+# detail's shared element). Wide on purpose: the kit is small and most of it runs in every app's first
+# minute. An app can add its own rules, or generate them, beside these.
+HSPLdesktopkit/**->**(**)**
