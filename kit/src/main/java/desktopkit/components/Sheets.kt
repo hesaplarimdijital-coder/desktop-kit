@@ -53,6 +53,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
@@ -430,6 +431,8 @@ private fun SheetSurface(
                     if (esc) onDismiss()
                     esc
                 }
+                // the keyboard's focus stays in the sheet while it is up: Tab does not reach the screen behind
+                .focusProperties { onExit = { cancelFocusChange() } }
                 .focusRequester(focus)
                 .focusable()
                 // a finger or a mouse button is down: only then may a scroll at the list's top pull
