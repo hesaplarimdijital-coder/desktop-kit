@@ -20,7 +20,16 @@ import desktopkit.R
 import desktopkit.components.MenuEntry
 import desktopkit.components.MenuSpec
 
-/** A key with its modifiers, e.g. Ctrl+K. */
+/**
+ * A key with its modifiers, e.g. Ctrl+K.
+ *
+ * A punctuation key (/ , . - = + [ ]) also matches by the character it types, whichever key types
+ * it: on a Turkish Q keyboard "/" is Shift+7 and no key sends [Key.Slash], so Ctrl+/ never came
+ * (DeskMail's request 10). Such a chord matches when the character typed with the keys held, Ctrl,
+ * Alt and Meta left aside, is its character and Ctrl, Alt and Meta are as asked; Shift may be held
+ * for the character. [char] sets the character for any other key (null: the key's own, if it is
+ * one of these).
+ */
 @Immutable
 data class KeyChord(
     val key: Key,
@@ -28,14 +37,24 @@ data class KeyChord(
     val shift: Boolean = false,
     val alt: Boolean = false,
     val meta: Boolean = false,
+    val char: Char? = null,
 ) {
     val hasModifier: Boolean get() = ctrl || alt || meta
 
     /** F1–F12: safe to handle globally because they never type text. */
     val isFunctionKey: Boolean get() = key.nativeKeyCode in AndroidKeyEvent.KEYCODE_F1..AndroidKeyEvent.KEYCODE_F12
 
-    fun matches(event: KeyEvent): Boolean = event.key == key && event.isCtrlPressed == ctrl &&
-        event.isShiftPressed == shift && event.isAltPressed == alt && event.isMetaPressed == meta
+    /** The character this chord also matches by: [char], or the key's own punctuation. */
+    val typedChar: Char? get() = char ?: punctuation(key)
+
+    fun matches(event: KeyEvent): Boolean {
+        if (event.key == key && event.isCtrlPressed == ctrl && event.isShiftPressed == shift && event.isAltPressed == alt &&
+            event.isMetaPressed == meta) return true
+        val wanted = typedChar ?: return false
+        // the right Alt (AltGr) types characters, so only the left one counts as the chord's Alt here
+        val leftAlt = event.nativeKeyEvent.metaState and AndroidKeyEvent.META_ALT_LEFT_ON != 0
+        return event.isCtrlPressed == ctrl && leftAlt == alt && event.isMetaPressed == meta && typed(event) == wanted
+    }
 
     /** "Ctrl+Shift+N", "Space", "Alt+→": the same text in menus, tooltips and the shortcut list. */
     fun label(resources: Resources? = null): String = buildString {
@@ -52,6 +71,32 @@ data class KeyChord(
             (if (shift) AndroidKeyEvent.META_SHIFT_ON else 0) or
             (if (alt) AndroidKeyEvent.META_ALT_ON else 0) or
             (if (meta) AndroidKeyEvent.META_META_ON else 0)
+}
+
+/** The punctuation [key] stands for, when it is one that layouts put on other keys. */
+private fun punctuation(key: Key): Char? = when (key) {
+    Key.Slash -> '/'
+    Key.Comma -> ','
+    Key.Period -> '.'
+    Key.Minus -> '-'
+    Key.Equals -> '='
+    Key.Plus -> '+'
+    Key.LeftBracket -> '['
+    Key.RightBracket -> ']'
+    else -> null
+}
+
+/** Meta states that only make chords and type nothing themselves (AltGr, the right Alt, types). */
+private const val CHORD_ONLY_META = AndroidKeyEvent.META_CTRL_MASK or AndroidKeyEvent.META_META_MASK or AndroidKeyEvent.META_ALT_LEFT_ON
+
+/** The character [event] types with Shift, Caps Lock and AltGr as held, Ctrl, Meta and the left Alt left aside. */
+private fun typed(event: KeyEvent): Char? {
+    val native = event.nativeKeyEvent
+    var meta = native.metaState and CHORD_ONLY_META.inv()
+    // with only the left Alt gone, the plain Alt bit would stay and pick the layout's Alt row
+    if (native.metaState and AndroidKeyEvent.META_ALT_RIGHT_ON == 0) meta = meta and AndroidKeyEvent.META_ALT_ON.inv()
+    val code = runCatching { native.getUnicodeChar(meta) }.getOrDefault(0)
+    return if (code == 0 || code and android.view.KeyCharacterMap.COMBINING_ACCENT != 0) null else code.toChar()
 }
 
 private fun keyName(key: Key, resources: Resources?): String = when (key) {
