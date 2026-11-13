@@ -194,6 +194,28 @@ class CompactTopBarTest {
         compose.onNodeWithTag("counter-music").assertTextEquals("music: 2")
     }
 
+    /** DeskMail's request 15: a page opened over Settings shows its own title and way back on a tablet's rail too. */
+    @Test
+    fun aPageCanShowItsBarOnTheRail() {
+        var onRail by mutableStateOf(true)
+        compose.setContent {
+            DesktopKitTheme(themeMode = ThemeMode.Dark, inputMode = InputMode.Touch) {
+                TestShell(WidthClass.Expanded, startRoute = "documents", content = { _, _ ->
+                    CompactTopBar(title = "Hesap ekle", onBack = { backs++ }, showOnRail = onRail)
+                    Text("içerik")
+                })
+            }
+        }
+        compose.waitForIdle()
+        compose.onNodeWithText("Hesap ekle").assertIsDisplayed()
+        pressSystemBack()
+        assertEquals(1, backs)
+        onRail = false
+        compose.waitForIdle()
+        compose.onNodeWithText("Hesap ekle").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Back").assertDoesNotExist()
+    }
+
     /**
      * DeskMail's request 18: the bar of a screen being left gave way only once its way out had played,
      * so the title changed first and the back button and actions a quarter of a second later.

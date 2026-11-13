@@ -414,8 +414,9 @@ private fun ShellContent(
                     }
                 } else {
                     val title = if (currentRoute == ShellSpec.MORE_ROUTE) more.label else spec.item(currentRoute)?.label ?: spec.appTitle
-                    // CompactTopBar registers nothing on wider windows; checked here as well
-                    val screen = if (navKind == NavKind.BottomBar) topBarHost.current else null
+                    // CompactTopBar registers nothing in the sidebar layout, and on the rail only with showOnRail (checked
+                    // here as well: on the frame a window widens, the phone's calls are still there)
+                    val screen = topBarHost.current?.takeIf { navKind == NavKind.BottomBar || it.showOnRail }
                     PageTopBar(
                         title = screen?.title ?: title,
                         onSearch = if (screen?.showSearch == false) null else onSearch,

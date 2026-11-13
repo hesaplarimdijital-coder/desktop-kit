@@ -82,13 +82,16 @@ fun currentWidthClass(): WidthClass = LocalWidthClass.current
 
 /**
  * Replaces the compact (phone) top bar's title, adds a back/close button and action icons while
- * this is in composition. No effect on Medium and wider layouts (DeX unchanged). The last one
- * composed wins; leaving composition restores the default.
+ * this is in composition. No effect on Medium and wider layouts (DeX unchanged) unless
+ * [showOnRail]: then the rail layout's top bar (tablets, split screen) takes it too, for a page
+ * opened over another one ("Add account" over Settings) whose own title and way back would
+ * otherwise show nowhere there. The sidebar layout never does. The last one composed wins; leaving
+ * composition restores the default.
  *
  * - [title]: shown instead of the route's label (null keeps it); single line, cross-fades when it changes.
  * - [onBack]: adds a 48 dp back (arrow) or close (cross, [backIcon]) button before the title, and
  *   the system Back gesture calls it while this is the active top bar. Nothing is registered on
- *   wider layouts, where Back keeps its usual meaning.
+ *   wider layouts (unless [showOnRail], on the rail), where Back keeps its usual meaning.
  * - [actions]: icon buttons before the search button; with more than three, the first two (primary
  *   ones first) stay and the rest go into a "more" (⋮) menu.
  * - [showSearch]: false hides the shell's search button.
@@ -100,12 +103,14 @@ fun CompactTopBar(
     backIcon: TopBarBackIcon = TopBarBackIcon.Back,
     actions: List<TopBarAction> = emptyList(),
     showSearch: Boolean = true,
+    showOnRail: Boolean = false,
 ) {
     val host = LocalCompactTopBarHost.current ?: return
-    if (LocalWidthClass.current != WidthClass.Compact) return
+    val kind = NavKind.forWidth(LocalWidthClass.current)
+    if (kind == NavKind.Sidebar || (kind == NavKind.Rail && !showOnRail)) return
     val latestOnBack by rememberUpdatedState(onBack)
     val stableBack: () -> Unit = remember { { latestOnBack?.invoke() } }
-    val override = TopBarOverride(title, if (onBack != null) stableBack else null, backIcon, actions, showSearch)
+    val override = TopBarOverride(title, if (onBack != null) stableBack else null, backIcon, actions, showSearch, showOnRail)
     val leaving = LocalScreenLeaving.current
     val entry = remember(host) { CompactTopBarHost.Entry(override, leaving) }
     SideEffect {
@@ -128,6 +133,7 @@ internal data class TopBarOverride(
     val backIcon: TopBarBackIcon,
     val actions: List<TopBarAction>,
     val showSearch: Boolean,
+    val showOnRail: Boolean = false,
 )
 
 /**
