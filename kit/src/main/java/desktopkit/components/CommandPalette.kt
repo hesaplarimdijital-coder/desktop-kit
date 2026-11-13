@@ -229,6 +229,18 @@ sealed interface PaletteRow {
     data class Result(val item: PaletteItem, val match: PaletteMatcher.Match, val best: Boolean = false) : PaletteRow
 }
 
+/**
+ * 2.5.0: a line of the palette's list as the palette itself draws it: a [PaletteRow], or the line under a group
+ * that shows its best only, which says how many matches the group has and shows them all when chosen.
+ */
+internal sealed interface PaletteLine {
+    data class Row(val row: PaletteRow) : PaletteLine
+    data class More(val group: String, val total: Int) : PaletteLine
+}
+
+/** 2.5.0: the groups shown whole ("show all" chosen under them) for one query and filter; typing or filtering starts again. */
+internal data class PaletteExpansion(val query: String = "", val filter: String? = null, val groups: Set<String> = emptySet())
+
 /** Ranking of the palette, free of Compose so it can be tested. */
 object PaletteSearch {
     /**
@@ -242,7 +254,20 @@ object PaletteSearch {
         filter: String? = null,
         bestHeading: String = "",
         perGroup: Int = 6,
-    ): List<PaletteRow> {
+    ): List<PaletteRow> = lines(items, query, filter, bestHeading, perGroup, emptySet()).mapNotNull { (it as? PaletteLine.Row)?.row }
+
+    /**
+     * 2.5.0: [rows] as the palette draws them: a group that has more matches than the [perGroup] it shows ends
+     * with a [PaletteLine.More] that counts them; a group in [expanded] shows them all, as a filtered one does.
+     */
+    internal fun lines(
+        items: List<PaletteItem>,
+        query: String,
+        filter: String?,
+        bestHeading: String,
+        perGroup: Int,
+        expanded: Set<String>,
+    ): List<PaletteLine> {
         val scored = items.filter { filter == null || it.group == filter }.mapNotNull { item ->
             val title = PaletteMatcher.match(query, item.title)
             if (title != null) return@mapNotNull item to title
@@ -252,22 +277,21 @@ object PaletteSearch {
         }
         if (scored.isEmpty()) return emptyList()
         val groups = scored.map { it.first.group }.distinct()
-        val rows = mutableListOf<PaletteRow>()
+        val rows = mutableListOf<PaletteLine>()
         var best: PaletteItem? = null
         if (query.isNotBlank()) {
             val (item, match) = scored.maxBy { it.second.score }
             best = item
-            rows += PaletteRow.Heading(bestHeading)
-            rows += PaletteRow.Result(item, match, best = true)
+            rows += PaletteLine.Row(PaletteRow.Heading(bestHeading))
+            rows += PaletteLine.Row(PaletteRow.Result(item, match, best = true))
         }
-        val limit = if (filter != null) Int.MAX_VALUE else perGroup
         for (group in groups) {
-            val inGroup = scored.filter { it.first.group == group && it.first !== best }
-                .sortedByDescending { it.second.score }
-                .take(limit)
+            val inGroup = scored.filter { it.first.group == group && it.first !== best }.sortedByDescending { it.second.score }
             if (inGroup.isEmpty()) continue
-            rows += PaletteRow.Heading(group)
-            inGroup.forEach { (item, match) -> rows += PaletteRow.Result(item, match) }
+            val shown = if (filter != null || group in expanded) inGroup else inGroup.take(perGroup)
+            rows += PaletteLine.Row(PaletteRow.Heading(group))
+            shown.forEach { (item, match) -> rows += PaletteLine.Row(PaletteRow.Result(item, match)) }
+            if (shown.size < inGroup.size) rows += PaletteLine.More(group, inGroup.size)
         }
         return rows
     }
@@ -299,10 +323,14 @@ class CommandPaletteState {
     /** The group chosen with a filter chip; null shows every group. */
     var filter by mutableStateOf<String?>(null)
 
+    /** 2.5.0: the groups shown whole, for the query and the filter they were opened under. */
+    internal var expansion by mutableStateOf(PaletteExpansion())
+
     /** Opens the palette, empty or with [initialQuery] (also when it is open already). */
     fun open(initialQuery: String = "") {
         query = initialQuery
         filter = null
+        expansion = PaletteExpansion()
         isOpen = true
     }
 
@@ -420,11 +448,15 @@ private fun PalettePanel(
     val allLabel = stringResource(R.string.dk_palette_all)
     val label = stringResource(R.string.dk_palette)
     val currentItems by rememberUpdatedState(items)
-    val rows = remember(state.query, state.filter) {
-        PaletteSearch.rows(currentItems(state.query), state.query, state.filter, bestHeading)
+    // 2.5.0: the groups "show all" was chosen under, while the query and the filter are the ones it was chosen for
+    val expanded = state.expansion.takeIf { it.query == state.query && it.filter == state.filter }?.groups.orEmpty()
+    val rows = remember(state.query, state.filter, expanded) {
+        PaletteSearch.lines(currentItems(state.query), state.query, state.filter, bestHeading, perGroup = 6, expanded = expanded)
     }
-    val results = rows.filterIsInstance<PaletteRow.Result>()
-    var selected by remember(rows) { mutableIntStateOf(0) }
+    // what the arrows stop at: the results, and the "show all" line under a group that shows its best only
+    val results = rows.filter { it is PaletteLine.More || (it is PaletteLine.Row && it.row is PaletteRow.Result) }
+    // (kept when a group is shown whole: the line's place is taken by the group's next result)
+    var selected by remember(state.query, state.filter) { mutableIntStateOf(0) }
     val listState = rememberLazyListState()
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
@@ -438,11 +470,16 @@ private fun PalettePanel(
             listState.animateScrollToItem((index - 1).coerceAtLeast(0))
         }
     }
+    val showAll = { group: String -> state.expansion = PaletteExpansion(state.query, state.filter, expanded + group) }
     val run = { newWindow: Boolean ->
-        val item = results.getOrNull(selected)
-        if (item != null) {
-            state.close()
-            if (newWindow && item.item.onOpenInNewWindow != null) item.item.onOpenInNewWindow.invoke() else item.item.onSelect()
+        when (val chosen = results.getOrNull(selected)) {
+            // "show all": the group whole, the palette stays open
+            is PaletteLine.More -> showAll(chosen.group)
+            is PaletteLine.Row -> (chosen.row as? PaletteRow.Result)?.item?.let { item ->
+                state.close()
+                if (newWindow && item.onOpenInNewWindow != null) item.onOpenInNewWindow.invoke() else item.onSelect()
+            }
+            null -> Unit
         }
     }
     val chips = if (filters.isEmpty()) emptyList() else listOf<String?>(null) + filters
@@ -526,16 +563,21 @@ private fun PalettePanel(
             modifier = (if (compact) Modifier.weight(1f) else Modifier.heightIn(max = 440.dp)).fillMaxWidth(),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 6.dp, end = 6.dp, bottom = 8.dp),
         ) {
-            itemsIndexed(rows) { _, row ->
-                when (row) {
-                    is PaletteRow.Heading -> Text(row.title, style = DeskTheme.type.labelSmall, color = colors.textTertiary,
+            itemsIndexed(rows) { _, line ->
+                val row = (line as? PaletteLine.Row)?.row
+                when {
+                    row is PaletteRow.Heading -> Text(row.title, style = DeskTheme.type.labelSmall, color = colors.textTertiary,
                         modifier = Modifier.padding(start = 12.dp, top = 10.dp, bottom = 4.dp))
-                    is PaletteRow.Result -> {
-                        val index = results.indexOf(row)
+                    row is PaletteRow.Result -> {
+                        val index = results.indexOf(line)
                         PaletteResultRow(row, chosen = index == selected, onHover = { selected = index }, onClick = {
                             selected = index
                             run(false)
                         })
+                    }
+                    line is PaletteLine.More -> {
+                        val index = results.indexOf(line)
+                        PaletteMoreRow(line, chosen = index == selected, onHover = { selected = index }, onClick = { showAll(line.group) })
                     }
                 }
             }
@@ -603,6 +645,39 @@ private fun PaletteResultRow(row: PaletteRow.Result, chosen: Boolean, onHover: (
         }
         if (item.shortcut != null && keys) KeyCap(item.shortcut)
         Spacer(Modifier.width(0.dp))
+    }
+}
+
+/**
+ * 2.5.0: under a group that shows its best only: how many matches it has. Enter on it (the arrows stop there), a
+ * click or a tap shows them all; the palette stays open.
+ */
+@Composable
+private fun PaletteMoreRow(line: PaletteLine.More, chosen: Boolean, onHover: () -> Unit, onClick: () -> Unit) {
+    val colors = DeskTheme.colors
+    val dimens = DeskTheme.dimens
+    val touch = DeskTheme.inputMode == InputMode.Touch
+    val interaction = remember { MutableInteractionSource() }
+    val state = interaction.collectState()
+    val latestHover by rememberUpdatedState(onHover)
+    LaunchedEffect(state.hovered) { if (state.hovered) latestHover() }
+    val shape = RoundedCornerShape(dimens.radiusControl)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = if (touch) 52.dp else 44.dp)
+            .background(if (chosen) colors.selection else if (state.pressed) colors.pressed else androidx.compose.ui.graphics.Color.Transparent, shape)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .hoverable(interaction)
+            // as the results: the keyboard stays in the field
+            .focusProperties { canFocus = false }
+            .deskClickable(interaction, onClick, role = Role.Button)
+            .semantics { selected = chosen }
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(stringResource(R.string.dk_palette_show_all, line.total), style = DeskTheme.type.body.copy(fontWeight = FontWeight.Medium),
+            color = if (chosen) colors.onSelection else colors.accentText, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

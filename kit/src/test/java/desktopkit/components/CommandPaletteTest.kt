@@ -9,6 +9,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.pressKey
@@ -29,8 +30,9 @@ import org.robolectric.annotation.Config
 /**
  * The command palette (K4): Turkish-aware matching, ranking, and the keyboard.
  *
- * What 2.4.1 does with a group that has more than six matches (written down before it is changed): the seventh
- * is not shown, nothing says there is one, and without filter chips nothing leads to it.
+ * 2.5.0: a group that shows its best six ends with a line that counts its matches and shows them all. In 2.4.1 the
+ * seventh match of a group was not shown, nothing said there was one, and without filter chips nothing led to it
+ * (the commit before this one has that as a test).
  */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
@@ -89,6 +91,7 @@ class CommandPaletteTest {
 
     private val bestHeading = "En iyi eşleşme"
 
+    /** PaletteSearch.rows, the public ranking, is as it was: the best six of a group and no other kind of row. */
     @Test
     fun aGroupShowsSixOfItsMatches() {
         val albums = (1..10).map { item("a$it", "Gece $it", "Albümler") }
@@ -100,14 +103,40 @@ class CommandPaletteTest {
         assertEquals(2 + 1 + 9, PaletteSearch.rows(albums, "gece", filter = "Albümler", bestHeading = bestHeading).size)
     }
 
+    private fun lines(items: List<PaletteItem>, query: String, filter: String? = null, expanded: Set<String> = emptySet()) =
+        PaletteSearch.lines(items, query, filter, bestHeading, perGroup = 6, expanded = expanded)
+
+    private fun results(lines: List<PaletteLine>) = lines.mapNotNull { ((it as? PaletteLine.Row)?.row as? PaletteRow.Result)?.item?.id }
+
     @Test
-    fun in241NothingLeadsToAGroupsSeventhMatch() {
+    fun aGroupThatShowsItsBestCountsItsMatchesAndShowsThemAll() {
+        val albums = (1..10).map { item("a$it", "Gece $it", "Albümler") }
+        val tracks = (1..3).map { item("t$it", "Gece şarkısı $it", "Parçalar") }
+        val shown = lines(albums + tracks, "gece")
+        // the best match apart, nine albums: six of them, then the line that counts the nine; three tracks: no line
+        assertEquals(listOf(PaletteLine.More("Albümler", 9)), shown.filterIsInstance<PaletteLine.More>())
+        assertEquals(listOf("a1", "a2", "a3", "a4", "a5", "a6", "a7", "t1", "t2", "t3"), results(shown))
+        val line = shown.indexOf(PaletteLine.More("Albümler", 9))
+        assertEquals("the line ends its group", PaletteLine.Row(PaletteRow.Heading("Parçalar")), shown[line + 1])
+        assertEquals("a7", ((shown[line - 1] as PaletteLine.Row).row as PaletteRow.Result).item.id)
+        // the group shown whole: its nine and no line; the others as they were
+        val whole = lines(albums + tracks, "gece", expanded = setOf("Albümler"))
+        assertTrue(whole.none { it is PaletteLine.More })
+        assertEquals((1..10).map { "a$it" } + listOf("t1", "t2", "t3"), results(whole))
+        // a filter keeps one group whole, as before; no line there
+        assertEquals((1..10).map { "a$it" }, results(lines(albums + tracks, "gece", filter = "Albümler")))
+        assertTrue(lines(albums + tracks, "gece", filter = "Albümler").none { it is PaletteLine.More })
+        // nothing typed: no best match; ten albums, six shown, the line counts the ten
+        assertEquals(listOf(PaletteLine.More("Albümler", 10)), lines(albums + tracks, "").filterIsInstance<PaletteLine.More>())
+    }
+
+    @Test
+    fun theLineUnderAGroupShowsItWholeAndThePaletteStaysOpen() {
         val state = CommandPaletteState()
         var ran = ""
         val items = (1..10).map { n -> item("a$n", "Gece $n", "Albümler", onSelect = { ran = "a$n" }) }
         compose.setContent {
             DesktopKitTheme(inputMode = InputMode.Pointer) {
-                // no filter chips, as an app that passes no groups to filter by
                 Box(Modifier.fillMaxSize()) { CommandPalette(state, items = { items }) }
             }
         }
@@ -115,15 +144,39 @@ class CommandPaletteTest {
         compose.waitForIdle()
         compose.onNode(hasSetTextAction()).performTextInput("gece")
         compose.waitForIdle()
-        compose.onNodeWithText("Gece 7").assertExists()
+        compose.onNodeWithText("9 sonucun hepsini göster").assertExists()
         compose.onNodeWithText("Gece 8").assertDoesNotExist()
-        // seven rows down from the first comes round to the first again: the list has seven rows and ends there
-        compose.onNode(hasSetTextAction()).performKeyInput { repeat(7) { pressKey(Key.DirectionDown) } }
+        // the best match, six albums, the line: seven rows down from the first; Enter on the line
+        compose.onNode(hasSetTextAction()).performKeyInput {
+            repeat(7) { pressKey(Key.DirectionDown) }
+            pressKey(Key.Enter)
+        }
         compose.waitForIdle()
-        compose.onNodeWithText("Gece 8").assertDoesNotExist()
+        assertTrue("the palette stays open", state.isOpen)
+        assertEquals("nothing ran", "", ran)
+        compose.onNodeWithText("9 sonucun hepsini göster").assertDoesNotExist()
+        compose.onNodeWithText("Gece 8").assertExists()
+        // the line's place is the group's next album now, and it is the chosen one: Enter runs it
         compose.onNode(hasSetTextAction()).performKeyInput { pressKey(Key.Enter) }
         compose.waitForIdle()
-        assertEquals("the first row again", "a1", ran)
+        assertEquals("a8", ran)
+        assertFalse(state.isOpen)
+
+        // opened again: the group shows its best again; a click on the line shows it whole
+        compose.runOnIdle { state.open() }
+        compose.waitForIdle()
+        compose.onNode(hasSetTextAction()).performTextInput("gece")
+        compose.waitForIdle()
+        compose.onNodeWithText("Gece 8").assertDoesNotExist()
+        compose.onNodeWithText("9 sonucun hepsini göster").performClick()
+        compose.waitForIdle()
+        assertTrue(state.isOpen)
+        compose.onNodeWithText("9 sonucun hepsini göster").assertDoesNotExist()
+        // another query: its groups show their best again
+        compose.onNode(hasSetTextAction()).performTextInput(" 1")
+        compose.waitForIdle()
+        compose.onNodeWithText("9 sonucun hepsini göster").assertDoesNotExist()
+        compose.onNodeWithText("Gece 10").assertExists()
     }
 
     @Test
