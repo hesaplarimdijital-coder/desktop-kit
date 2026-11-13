@@ -72,6 +72,7 @@
     <string name="dk_palette_all">All</string>
     <string name="dk_palette_none">Nothing found</string>
     <string name="dk_palette_new_window">in a new window</string>
+    <string name="dk_palette_show_all">Show all %1$d</string>
     <string name="dk_new_window">New window</string>
     <string name="dk_play">Play</string>
 </resources>
