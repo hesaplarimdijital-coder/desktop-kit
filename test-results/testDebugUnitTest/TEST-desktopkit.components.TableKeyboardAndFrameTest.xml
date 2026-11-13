@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.components.TableKeyboardAndFrameTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-13T20:17:56.717Z" hostname="runnervmwuk1x" time="0.288">
+  <properties/>
+  <testcase name="aFrameSelectsTheRowsItTouchesAndEscPutsTheSelectionBack" classname="desktopkit.components.TableKeyboardAndFrameTest" time="0.09"/>
+  <testcase name="tabLeavesALongTableAtOnceAndItsStarsAreNoStops" classname="desktopkit.components.TableKeyboardAndFrameTest" time="0.066"/>
+  <testcase name="aFrameWithoutCtrlOrShiftReplacesTheSelection" classname="desktopkit.components.TableKeyboardAndFrameTest" time="0.067"/>
+  <testcase name="theRowsAreOneTabStopAndTheKeysMoveAmongThem" classname="desktopkit.components.TableKeyboardAndFrameTest" time="0.063"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

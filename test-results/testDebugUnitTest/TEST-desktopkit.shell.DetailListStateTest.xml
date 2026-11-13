@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.shell.DetailListStateTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-11-13T20:18:11.763Z" hostname="runnervmwuk1x" time="0.091">
+  <properties/>
+  <testcase name="onAPhone" classname="desktopkit.shell.DetailListStateTest" time="0.043"/>
+  <testcase name="widerUp" classname="desktopkit.shell.DetailListStateTest" time="0.046"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

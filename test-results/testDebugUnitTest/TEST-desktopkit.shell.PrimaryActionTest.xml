@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.shell.PrimaryActionTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-13T20:18:16.499Z" hostname="runnervmwuk1x" time="0.114">
+  <properties/>
+  <testcase name="onTheRailItIsAnIconAtTheTop" classname="desktopkit.shell.PrimaryActionTest" time="0.036"/>
+  <testcase name="inTheSidebarItIsAButtonWithItsLabel" classname="desktopkit.shell.PrimaryActionTest" time="0.034"/>
+  <testcase name="onAPhoneItFloatsAboveTheBottomBarAndGoesWithItsScreen" classname="desktopkit.shell.PrimaryActionTest" time="0.043"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

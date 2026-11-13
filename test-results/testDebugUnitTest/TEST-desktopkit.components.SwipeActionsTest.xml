@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.components.SwipeActionsTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-13T20:17:56.571Z" hostname="runnervmwuk1x" time="0.142">
+  <properties/>
+  <testcase name="aShortSlideComesBackAndDoesNothing" classname="desktopkit.components.SwipeActionsTest" time="0.062"/>
+  <testcase name="aLongSlideTowardTheEndArchives" classname="desktopkit.components.SwipeActionsTest" time="0.044"/>
+  <testcase name="theMouseDoesNotSwipeButTalkBackHasTheActions" classname="desktopkit.components.SwipeActionsTest" time="0.032"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

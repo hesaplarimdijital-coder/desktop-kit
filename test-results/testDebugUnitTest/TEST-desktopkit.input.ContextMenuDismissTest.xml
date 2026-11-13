@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.input.ContextMenuDismissTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-13T20:17:58.319Z" hostname="runnervmwuk1x" time="0.595">
+  <properties/>
+  <testcase name="escapeClosesTheMenu" classname="desktopkit.input.ContextMenuDismissTest" time="0.09"/>
+  <testcase name="choosingAnItemClosesTheMenu" classname="desktopkit.input.ContextMenuDismissTest" time="0.094"/>
+  <testcase name="rightClickOutsideOpensOneMenuThereAndTheOldOneNeverMovesThere" classname="desktopkit.input.ContextMenuDismissTest" time="0.107"/>
+  <testcase name="leftClickOutsideClosesTheMenuWhereItIsAndDoesNothingElse" classname="desktopkit.input.ContextMenuDismissTest" time="0.091"/>
+  <testcase name="longPressStillOpensTheMenu" classname="desktopkit.input.ContextMenuDismissTest" time="0.093"/>
+  <testcase name="rightClickElsewhereOnTheSameRowReopensThere" classname="desktopkit.input.ContextMenuDismissTest" time="0.117"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
