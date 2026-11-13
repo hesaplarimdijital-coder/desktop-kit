@@ -233,7 +233,7 @@ internal fun TextFieldImpl(
             error -> colors.danger
             focused -> colors.accent
             (hovered || pressed) && enabled && !readOnly -> colors.textTertiary
-            else -> colors.borderStrong
+            else -> colors.controlBorder
         },
     )
     val ringWidth = if ((focused || error) && enabled) 2.dp else 1.dp
@@ -690,7 +690,7 @@ fun DeskSwitch(
     val position by animateFloatAsState(if (checked) 1f else 0f,
         DeskMotion.spatial(tier, tween(DeskMotion.MEDIUM_MS, easing = DeskMotion.Emphasized), 0.01f), label = "switchThumb")
     val pressedGrowth by animateFloatAsState(if (state.pressed && touch) 1f else 0f, DeskMotion.fade(tier, DeskMotion.fastSpatial()), label = "switchPress")
-    val track by animateInteractionColor(if (checked) colors.accent else colors.borderStrong, selected = checked)
+    val track by animateInteractionColor(if (checked) colors.accent else colors.controlBorder, selected = checked)
     val thumb by animateInteractionColor(
         when {
             checked -> colors.onAccent
