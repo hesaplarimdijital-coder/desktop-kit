@@ -166,6 +166,9 @@ fun KeyValueRow(
  * words under its subject), up to [previewMaxLines] lines. [moreButton] puts a "⋯" button at the
  * row's end that opens [menu]: on touch the long press that opens it is not discovered by everyone,
  * and the button says the row has actions.
+ *
+ * [swipeStart] and [swipeEnd] are what a finger does by sliding the row toward the end and toward the
+ * start ([SwipeAction]: archive, snooze); not in [selectionMode], not with a mouse.
  */
 @Composable
 fun DeskListRow(
@@ -198,6 +201,8 @@ fun DeskListRow(
     preview: String? = null,
     previewMaxLines: Int = 2,
     moreButton: Boolean = false,
+    swipeStart: SwipeAction? = null,
+    swipeEnd: SwipeAction? = null,
 ) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
@@ -215,76 +220,84 @@ fun DeskListRow(
         else -> dimens.rowHeight.coerceAtLeast(dimens.minTarget)
     }
     Box(modifier.fillMaxWidth().onSizeChanged { rowHeight = it.height }.dragSource(enabled = drag != null) { drag?.invoke() }) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = minHeight)
-                .focusRing(state, RoundedCornerShape(dimens.radiusSmall))
-                .background(background)
-                .pointerHoverIcon(PointerIcon.Hand)
-                .hoverable(interaction, enabled)
-                .secondaryClick(enabled && menu != null, openMenuAt)
-                .combinedClickable(
-                    interactionSource = interaction,
-                    indication = null,
-                    enabled = enabled,
-                    onLongClick = when {
-                        onLongClick != null -> onLongClick
-                        menu != null -> { { menuAt = IntOffset(0, rowHeight) } }
-                        else -> null
-                    },
-                    onClick = if (openMenuOnTap && !selectionMode && menu != null) { { menuAt = IntOffset(0, rowHeight) } } else onClick,
-                )
-                .onKeyEvent { event ->
-                    val opens = event.type == KeyEventType.KeyDown && latestMenu != null &&
-                        (event.key == Key.Menu || (event.key == Key.F10 && event.isShiftPressed))
-                    if (opens) menuAt = IntOffset(0, rowHeight)
-                    opens
+        SwipeBox(swipeStart, swipeEnd, enabled = touch && enabled && !selectionMode) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = minHeight)
+                    .focusRing(state, RoundedCornerShape(dimens.radiusSmall))
+                    .background(background)
+                    .pointerHoverIcon(PointerIcon.Hand)
+                    .hoverable(interaction, enabled)
+                    .secondaryClick(enabled && menu != null, openMenuAt)
+                    .combinedClickable(
+                        interactionSource = interaction,
+                        indication = null,
+                        enabled = enabled,
+                        onLongClick = when {
+                            onLongClick != null -> onLongClick
+                            menu != null -> { { menuAt = IntOffset(0, rowHeight) } }
+                            else -> null
+                        },
+                        onClick = if (openMenuOnTap && !selectionMode && menu != null) { { menuAt = IntOffset(0, rowHeight) } } else onClick,
+                    )
+                    .onKeyEvent { event ->
+                        val opens = event.type == KeyEventType.KeyDown && latestMenu != null &&
+                            (event.key == Key.Menu || (event.key == Key.F10 && event.isShiftPressed))
+                        if (opens) menuAt = IntOffset(0, rowHeight)
+                        opens
+                    }
+                    .semantics {
+                        this.selected = selected
+                        // the menu and the swipes, by name: TalkBack's actions
+                        val actions = listOfNotNull(
+                            if (menu != null) CustomAccessibilityAction(moreLabel) { menuAt = IntOffset(0, rowHeight); true } else null,
+                            swipeStart?.let { swipe -> CustomAccessibilityAction(swipe.label) { swipe.onSwipe(); true } },
+                            swipeEnd?.let { swipe -> CustomAccessibilityAction(swipe.label) { swipe.onSwipe(); true } },
+                        )
+                        if (actions.isNotEmpty()) customActions = actions
+                    }
+                    .padding(start = dimens.pagePadding + indent, end = dimens.pagePadding, top = dimens.gapS, bottom = dimens.gapS),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(dimens.gapM),
+            ) {
+                if (selectionMode) DeskCheckbox(selected, onCheckedChange = null)
+                if (leadingContent != null) {
+                    leadingContent()
+                } else if (leading != null) {
+                    Icon(leading, contentDescription = null, tint = leadingTint, modifier = Modifier.size(dimens.icon))
                 }
-                .semantics {
-                    this.selected = selected
-                    if (menu != null) customActions = listOf(CustomAccessibilityAction(moreLabel) { menuAt = IntOffset(0, rowHeight); true })
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        title,
+                        style = if (strong) DeskTheme.type.bodyStrong else DeskTheme.type.body,
+                        color = if (!enabled) colors.textTertiary else if (selected) colors.onSelection else colors.text,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (!subtitle.isNullOrEmpty()) {
+                        Text(subtitle, style = DeskTheme.type.caption, color = subtitleColor, maxLines = subtitleMaxLines.coerceAtLeast(1),
+                            overflow = TextOverflow.Ellipsis)
+                    }
+                    if (!preview.isNullOrEmpty()) {
+                        Text(preview, style = DeskTheme.type.caption, color = colors.textTertiary, maxLines = previewMaxLines.coerceAtLeast(1),
+                            overflow = TextOverflow.Ellipsis)
+                    }
+                    if (progress != null) {
+                        Spacer(Modifier.height(2.dp))
+                        DeskProgressBar(progress.coerceIn(0f, 1f), Modifier.fillMaxWidth(), color = progressColor, height = 3.dp)
+                    }
                 }
-                .padding(start = dimens.pagePadding + indent, end = dimens.pagePadding, top = dimens.gapS, bottom = dimens.gapS),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(dimens.gapM),
-        ) {
-            if (selectionMode) DeskCheckbox(selected, onCheckedChange = null)
-            if (leadingContent != null) {
-                leadingContent()
-            } else if (leading != null) {
-                Icon(leading, contentDescription = null, tint = leadingTint, modifier = Modifier.size(dimens.icon))
-            }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    title,
-                    style = if (strong) DeskTheme.type.bodyStrong else DeskTheme.type.body,
-                    color = if (!enabled) colors.textTertiary else if (selected) colors.onSelection else colors.text,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (!subtitle.isNullOrEmpty()) {
-                    Text(subtitle, style = DeskTheme.type.caption, color = subtitleColor, maxLines = subtitleMaxLines.coerceAtLeast(1),
-                        overflow = TextOverflow.Ellipsis)
+                if (trailing != null || trailingSub != null) {
+                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.widthIn(max = 120.dp)) {
+                        if (trailing != null) Text(trailing, style = DeskTheme.type.mono, color = trailingColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        if (trailingSub != null) Text(trailingSub, style = DeskTheme.type.caption, color = trailingSubColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
                 }
-                if (!preview.isNullOrEmpty()) {
-                    Text(preview, style = DeskTheme.type.caption, color = colors.textTertiary, maxLines = previewMaxLines.coerceAtLeast(1),
-                        overflow = TextOverflow.Ellipsis)
+                trailingContent?.invoke(this)
+                if (moreButton && menu != null && !selectionMode) {
+                    DeskIconButton(DeskIcons.MoreHorizontal, moreLabel, onClick = { menuAt = IntOffset(0, rowHeight) }, enabled = enabled)
                 }
-                if (progress != null) {
-                    Spacer(Modifier.height(2.dp))
-                    DeskProgressBar(progress.coerceIn(0f, 1f), Modifier.fillMaxWidth(), color = progressColor, height = 3.dp)
-                }
-            }
-            if (trailing != null || trailingSub != null) {
-                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.widthIn(max = 120.dp)) {
-                    if (trailing != null) Text(trailing, style = DeskTheme.type.mono, color = trailingColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    if (trailingSub != null) Text(trailingSub, style = DeskTheme.type.caption, color = trailingSubColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            }
-            trailingContent?.invoke(this)
-            if (moreButton && menu != null && !selectionMode) {
-                DeskIconButton(DeskIcons.MoreHorizontal, moreLabel, onClick = { menuAt = IntOffset(0, rowHeight) }, enabled = enabled)
             }
         }
         if (divider) HorizontalRule(Modifier.align(Alignment.BottomStart).padding(start = dimens.pagePadding + indent))
