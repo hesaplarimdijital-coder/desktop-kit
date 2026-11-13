@@ -1,5 +1,34 @@
 # Değişiklikler
 
+## 2.5.0 (2026-11-13)
+
+Komut paletinde bir grubun gerisi artık görünür: yalnız en iyi altısı gösterilen grubun altındaki satır kaç eşleşmesi
+olduğunu yazar ve seçilince hepsini gösterir. 2.4.1'de bir grubun yedinci eşleşmesi gösterilmiyordu; bunu söyleyen bir
+şey de yoktu, süzgeç (`filters`) vermeyen uygulamada ona götüren bir yol da. Kod değişmeden derlenir, API aynı
+([MIGRATION.md](MIGRATION.md#241den-250a)). Paletlerde yeni bir satır ve yeni bir davranış göründüğü için sürüm ikinci
+sayıyı artırır.
+
+- **Nereden çıktı:** Nağmedar'da, 13 Kasım: "ctrl k arama sayfası düzgün çalışmıyor. Her sonucu vermiyor". Nağmedar'ın
+  paleti kendi kodudur ve orada düzeltildi (Nağmedar 1.0.7): 64 parçalık bir kütüphanede saydığı 64 parçanın 6'sını
+  gösteriyordu. Kitin paleti aynı kesintiyi yapıyor: `PaletteSearch.rows`, süzgeç seçilmedikçe her gruptan en çok altı
+  sonuç verir; başlıkta sayı yok.
+- **Satır:** "9 sonucun hepsini göster" (İngilizce arayüzde "Show all 9"). Oklar onda durur; Enter, tıklama ya da
+  dokunuş grubun hepsini gösterir, palet açık kalır. Seçim satırın olduğu yerde kalır: orası artık grubun sıradaki
+  sonucudur. Grup, açıldığı sorgu ve süzgeç için bütün kalır; palet yeniden açılınca gruplar yine en iyi altılarıyla
+  başlar.
+- **Sayı:** grubun eşleşmelerinin hepsi, gösterilen altı dahil. "En iyi eşleşme" olarak yukarı alınan sonuç sayılmaz.
+- **Değişmeyenler:** süzgeç seçilince grup eskisi gibi bütün gelir, satır çıkmaz. Altı ya da daha az eşleşmesi olan
+  grupta satır yoktur. `PaletteSearch.rows` aynı satırları verir (en iyi altı; başlık ve sonuçtan başka tür yok);
+  palet artık kit içi bir listeden çizer. `PaletteRow`, `PaletteItem`, `CommandPaletteState` ve `CommandPalette`
+  aynıdır.
+- **Testler:** PR'ın ilk gönderisi 2.4.1'in davranışını kaydeder (yedinci eşleşme görünmez; oklar yedinci satırdan
+  sonra başa döner). İkincisi düzeltip testi çevirir: satır dokuzu sayar, üzerinde Enter grubu açar ve palet açık
+  kalır, seçim sekizinci albümdedir ve Enter onu çalıştırır; tıklama da açar; başka bir sorguda satır yeniden
+  hesaplanır.
+- **Doğrulama, neyi kapsıyor:** kitin testleri (Robolectric). Kitin örnek uygulaması hiçbir cihazda ya da emülatörde
+  çalıştırılmadı. Nağmedar'ın kendi paletindeki benzer satır Android emülatöründe denendi (Nağmedar 1.0.7'nin `search`
+  geçişi); bu, kitin paletinin bir cihazda denenmesi değildir.
+
 ## 2.4.1 (2026-11-13)
 
 Düzeltme: dokunmatik ekranda parmak hâlâ hareket ederken bırakılan bildirim (`ToastHost`) ve alt sayfa
