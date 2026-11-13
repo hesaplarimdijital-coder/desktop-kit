@@ -28,6 +28,24 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import desktopkit.input.TabNavigation
+import androidx.compose.foundation.lazy.LazyListLayoutInfo
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
@@ -61,6 +79,7 @@ import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerType
+import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.Role
@@ -229,16 +248,91 @@ fun <T> DenseTable(
     val selection = selectedKeys ?: emptySet()
     val touch = DeskTheme.inputMode == InputMode.Touch
     val tracker = remember { SelectionTracker() }
-    val focusManager = LocalFocusManager.current
-    val keysInOrder = { rows.map(key) }
+    val scope = rememberCoroutineScope()
+    // read through these in the pointer and key handlers, which outlive a composition
+    val keysRef = rememberUpdatedState(remember(rows) { rows.map(key) })
+    val keySetRef = rememberUpdatedState(remember(keysRef.value) { keysRef.value.toHashSet() })
+    val selectedKeyRef = rememberUpdatedState(selectedKey)
+    val onSelectionChangeRef = rememberUpdatedState(onSelectionChange)
+    val keysInOrder = { keysRef.value }
+    // each composed row's focus, so the arrow keys can move it to a row that is scrolled into view
+    val rowFocus = remember { HashMap<Any, FocusRequester>() }
+    val latestSelection by rememberUpdatedState(selection)
+    val latestMulti by rememberUpdatedState(multi)
+    val latestDrag by rememberUpdatedState(rowDrag != null)
+    val marquee = remember { Marquee() }
+    val marqueeColor = colors.accent
     // while the rows load: breathing placeholder rows under the header
     val skeleton = loading && rows.isEmpty()
     val pulse = if (skeleton) rememberSkeletonPulse() else null
     val loadingLabel = stringResource(R.string.dk_loading)
     fun update(result: TableSelection.Result) {
         tracker.anchor = result.anchor
-        if (result.selection != selection) onSelectionChange?.invoke(result.selection)
+        if (result.selection != latestSelection) onSelectionChangeRef.value?.invoke(result.selection)
     }
+
+    /**
+     * The one row Tab reaches: the focused one, else the anchor of the selection or the selected
+     * one, when it is in view; else the first row in view. Read when the focus moves, not composed.
+     */
+    fun rovingKey(): Any? {
+        val keySet = keySetRef.value
+        val active = tracker.focused ?: tracker.anchor ?: selectedKeyRef.value ?: latestSelection.firstOrNull()
+        val visible = state.layoutInfo.visibleItemsInfo
+        return if (active != null && active in keySet && visible.any { it.key == active }) active
+        else visible.firstOrNull { it.key in keySet }?.key
+    }
+
+    /** Moves the keyboard focus to the row at [index], scrolling it into view. */
+    fun focusRow(index: Int) {
+        val keys = keysRef.value
+        val keySet = keySetRef.value
+        val target = keys.getOrNull(index.coerceIn(0, (keys.size - 1).coerceAtLeast(0))) ?: return
+        val at = keys.indexOf(target)
+        tracker.focused = target
+        scope.launch {
+            val info = state.layoutInfo
+            val shown = info.visibleItemsInfo.firstOrNull { it.key == target }
+            val limit = info.viewportSize.height - info.beforeContentPadding - info.afterContentPadding
+            when {
+                shown == null -> {
+                    val below = at > (info.visibleItemsInfo.firstOrNull { it.key in keySet }?.index ?: 0)
+                    state.scrollToItem(at)
+                    // going down, the row comes in at the bottom, as a list moved by the keys does (at the end of the
+                    // list it is there already: the list cannot scroll further)
+                    val row = state.layoutInfo.visibleItemsInfo.firstOrNull { it.key == target }
+                    if (below && row != null) {
+                        val past = row.offset - (limit - row.size)
+                        if (past < 0) state.scrollBy(past.toFloat())
+                    }
+                }
+                shown.offset < 0 -> state.scrollBy(shown.offset.toFloat())
+                shown.offset + shown.size > limit -> state.scrollBy((shown.offset + shown.size - limit).toFloat())
+            }
+            withFrameNanos { }
+            runCatching { rowFocus[target]?.requestFocus() }
+        }
+    }
+
+    /** The rows that fit in view, for Page Up and Page Down. */
+    fun pageRows(): Int = state.layoutInfo.visibleItemsInfo.count { it.key in keySetRef.value }.coerceAtLeast(2) - 1
+
+    /** The row index under [y] (in the table), -1 above the first row in view's predecessor, past the end below the last. */
+    fun indexAt(y: Float): Int {
+        val keys = keysRef.value
+        val keySet = keySetRef.value
+        val info = state.layoutInfo
+        val at = y - info.beforeContentPadding
+        val rowsInView = info.visibleItemsInfo.filter { it.key in keySet }
+        val hit = rowsInView.firstOrNull { at >= it.offset && at < it.offset + it.size }
+        return when {
+            hit != null -> keys.indexOf(hit.key)
+            rowsInView.isEmpty() -> keys.size
+            at < rowsInView.first().offset -> keys.indexOf(rowsInView.first().key) - 1
+            else -> keys.indexOf(rowsInView.last().key) + 1
+        }
+    }
+
     if (multi && clearSelectionOnBack) ClearSelectionOnBack(selection, touch, toggleOnClick) { update(TableSelection.clear()) }
     Box(
         modifier
@@ -259,38 +353,131 @@ fun <T> DenseTable(
                             }
                         }
                     }
-                    .onPreviewKeyEvent { event ->
-                        // Enter and Space click the focused row: remember the keys held with them too
-                        tracker.toggle = event.isCtrlPressed || event.isMetaPressed
-                        tracker.range = event.isShiftPressed
-                        tracker.finger = false
-                        false
+                    // the selection frame (DeskMail's request 22): a mouse dragged from a row that is not selected, or
+                    // from below the rows, draws a frame and the rows it touches are selected
+                    .pointerInput(Unit) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                            if (down.type != PointerType.Mouse || !currentEvent.buttons.isPrimaryPressed) return@awaitEachGesture
+                            if (!latestMulti || down.position.y < headerPx.intValue) return@awaitEachGesture
+                            val startIndex = indexAt(down.position.y)
+                            val startKey = keysRef.value.getOrNull(startIndex)
+                            // a selected row drags the selection instead (rowDrag)
+                            if (latestDrag && startKey != null && startKey in latestSelection) return@awaitEachGesture
+                            val mods = currentEvent.keyboardModifiers
+                            val toggle = mods.pointerCtrl || mods.pointerMeta
+                            val add = mods.pointerShift
+                            val slop = viewConfiguration.touchSlop
+                            // a click stays a click; the frame starts once the mouse has moved
+                            while (true) {
+                                val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: return@awaitEachGesture
+                                if (!change.pressed) return@awaitEachGesture
+                                if ((change.position - down.position).getDistance() > slop) {
+                                    change.consume()
+                                    break
+                                }
+                            }
+                            val before = latestSelection
+                            val rowInfo = state.layoutInfo.visibleItemsInfo.firstOrNull { it.key == startKey }
+                            marquee.start(startIndex, down.position, (down.position.y - state.layoutInfo.beforeContentPadding) - (rowInfo?.offset ?: 0))
+                            // Esc reaches the table: the focus goes to the row the frame started on
+                            (startKey ?: rovingKey())?.let { first ->
+                                tracker.focused = first
+                                runCatching { rowFocus[first]?.requestFocus() }
+                            }
+                            val edge = 32.dp.toPx()
+                            // near the rows' top or bottom edge the list scrolls along, and the frame with it; only
+                            // there: frames are asked for while the pointer is at an edge, not all the time it is down
+                            fun speedAt(y: Float): Float {
+                                val top = headerPx.intValue.toFloat()
+                                val bottom = size.height.toFloat()
+                                return when {
+                                    y < top + edge -> -(top + edge - y).coerceAtMost(edge) / 2f
+                                    y > bottom - edge -> (y - (bottom - edge)).coerceAtMost(edge) / 2f
+                                    else -> 0f
+                                }
+                            }
+                            var scrolling: Job? = null
+                            try {
+                                while (true) {
+                                    val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: break
+                                    change.consume()
+                                    if (!change.pressed) break
+                                    marquee.pointer = change.position
+                                    if (!marquee.cancelled) marquee.select(indexAt(change.position.y), keysRef.value, before, toggle, add, ::update)
+                                    if (speedAt(change.position.y) != 0f && scrolling?.isActive != true) {
+                                        scrolling = scope.launch {
+                                            while (true) {
+                                                withFrameNanos { }
+                                                val y = marquee.pointer.y
+                                                val speed = speedAt(y)
+                                                if (speed == 0f || marquee.cancelled) break
+                                                state.dispatchRawDelta(speed)
+                                                marquee.select(indexAt(y), keysRef.value, before, toggle, add, ::update)
+                                            }
+                                        }
+                                    }
+                                }
+                            } finally {
+                                scrolling?.cancel()
+                                marquee.end()
+                            }
+                        }
                     }
-                    .onKeyEvent { event ->
-                        if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
-                        val command = event.isCtrlPressed || event.isMetaPressed
-                        when {
-                            event.key == Key.A && command && !event.isShiftPressed && !event.isAltPressed -> {
-                                update(TableSelection.all(keysInOrder(), tracker.anchor))
-                                true
-                            }
-                            event.key == Key.Escape && !command && selection.isNotEmpty() -> {
-                                update(TableSelection.clear())
-                                true
-                            }
-                            (event.key == Key.DirectionUp || event.key == Key.DirectionDown) && event.isShiftPressed && !command -> {
-                                val focused = tracker.focused ?: return@onKeyEvent false
-                                val down = event.key == Key.DirectionDown
-                                val result = TableSelection.extend(keysInOrder(), tracker.anchor, focused, if (down) 1 else -1)
-                                    ?: return@onKeyEvent true
-                                update(result)
-                                focusManager.moveFocus(if (down) FocusDirection.Down else FocusDirection.Up)
-                                true
-                            }
-                            else -> false
+                    .drawWithContent {
+                        drawContent()
+                        if (marquee.active && !marquee.cancelled) {
+                            val rect = marquee.rect(state.layoutInfo, keysRef.value, headerPx.intValue.toFloat(), size.height)
+                            drawRect(marqueeColor.copy(alpha = 0.12f), rect.topLeft, rect.size)
+                            drawRect(marqueeColor, rect.topLeft, rect.size, style = Stroke(1.dp.toPx()))
                         }
                     },
-            ),
+            )
+            .onPreviewKeyEvent { event ->
+                // Enter and Space click the focused row: remember the keys held with them too
+                tracker.toggle = event.isCtrlPressed || event.isMetaPressed
+                tracker.range = event.isShiftPressed
+                tracker.finger = false
+                false
+            }
+            .onKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+                val command = event.isCtrlPressed || event.isMetaPressed
+                val focusedIndex = tracker.focused?.let { keysRef.value.indexOf(it) } ?: -1
+                when {
+                    multi && event.key == Key.A && command && !event.isShiftPressed && !event.isAltPressed -> {
+                        update(TableSelection.all(keysInOrder(), tracker.anchor))
+                        true
+                    }
+                    event.key == Key.Escape && marquee.active -> {
+                        // the frame is dropped and the selection is as it was before it
+                        marquee.cancel()?.let { update(TableSelection.Result(it, tracker.anchor)) }
+                        true
+                    }
+                    multi && event.key == Key.Escape && !command && selection.isNotEmpty() -> {
+                        update(TableSelection.clear())
+                        true
+                    }
+                    multi && (event.key == Key.DirectionUp || event.key == Key.DirectionDown) && event.isShiftPressed && !command -> {
+                        val focused = tracker.focused ?: return@onKeyEvent false
+                        val down = event.key == Key.DirectionDown
+                        val result = TableSelection.extend(keysInOrder(), tracker.anchor, focused, if (down) 1 else -1)
+                            ?: return@onKeyEvent true
+                        update(result)
+                        focusRow(focusedIndex + if (down) 1 else -1)
+                        true
+                    }
+                    // the rows are one Tab stop: the arrows, Home, End and the page keys move the focus among them
+                    focusedIndex < 0 || event.isAltPressed || command -> false
+                    event.key == Key.DirectionDown -> { focusRow(focusedIndex + 1); true }
+                    event.key == Key.DirectionUp -> { focusRow(focusedIndex - 1); true }
+                    event.key == Key.MoveHome -> { focusRow(0); true }
+                    event.key == Key.MoveEnd -> { focusRow(keysRef.value.size - 1); true }
+                    event.key == Key.PageDown -> { focusRow(focusedIndex + pageRows()); true }
+                    event.key == Key.PageUp -> { focusRow(focusedIndex - pageRows()); true }
+                    else -> false
+                }
+            },
     ) {
         LazyColumn(
             state = state,
@@ -310,6 +497,11 @@ fun <T> DenseTable(
             }
             itemsIndexed(rows, key = { _, item -> key(item) }) { index, item ->
                 val itemKey = key(item)
+                val requester = remember { FocusRequester() }
+                DisposableEffect(itemKey, requester) {
+                    rowFocus[itemKey] = requester
+                    onDispose { if (rowFocus[itemKey] === requester) rowFocus.remove(itemKey) }
+                }
                 val onClick = {
                     // the press's pointer when there was one; TalkBack's double tap follows the layout
                     val finger = tracker.finger ?: touch
@@ -334,9 +526,22 @@ fun <T> DenseTable(
                         selected = itemKey in selection || (selectedKey != null && itemKey == selectedKey),
                         emphasized = rowEmphasis?.invoke(item) == true,
                         onClick = onClick,
-                        modifier = (if (!multi) Modifier else Modifier.onFocusChanged { focus ->
-                            if (focus.isFocused) tracker.focused = itemKey else if (tracker.focused == itemKey) tracker.focused = null
-                        }).dragSource(enabled = rowDrag != null) { rowDrag?.invoke(item, index) },
+                        modifier = Modifier
+                            .focusRequester(requester)
+                            // one Tab stop: Tab reaches only the current row (the arrows reach every one)
+                            .focusProperties { canFocus = !TabNavigation.active || itemKey == rovingKey() }
+                            .onFocusChanged { focus ->
+                                if (focus.isFocused) tracker.focused = itemKey else if (tracker.focused == itemKey) tracker.focused = null
+                            }
+                            // with a mouse a selected row drags at once (the rest a finger needs is not asked of it); a
+                            // press on a row that is not selected draws the selection frame instead
+                            .dragSource(
+                                enabled = rowDrag != null,
+                                acrossWindows = true,
+                                touch = false,
+                                pointerHold = false,
+                                canStart = { !multi || itemKey in latestSelection },
+                            ) { rowDrag?.invoke(item, index) },
                     )
                 }
                 if (rowMenu != null) {
@@ -381,6 +586,72 @@ fun <T> DenseTable(
             }
             HorizontalRule()
         }
+    }
+}
+
+/**
+ * A selection frame being drawn with the mouse: where it started (the row and the point within it, so
+ * the frame stays with the rows as they scroll) and where the pointer is.
+ */
+private class Marquee {
+    var active by mutableStateOf(false)
+        private set
+    var cancelled by mutableStateOf(false)
+        private set
+    var pointer by mutableStateOf(Offset.Zero)
+    private var startIndex = 0
+    private var startX = 0f
+    private var startInRow = 0f
+    private var before: Set<Any> = emptySet()
+
+    fun start(index: Int, at: Offset, inRow: Float) {
+        startIndex = index
+        startX = at.x
+        startInRow = inRow
+        pointer = at
+        cancelled = false
+        active = true
+    }
+
+    /** Selects the rows between the start and [index]: alone, toggled into [base] ([toggle]) or added to it ([add]). */
+    fun select(index: Int, keys: List<Any>, base: Set<Any>, toggle: Boolean, add: Boolean, update: (TableSelection.Result) -> Unit) {
+        before = base
+        val first = minOf(startIndex, index).coerceAtLeast(0)
+        val last = maxOf(startIndex, index).coerceAtMost(keys.size - 1)
+        val covered = if (first > last) emptySet() else keys.subList(first, last + 1).toCollection(LinkedHashSet())
+        val result = when {
+            toggle -> (base - covered) + (covered - base)
+            add -> base + covered
+            else -> covered
+        }
+        update(TableSelection.Result(result, keys.getOrNull(startIndex.coerceIn(0, (keys.size - 1).coerceAtLeast(0)))))
+    }
+
+    /** Esc: the frame is dropped; the selection it started from, to put back. */
+    fun cancel(): Set<Any>? {
+        if (!active || cancelled) return null
+        cancelled = true
+        return before
+    }
+
+    fun end() {
+        active = false
+        cancelled = false
+    }
+
+    /** The frame in the table's coordinates: its start follows its row, clamped to the rows' area. */
+    fun rect(info: LazyListLayoutInfo, keys: List<Any>, top: Float, bottom: Float): Rect {
+        val key = keys.getOrNull(startIndex)
+        val row = info.visibleItemsInfo.firstOrNull { it.key == key }
+        val keySet = keys.toHashSet()
+        val rowsInView = info.visibleItemsInfo.filter { it.key in keySet }
+        val startY = when {
+            row != null -> info.beforeContentPadding + row.offset + startInRow
+            rowsInView.isNotEmpty() && startIndex < keys.indexOf(rowsInView.first().key) -> top
+            else -> bottom
+        }.coerceIn(top, bottom)
+        val y = pointer.y.coerceIn(top, bottom)
+        return Rect(minOf(startX, pointer.x), minOf(startY, y), maxOf(startX, pointer.x), maxOf(startY, y))
     }
 }
 
