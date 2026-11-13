@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
@@ -105,8 +106,12 @@ fun CompactTopBar(
     val latestOnBack by rememberUpdatedState(onBack)
     val stableBack: () -> Unit = remember { { latestOnBack?.invoke() } }
     val override = TopBarOverride(title, if (onBack != null) stableBack else null, backIcon, actions, showSearch)
-    val entry = remember(host) { CompactTopBarHost.Entry(override) }
-    SideEffect { entry.value = override }
+    val leaving = LocalScreenLeaving.current
+    val entry = remember(host) { CompactTopBarHost.Entry(override, leaving) }
+    SideEffect {
+        entry.value = override
+        entry.leaving = leaving
+    }
     DisposableEffect(host, entry) {
         host.add(entry)
         onDispose { host.remove(entry) }
@@ -125,18 +130,30 @@ internal data class TopBarOverride(
     val showSearch: Boolean,
 )
 
-/** The [CompactTopBar] calls in composition, oldest first; the newest one is shown. */
+/**
+ * The [CompactTopBar] calls in composition, oldest first; the newest one of a screen that is not
+ * leaving is shown.
+ *
+ * A screen being left stays composed until its way out has played. 2.4.0 kept its call until then:
+ * the title changed with the route at once, the back button and the actions only once the old screen
+ * was gone, so the bar changed twice and its heading faded out and in twice (DeskMail's request 18).
+ * A call made by a screen that is being left ([LocalScreenLeaving]) no longer counts, so the whole bar
+ * changes in one step, together with the title.
+ */
 @Stable
 internal class CompactTopBarHost {
-    class Entry(initial: TopBarOverride) {
+    class Entry(initial: TopBarOverride, leaving: () -> Boolean) {
         var value by mutableStateOf(initial)
+        var leaving by mutableStateOf(leaving)
     }
 
     private val entries = mutableStateListOf<Entry>()
 
-    val current: TopBarOverride? get() = entries.lastOrNull()?.value
+    private val shown: Entry? get() = entries.lastOrNull { !it.leaving() }
 
-    fun isActive(entry: Entry): Boolean = entries.lastOrNull() === entry
+    val current: TopBarOverride? get() = shown?.value
+
+    fun isActive(entry: Entry): Boolean = shown === entry
 
     fun add(entry: Entry) {
         entries.add(entry)
@@ -148,6 +165,22 @@ internal class CompactTopBarHost {
 }
 
 internal val LocalCompactTopBarHost = staticCompositionLocalOf<CompactTopBarHost?> { null }
+
+/**
+ * Whether the screen around is being left: a tab that is no longer the current route, the list
+ * while a detail is open, a detail the app has closed ([DetailTransition]). Read in snapshots, so a
+ * reader follows the change. The answer follows the app's state, not the animation: a screen the
+ * finger is pulling away with the Back gesture counts as left only once the gesture is let go.
+ */
+internal val LocalScreenLeaving = staticCompositionLocalOf<() -> Boolean> { { false } }
+
+/** [LocalScreenLeaving] for content inside this one, which is also being left when [leaving] says so. */
+@Composable
+internal fun ProvideScreenLeaving(leaving: () -> Boolean, content: @Composable () -> Unit) {
+    val outer = LocalScreenLeaving.current
+    val combined = remember(outer, leaving) { { outer() || leaving() } }
+    CompositionLocalProvider(LocalScreenLeaving provides combined, content = content)
+}
 
 /** Icons shown in the top bar at most, the "more" button included. */
 internal const val MAX_TOP_BAR_ICONS = 3

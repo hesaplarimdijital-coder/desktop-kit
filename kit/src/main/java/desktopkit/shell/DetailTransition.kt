@@ -181,6 +181,9 @@ fun <T : Any> DetailTransition(
                 if (shared != null && animated) DetailSharedScopes(shared, this, tier, side, cards) else null
             }
             val held = phone && dropped && target?.let(detailKey) != seekable.currentState?.let(detailKey)
+            // a side is being left once the app has moved on from it (a top bar it set gives way at once)
+            val sideKey = target?.let(detailKey)
+            ProvideScreenLeaving({ latestDetail?.let(detailKey) != sideKey }) {
             CompositionLocalProvider(
                 LocalDetailSharedScopes provides (if (held) null else scopes),
                 // the list's cards register at rest too: the opening decides on its first frame whether a card carries it
@@ -249,6 +252,7 @@ fun <T : Any> DetailTransition(
                             .background(page),
                     ) { detailContent(shown) }
                 }
+            }
             }
         }
     }

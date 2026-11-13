@@ -1,6 +1,10 @@
 package desktopkit.shell
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.VisibilityThreshold
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -59,6 +63,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
@@ -505,32 +510,50 @@ fun PageTopBar(
             modifier = Modifier.fillMaxWidth().heightIn(min = dimens.topBarHeight).padding(end = dimens.gapS),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            AnimatedContent(
-                targetState = TopBarHeading(title, if (onBack != null) backIcon else null),
-                // the old title is gone before the new one fades in: two titles never overlap
-                transitionSpec = {
-                    if (tier == MotionTier.Reduced) fadeIn(tween(0)) togetherWith fadeOut(tween(0))
-                    else fadeIn(tween(TOP_BAR_FADE_MS, delayMillis = TOP_BAR_FADE_OUT_MS)) togetherWith fadeOut(tween(TOP_BAR_FADE_OUT_MS))
-                },
-                contentAlignment = Alignment.CenterStart,
-                label = "topBarHeading",
-                modifier = Modifier.weight(1f),
-            ) { heading ->
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(start = if (heading.back != null) dimens.gapXs else dimens.pagePadding),
-                    verticalAlignment = Alignment.CenterVertically,
+            // The back button slides in or out before the title, and the title moves along with it. The title
+            // only fades when its words change: 2.4.0 faded the whole heading out and in when only the button
+            // came or went ("Gelen" › "← Gelen" on opening a message, DeskMail's request 18).
+            val withBack = onBack != null
+            // the button keeps its icon while it slides away
+            val lastBack = remember { arrayOf(backIcon) }
+            if (withBack) lastBack[0] = backIcon
+            val lastBackIcon = lastBack[0]
+            val slide = DeskMotion.fade(tier, DeskMotion.open<IntSize>(IntSize.VisibilityThreshold))
+            val inset by animateDpAsState(
+                if (withBack) 0.dp else (dimens.pagePadding - dimens.gapXs).coerceAtLeast(0.dp),
+                DeskMotion.fade(tier, DeskMotion.open(Dp.VisibilityThreshold)),
+                label = "topBarTitleInset",
+            )
+            Row(Modifier.weight(1f).padding(start = dimens.gapXs), verticalAlignment = Alignment.CenterVertically) {
+                AnimatedVisibility(
+                    visible = withBack,
+                    enter = expandHorizontally(slide, expandFrom = Alignment.Start) + fadeIn(DeskMotion.fade(tier, tween(TOP_BAR_FADE_MS))),
+                    exit = shrinkHorizontally(slide, shrinkTowards = Alignment.Start) + fadeOut(DeskMotion.fade(tier, tween(TOP_BAR_FADE_OUT_MS))),
+                    label = "topBarBack",
                 ) {
-                    if (heading.back != null) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         TopBarIconButton(
-                            icon = if (heading.back == TopBarBackIcon.Close) DeskIcons.Close else DeskIcons.ArrowLeft,
-                            label = stringResource(if (heading.back == TopBarBackIcon.Close) R.string.dk_close else R.string.dk_back),
+                            icon = if (lastBackIcon == TopBarBackIcon.Close) DeskIcons.Close else DeskIcons.ArrowLeft,
+                            label = stringResource(if (lastBackIcon == TopBarBackIcon.Close) R.string.dk_close else R.string.dk_back),
                             onClick = { latestOnBack?.invoke() },
                             size = 48.dp,
                         )
                         Spacer(Modifier.width(dimens.gapXs))
                     }
-                    Text(heading.title, style = DeskTheme.type.headline, color = colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f))
+                }
+                AnimatedContent(
+                    targetState = title,
+                    // the old title is gone before the new one fades in: two titles never overlap
+                    transitionSpec = {
+                        if (tier == MotionTier.Reduced) fadeIn(tween(0)) togetherWith fadeOut(tween(0))
+                        else fadeIn(tween(TOP_BAR_FADE_MS, delayMillis = TOP_BAR_FADE_OUT_MS)) togetherWith fadeOut(tween(TOP_BAR_FADE_OUT_MS))
+                    },
+                    contentAlignment = Alignment.CenterStart,
+                    label = "topBarTitle",
+                    modifier = Modifier.weight(1f).padding(start = inset),
+                ) { heading ->
+                    Text(heading, style = DeskTheme.type.headline, color = colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth())
                 }
             }
             shown.forEach { action ->
@@ -541,9 +564,6 @@ fun PageTopBar(
         }
     }
 }
-
-@Immutable
-private data class TopBarHeading(val title: String, val back: TopBarBackIcon?)
 
 private const val TOP_BAR_FADE_MS = 150
 private const val TOP_BAR_FADE_OUT_MS = 90

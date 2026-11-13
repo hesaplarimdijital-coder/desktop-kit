@@ -309,6 +309,9 @@ private fun ShellContent(
     val currentKind by rememberUpdatedState(navKind)
     val currentTransitions by rememberUpdatedState(transitions)
     val currentTier by rememberUpdatedState(tier)
+    // read by each tab's page: a tab that is not the current route is being left (see LocalScreenLeaving)
+    val latestRoute by rememberUpdatedState(currentRoute)
+    val leavingTab: (String) -> Boolean = remember { { route -> latestRoute != route } }
     // read when a transition starts, so a new width class or setting applies to the next one
     val enter: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition =
         remember { { shellEnter(currentTransitions, currentKind, currentTier) } }
@@ -475,13 +478,13 @@ private fun ShellContent(
                         ) {
                             spec.items.forEach { item ->
                                 composable(item.route) {
-                                    TabPage(transition) {
+                                    TabPage(transition, leaving = { leavingTab(item.route) }) {
                                         ShellScreenFrame(metrics, scroll) { currentContent(item.route, navigator) }
                                     }
                                 }
                             }
                             composable(ShellSpec.MORE_ROUTE) {
-                                TabPage(transition) {
+                                TabPage(transition, leaving = { leavingTab(ShellSpec.MORE_ROUTE) }) {
                                     ShellScreenFrame(metrics, scroll) {
                                         OverflowScreen(currentSpec.overflow(currentKind), onSelect = navigator::navigate)
                                     }
@@ -546,7 +549,7 @@ private val TAB_CORNER = 28.dp
  * width classes keeps the screen's state.
  */
 @Composable
-private fun TabPage(transition: Transition<EnterExitState>, content: @Composable () -> Unit) {
+private fun TabPage(transition: Transition<EnterExitState>, leaving: () -> Boolean, content: @Composable () -> Unit) {
     // composed again on the frame the transition starts, which is the frame the other tab is composed
     val moving = LocalNavKind.current == NavKind.BottomBar && transition.currentState != transition.targetState
     val page = DeskTheme.colors.background
@@ -564,7 +567,7 @@ private fun TabPage(transition: Transition<EnterExitState>, content: @Composable
             }
         }
         .background(page)
-    Box(Modifier.fillMaxSize().then(surface)) { content() }
+    Box(Modifier.fillMaxSize().then(surface)) { ProvideScreenLeaving(leaving, content) }
 }
 
 /**
