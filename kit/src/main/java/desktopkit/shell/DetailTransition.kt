@@ -86,7 +86,7 @@ import kotlinx.coroutines.launch
  *
  * - opening ([detail] becomes non-null): on a phone as Android's own list → detail: the detail,
  *   opaque from its first frame, slides in from the end edge over the list on the
- *   [desktopkit.theme.DeskMotion.open] spring; the list behind it is not faded, it sinks to 95 %
+ *   [desktopkit.theme.DeskMotion.page] spring (no overshoot); the list behind it is not faded, it sinks to 95 %
  *   and darkens under a scrim, so its text never shows through the detail. With a
  *   [detailSharedCard] the card carries the way and the rest fades through: the list is gone
  *   before the detail starts to appear. From tablet width up the 0.2.0 shared axis: the detail
@@ -197,11 +197,11 @@ fun <T : Any> DetailTransition(
                     // scrim is drawn over the whole window, the margins left by the sinking list included.
                     val behindDetail: (EnterExitState) -> Float = { state -> if (state == EnterExitState.Visible || !(phone && animated)) 0f else 1f }
                     val depth = this.transition.animateFloat(
-                        transitionSpec = { if (gestureClose) tween(GESTURE_MS, easing = DeskMotion.Standard) else DeskMotion.open(FRACTION) },
+                        transitionSpec = { if (gestureClose) tween(GESTURE_MS, easing = DeskMotion.Standard) else DeskMotion.page(FRACTION) },
                         label = "listDepth",
                     ) { behindDetail(it) }
                     val dim = this.transition.animateFloat(
-                        transitionSpec = { if (gestureClose) tween(GESTURE_MS, easing = AfterTheFinger) else DeskMotion.open(FRACTION) },
+                        transitionSpec = { if (gestureClose) tween(GESTURE_MS, easing = AfterTheFinger) else DeskMotion.page(FRACTION) },
                         label = "listScrim",
                     ) { behindDetail(it) }
                     // opaque, so the shade left behind a closed detail never shows through the list
@@ -471,7 +471,9 @@ private fun <T> AnimatedContentTransitionScope<T?>.detailTransform(
         // from the end edge over the list on the opening spring; the list is not faded, it sinks and
         // darkens under it. Back the same way round. With a card the card carries the way and the rest
         // fades through: the side going away is gone before the other starts to appear.
-        val slide = DeskMotion.open(IntOffset.VisibilityThreshold)
+        // a whole page does not overshoot: on the 0.9 spring a page slid 2 px past its place and back as it
+        // landed, which over a page of text read as a shiver (DeskMail's request 19, S24 recording)
+        val slide = DeskMotion.page(IntOffset.VisibilityThreshold)
         val fadeIn = fadeIn(tween(FADE_IN_MS, delayMillis = FADE_OUT_MS, easing = DeskMotion.StandardDecelerate))
         val fadeOut = fadeOut(tween(FADE_OUT_MS, easing = DeskMotion.StandardAccelerate))
         return if (opening) {

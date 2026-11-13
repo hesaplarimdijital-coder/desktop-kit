@@ -63,8 +63,12 @@ object DeskMotion {
     /** Colour of hover, press and selection backgrounds. */
     fun <T> color(): FiniteAnimationSpec<T> = tween(150, easing = Standard)
 
-    /** Spatial spring for sizes and positions (indicator pills, panels); a hint of bounce, settles fast. */
-    fun <T> spatial(): FiniteAnimationSpec<T> = spring(dampingRatio = 0.85f, stiffness = 700f)
+    /**
+     * Spatial spring for sizes and positions (indicator pills, tab underlines, panels): settles fast
+     * without a visible bounce (0.9 at 700; 2.5.0 and earlier used 0.85, a bounce the standard keeps
+     * for expressive moments, not for a selection that moves).
+     */
+    fun <T> spatial(): FiniteAnimationSpec<T> = spring(dampingRatio = 0.9f, stiffness = 700f)
 
     /** Fast spring for small elements (press scale, thumbs). */
     fun <T> fastSpatial(): FiniteAnimationSpec<T> = spring(dampingRatio = 0.9f, stiffness = 1400f)
@@ -98,6 +102,17 @@ object DeskMotion {
     @JvmOverloads
     fun <T> open(visibilityThreshold: T? = null): SpringSpec<T> =
         spring(dampingRatio = 0.9f, stiffness = 700f, visibilityThreshold = visibilityThreshold)
+
+    /**
+     * The phone's spring for a whole page sliding in or out (a detail over its list): critically
+     * damped, so the page lands without passing its place. On [open]'s 0.9 a page crossing a phone's
+     * width passed its place by about 2 px and came back as it landed (85 ms), which over a page of
+     * text read as a shiver (DeskMail, Galaxy S24 recording). A little stiffer than [open], so it
+     * arrives about as soon. [visibilityThreshold] as for [gesture].
+     */
+    @JvmOverloads
+    fun <T> page(visibilityThreshold: T? = null): SpringSpec<T> =
+        spring(dampingRatio = 1f, stiffness = 800f, visibilityThreshold = visibilityThreshold)
 
     /** The tier for a window: springs on a phone, the timed curves from tablet width up, nothing with [reduced] motion. */
     fun tier(widthClass: WidthClass, reduced: Boolean = false): MotionTier = when {

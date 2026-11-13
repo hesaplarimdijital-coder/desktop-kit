@@ -495,8 +495,9 @@ class MotionStripsTest {
     fun listAppear() {
         var shown by mutableStateOf(false)
         phoneContent {
+            // the rows come in after the list appeared (as after a skeleton)
+            val appear = rememberListAppear(shown)
             if (shown) {
-                val appear = rememberListAppear()
                 Column(Modifier.fillMaxSize()) {
                     PageHeader("Parçalar", subtitle = "${sampleTracks.size} parça")
                     sampleTracks.forEachIndexed { i, (title, artist) ->

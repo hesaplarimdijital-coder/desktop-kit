@@ -15,10 +15,10 @@ import desktopkit.theme.MotionTier
 import kotlinx.coroutines.delay
 
 /**
- * The arrival of a list's rows on a phone: the first [ROWS] rows present when the list appears fade
- * in and rise a little, one after another ([STAGGER_MS] apart, each over [DURATION_MS]); rows that
- * come later (scrolled into view, added) are simply there. Wider up, and with reduced motion,
- * nothing moves.
+ * The arrival of a list's rows on a phone, when its data comes in: the first [ROWS] rows fade in and
+ * rise a little, one after another ([STAGGER_MS] apart, each over [DURATION_MS]); rows that come
+ * later (scrolled into view, added) are simply there. Wider up, and with reduced motion, nothing
+ * moves.
  *
  * Take one with [rememberListAppear] where the list is, and mark each row with [listAppear]:
  *
@@ -27,9 +27,12 @@ import kotlinx.coroutines.delay
  * LazyColumn { itemsIndexed(rows) { index, row -> Row(Modifier.listAppear(appear, index)) { … } } }
  * ```
  *
- * The keys of [rememberListAppear] say when the list is new: pass what changes when its rows arrive
- * (the loading flag, the album shown), and the rows arrive in turn after a skeleton or in a fresh
- * detail; leave them out and only the list's first appearance counts.
+ * The rows arrive in turn only when the data comes after the list first appeared: pass what changes
+ * when the rows arrive (the loading flag after a skeleton, a search's results) as the keys of
+ * [rememberListAppear]. A list that appears with its rows already there (a tab opened again, a
+ * screen come back to, a list without keys) shows them at once: the same rows rising every time a
+ * screen is opened is decoration, not information (2.5.0 and earlier animated every list's first
+ * appearance; the design standard's SLP-21).
  */
 @Stable
 class ListAppear internal constructor(internal val enabled: Boolean) {
@@ -51,11 +54,17 @@ class ListAppear internal constructor(internal val enabled: Boolean) {
     }
 }
 
-/** The [ListAppear] of a list; new when [keys] change (see [ListAppear]). */
+/**
+ * The [ListAppear] of a list: its rows arrive in turn once [keys] change after the list first
+ * appeared (see [ListAppear]); until then, and without keys, they are simply there.
+ */
 @Composable
 fun rememberListAppear(vararg keys: Any?): ListAppear {
     val enabled = LocalMotionTier.current == MotionTier.Gesture
-    val appear = remember(enabled, *keys) { ListAppear(enabled) }
+    // the keys the list first appeared with: its rows were there with it
+    val first = remember { keys.toList() }
+    val arrived = keys.toList() != first
+    val appear = remember(enabled, arrived, *keys) { ListAppear(enabled && arrived) }
     LaunchedEffect(appear) {
         delay(ListAppear.WINDOW_MS)
         appear.settled = true
