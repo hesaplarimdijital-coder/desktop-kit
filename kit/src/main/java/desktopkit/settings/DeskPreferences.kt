@@ -93,6 +93,13 @@ class DeskPreferences(
         prefs.edit().putFloat(KEY_SPLIT_PREFIX + key, value).apply()
     }
 
+    /** The cell width (dp) stored for the grid [key] (its zoom), NaN when never changed. */
+    fun gridCellWidth(key: String): Float = prefs.getFloat(KEY_GRID_PREFIX + key, Float.NaN)
+
+    fun updateGridCellWidth(key: String, value: Float) {
+        prefs.edit().putFloat(KEY_GRID_PREFIX + key, value).apply()
+    }
+
     /** Whether the inspector's visibility was ever stored (shown or hidden by the user). */
     internal val inspectorCollapsedStored: Boolean get() = prefs.contains(KEY_INSPECTOR_COLLAPSED)
 
@@ -116,6 +123,7 @@ class DeskPreferences(
         const val KEY_INSPECTOR_COLLAPSED = "dk_inspector_collapsed"
         const val KEY_TABLE_PREFIX = "dk_table_"
         const val KEY_SPLIT_PREFIX = "dk_split_"
+        const val KEY_GRID_PREFIX = "dk_grid_"
         private const val SEPARATOR = "\u001F"
         const val KEY_THEME = "dk_theme"
         const val KEY_ACCENT = "dk_accent"
