@@ -137,7 +137,8 @@ private class CellScope(
  * Columns are as many as fit [minCellWidth]. Draw each cell with [cell], usually a [CoverCell].
  * [itemDrag] lets covers be dragged with a mouse to a [dropZone], as [DenseTable]'s rowDrag.
  * [emptyContent] is shown across the grid when there are no items and nothing loads, usually a
- * [desktopkit.screens.MessageScreen] saying why and what to do.
+ * [desktopkit.screens.MessageScreen] saying why and what to do. With [zoom] the user makes the cells
+ * larger or smaller (Ctrl with the wheel, a pinch, Ctrl with + and −) and [minCellWidth] is its width.
  */
 @Composable
 fun <T> DeskGrid(
@@ -158,6 +159,7 @@ fun <T> DeskGrid(
     itemDrag: ((T, Int) -> DeskDragPayload?)? = null,
     clearSelectionOnBack: Boolean = true,
     emptyContent: (@Composable () -> Unit)? = null,
+    zoom: GridZoom? = null,
     cell: @Composable GridCellScope.(item: T) -> Unit,
 ) {
     val multi = onSelectionChange != null
@@ -235,10 +237,11 @@ fun <T> DeskGrid(
     val pulse = if (skeleton) rememberSkeletonPulse() else null
     val loadingLabel = stringResource(R.string.dk_loading)
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minCellWidth),
+        columns = GridCells.Adaptive(zoom?.cellWidth ?: minCellWidth),
         modifier = modifier
             .fillMaxSize()
             .verticalScrollbar(state)
+            .then(if (zoom == null) Modifier else Modifier.gridZoom(zoom))
             .then(gridModifier)
             .then(if (!skeleton) Modifier else Modifier.semantics { contentDescription = loadingLabel }),
         state = state,
