@@ -222,11 +222,13 @@ class CompactTopBarTest {
         }
         // the old screen is still on its way out ...
         compose.onNodeWithText("arşiv-ekranı").assertExists()
-        // ... and the bar is already the new screen's, all of it
+        // ... and the bar is already the new screen's: its actions are gone and its title is on its way in (the
+        // bottom bar's label and the title); the back button slides away with the title moving into its place
         compose.onNodeWithContentDescription("Yeni ileti").assertDoesNotExist()
-        compose.onNodeWithContentDescription("Back").assertDoesNotExist()
         compose.onAllNodesWithText("Ana sayfa").assertCountEquals(2)
         compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("Back").assertDoesNotExist()
     }
 
     /** The same title with a back button coming: the title moves aside, it does not fade out and in. */
