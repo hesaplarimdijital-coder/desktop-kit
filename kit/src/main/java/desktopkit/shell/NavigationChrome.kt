@@ -345,6 +345,7 @@ fun NavRail(
     navDrop: NavDrop? = null,
     iconBadges: NavIconBadges = emptyMap(),
     navMenu: ((route: String) -> List<MenuEntry>)? = null,
+    action: (@Composable () -> Unit)? = null,
 ) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
@@ -363,6 +364,10 @@ fun NavRail(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             brand?.invoke(Modifier.padding(vertical = dimens.gapS).size(28.dp))
+            // the screen's main action (ShellPrimaryAction) above the entries
+            if (action != null) {
+                Box(Modifier.padding(top = dimens.gapXs, bottom = dimens.gapS)) { action() }
+            }
             Column(
                 modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).selectableGroup(),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -433,6 +438,7 @@ fun Sidebar(
     navDrop: NavDrop? = null,
     iconBadges: NavIconBadges = emptyMap(),
     navMenu: ((route: String) -> List<MenuEntry>)? = null,
+    action: (@Composable (collapsed: Boolean) -> Unit)? = null,
 ) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
@@ -449,6 +455,8 @@ fun Sidebar(
     val span = (dimens.sidebarWidth - dimens.sidebarCollapsedWidth).value
     val open = if (span <= 0f) 1f else ((width - dimens.sidebarCollapsedWidth).value / span).coerceIn(0f, 1f)
     val footer = spec.footer?.takeIf { NavKind.Sidebar in it.showIn }
+    // the entries' inset from the sidebar's edges, narrower while collapsed
+    val inset = lerp(6.dp, dimens.gapS, open)
     Row(modifier.fillMaxHeight()) {
         Column(
             modifier = Modifier
@@ -458,11 +466,17 @@ fun Sidebar(
                 .background(colors.chrome)
                 .semantics { paneTitle = label },
         ) {
+            // the screen's main action (ShellPrimaryAction) above the entries, the icon alone while collapsed
+            if (action != null) {
+                Box(Modifier.padding(start = inset, end = inset, top = dimens.gapS)) {
+                    action(collapsed)
+                }
+            }
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = lerp(6.dp, dimens.gapS, open), vertical = dimens.gapS)
+                    .padding(horizontal = inset, vertical = dimens.gapS)
                     .selectableGroup(),
             ) {
                 spec.sections.forEach { section ->

@@ -52,6 +52,9 @@ internal class ShellChromeMetrics {
      */
     var systemBottomPx: () -> Int by mutableStateOf({ 0 })
 
+    /** The phone's floating action button with its margin (ShellPrimaryAction), 0 without one. */
+    var actionPx by mutableIntStateOf(0)
+
     val topPadPx: Int get() = if (underTop) topPx else 0
 
     val bottomPadPx: Int
@@ -65,7 +68,8 @@ internal class ShellChromeMetrics {
 /** The covered edges as padding; read while measuring, so a change re-measures without recomposing. */
 private class ShellPaddingValues(private val metrics: ShellChromeMetrics, private val density: Density) : PaddingValues {
     override fun calculateTopPadding(): Dp = with(density) { metrics.topPadPx.toDp() }
-    override fun calculateBottomPadding(): Dp = with(density) { metrics.bottomPadPx.toDp() }
+    // a list under the bars ends above the floating action button too, so its last row can be read
+    override fun calculateBottomPadding(): Dp = with(density) { (metrics.bottomPadPx + if (metrics.underBottom) metrics.actionPx else 0).toDp() }
     override fun calculateLeftPadding(layoutDirection: LayoutDirection): Dp = 0.dp
     override fun calculateRightPadding(layoutDirection: LayoutDirection): Dp = 0.dp
     override fun toString() = "ShellPaddingValues(top=${metrics.topPadPx}px, bottom=${metrics.bottomPadPx}px)"
