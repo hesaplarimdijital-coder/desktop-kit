@@ -1,6 +1,7 @@
 package desktopkit.components
 
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
@@ -106,5 +107,36 @@ class DenseTableRequestsTest {
         }
         compose.waitForIdle()
         compose.onNodeWithText("Albüm bulunamadı").assertExists()
+    }
+
+    /**
+     * Another order starts the rows at the top. Keyed rows kept the first one in view where the new order put it: forty
+     * mails at their top, sorted the other way, showed their end (found in Nağmedar 1.0.8).
+     */
+    @Test
+    fun anotherOrderStartsTheRowsAtTheTop() {
+        val state = LazyListState()
+        var ascending by mutableStateOf(true)
+        val rows = (1..40).map { Mail(it, "Gönderen", "Konu %02d".format(it), unread = false, starred = false) }
+        compose.setContent {
+            DesktopKitTheme(themeMode = ThemeMode.Dark, inputMode = InputMode.Pointer) {
+                DenseTable(
+                    columns = listOf(TableColumn("Konu", ColumnWidth.Weight(1f)) { it.subject }),
+                    rows = if (ascending) rows else rows.reversed(),
+                    key = { it.id },
+                    onRowClick = { _, _ -> },
+                    state = state,
+                    sort = TableSort(0, ascending),
+                )
+            }
+        }
+        compose.waitForIdle()
+        assertEquals(0, state.firstVisibleItemIndex)
+        compose.onNodeWithText("Konu 01").assertExists()
+        ascending = false
+        compose.waitForIdle()
+        assertEquals(0, state.firstVisibleItemIndex)
+        compose.onNodeWithText("Konu 40").assertExists()
+        compose.onNodeWithText("Konu 01").assertDoesNotExist()
     }
 }

@@ -161,6 +161,9 @@ class TableColumn<T>(
 @Immutable
 data class TableSort(val column: Int, val ascending: Boolean)
 
+/** The order a table last laid its rows out in ([DenseTable]'s `order`); plain, so keeping it redraws nothing. */
+private class OrderSeen(var order: Any?)
+
 /**
  * Dense, desktop-style table: sticky header with sortable columns, 32 dp rows in
  * pointer mode (taller in touch mode), hover and selection states, keyboard focus per row.
@@ -205,6 +208,9 @@ data class TableSort(val column: Int, val ascending: Boolean)
  * shown under the header when there are no rows and nothing is loading, usually a
  * [desktopkit.screens.MessageScreen] saying why and what to do (no device connected, nothing found,
  * the folder could not be read); without it an empty table is only its header.
+ *
+ * [order] is what the rows are ordered by ([sort] unless the app orders them some other way too, a menu's
+ * order on a phone where the titles show none): another order starts the rows at the top.
  */
 @Composable
 fun <T> DenseTable(
@@ -230,7 +236,19 @@ fun <T> DenseTable(
     clearSelectionOnBack: Boolean = true,
     rowEmphasis: ((T) -> Boolean)? = null,
     emptyContent: (@Composable () -> Unit)? = null,
+    order: Any? = sort,
 ) {
+    // Another order starts the rows at the top. Keyed rows keep the one first in view in view, wherever the new order
+    // puts it: a table at its top sorted the other way showed its end (found in Nağmedar 1.0.8: a drive sorted by size
+    // showed its smallest folders, the largest out of sight above them). Asked for before the rows are laid out in their
+    // new order, so no frame shows the other place.
+    val seenOrder = remember { OrderSeen(order) }
+    SideEffect {
+        if (seenOrder.order != order) {
+            seenOrder.order = order
+            state.requestScrollToItem(0)
+        }
+    }
     val dimens = DeskTheme.dimens
     val colors = DeskTheme.colors
     val density = LocalDensity.current
