@@ -114,20 +114,23 @@ class InspectorState(
 
 /**
  * An [InspectorState] whose width and visibility live in [prefs] (shared by every workstation of
- * the app), or only in the saved instance state when [prefs] is null.
+ * the app), or only in the saved instance state when [prefs] is null. [defaultCollapsed] true
+ * starts the inspector hidden until the user first shows it (a mail app whose details are asked
+ * for, not always wanted).
  */
 @Composable
-fun rememberInspectorState(prefs: DeskPreferences? = null, defaultWidth: Dp = 320.dp): InspectorState {
+fun rememberInspectorState(prefs: DeskPreferences? = null, defaultWidth: Dp = 320.dp, defaultCollapsed: Boolean = false): InspectorState {
     if (prefs != null) {
         return remember(prefs) {
             val stored = prefs.inspectorWidth
-            InspectorState(if (stored.isNaN()) defaultWidth.value else stored, prefs.inspectorCollapsed) { width, collapsed ->
+            val collapsed = if (prefs.inspectorCollapsedStored) prefs.inspectorCollapsed else defaultCollapsed
+            InspectorState(if (stored.isNaN()) defaultWidth.value else stored, collapsed) { width, collapsedNow ->
                 prefs.updateInspectorWidth(width)
-                prefs.updateInspectorCollapsed(collapsed)
+                prefs.updateInspectorCollapsed(collapsedNow)
             }
         }
     }
-    return rememberSaveable(saver = InspectorSaver) { InspectorState(defaultWidth.value) }
+    return rememberSaveable(saver = InspectorSaver) { InspectorState(defaultWidth.value, defaultCollapsed) }
 }
 
 private val InspectorSaver: Saver<InspectorState, List<Any>> = Saver(
