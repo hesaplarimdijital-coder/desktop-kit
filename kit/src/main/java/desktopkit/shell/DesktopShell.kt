@@ -165,6 +165,8 @@ class ShellNavigator(private val navController: NavHostController) {
  * it does not ride up on top of the keyboard; the content then reaches down to the keyboard. The
  * content ends above the keyboard because [desktopkit.DesktopKitRoot] pads the whole app with
  * `WindowInsets.safeDrawing` (IME included); a shell used without it needs the same padding around it.
+ * A full-screen task with its own buttons at the bottom (a form) takes the bar away for as long as it
+ * is shown with [HideBottomNavigation].
  * While the on-screen keyboard is up, a finger scrolling the content or tapping outside the text
  * fields takes the focus from the field, and the keyboard closes; a control that should leave it
  * open (a Send button beside a message field) or an app's own text field carries [keepsKeyboardOpen].
@@ -350,7 +352,10 @@ private fun ShellContent(
     val imeVisible = WindowInsets.isImeVisible
     val ime = WindowInsets.ime
     val imeTakesSpace by remember(ime, density) { derivedStateOf { ime.getBottom(density) > 0 } }
-    val showBottomNav = !(hideNavigationWithKeyboard && imeVisible && imeTakesSpace)
+    // a full-screen task on the phone (HideBottomNavigation) has the height down to the system bar, and keeps it
+    val navHider = remember { BottomNavigationHider() }
+    val screenHidesNav = navKind == NavKind.BottomBar && navHider.hidden
+    val showBottomNav = !(hideNavigationWithKeyboard && imeVisible && imeTakesSpace) && !screenHidesNav
     // a finger closes the on-screen keyboard only while it is there (and no keyboard cover is typing)
     val keyboardUp by rememberUpdatedState(imeVisible && imeTakesSpace && !hasHardwareKeyboard())
     // The graph builder below must not capture changing values, or NavHost would rebuild the graph.
@@ -494,6 +499,7 @@ private fun ShellContent(
         LocalShellBottomGlass provides sharedGlass,
         LocalShellReselect provides reselect,
         LocalPrimaryActionHost provides primaryHost,
+        LocalBottomNavigationHider provides navHider,
     ) {
         ShellLayout(
             navKind = navKind,

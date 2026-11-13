@@ -1,5 +1,18 @@
 # Değişiklikler
 
+## 2.9.0 (2026-11-13)
+
+### Yeni
+
+- **`HideBottomNavigation()`** (Kitap Bulucu, S24 kaydı): telefonda kendi "Vazgeç / Kaydet" çubuğu olan tam ekran bir
+  iş açıkken (kitap düzenleme formu, içe aktarma) kabuğun alt gezinme çubuğu formun çubuğunun altında duruyor,
+  form kaydırılınca kayıp gidip geri geliyordu; gidince formun düğmelerinin altında çubuk boyu boş bir şerit
+  kalıyordu ve form zıplıyormuş gibi görünüyordu. Ekran `HideBottomNavigation()` çağırınca çubuk o sürece
+  görünmez, kaydırınca hiçbir şey kaymaz, ekran sistem çubuğuna kadar uzar (Android'in tam ekran formları gibi;
+  işin ortasında sekme değiştirmek de yanlış olurdu). Kabuğun `bottomBar` şeridi yerinde kalır;
+  `rememberShellContentPadding()` çubuğu saymaz. `enabled = false` ya da bileşimden çıkmak çubuğu geri getirir,
+  bırakılan ekranın çağrısı hemen sayılmaz olur. Tablette ve DeX'te etkisi yok. Test: `HideBottomNavigationTest`.
+
 ## 2.8.0 (2026-11-13)
 
 Tasarım standardının denetimi ("Desktop Kit Tasarım Standardı" belgesinin son bölümü) ve DeskMail'in kitten

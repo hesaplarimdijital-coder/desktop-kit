@@ -65,7 +65,7 @@ Uygulama modülünün `build.gradle.kts` dosyası:
 
 ```kotlin
 dependencies {
-    implementation("com.github.hesaplarimdijital-coder:desktop-kit:2.8.0")
+    implementation("com.github.hesaplarimdijital-coder:desktop-kit:2.9.0")
     implementation("androidx.activity:activity-compose:1.13.0")
 }
 ```
@@ -199,6 +199,7 @@ Değerlere doğrudan erişim için `DeskTheme.colors.text`, `DeskTheme.type.body
 | `TooltipArea` | İmleç durunca ve klavye odağında; kısayolu da gösterir. Simge düğmelerinde kendiliğinden |
 | `PageHeader`, `MessageScreen`, `OverflowScreen` | Hazır ekran parçaları. `PageHeader` başlığı yalnızca kenar çubuklu düzende gösterir (aşağıya bak). |
 | `CompactTopBar`, `TopBarAction` | Telefonda üst çubuğun başlığı, geri düğmesi ve simgeleri (aşağıya bak) |
+| `HideBottomNavigation` | Telefonda tam ekran bir iş (kendi Vazgeç / Kaydet çubuğu olan form) açıkken alt gezinme çubuğunu kaldırır (aşağıya bak) |
 | `AppearanceSection`, `InputSection`, `ShortcutListSection`, `SettingsSection` | Hazır ayar bölümleri |
 | `DeskChip`, `ChipRow`, `FilterChips` | Filtre chip'leri: telefonda tek satır yana kayar, genişte sarar (aşağıya bak) |
 | `DetailTransition` | Liste → ayrıntı geçişi ve öngörülü geri hareketi (aşağıya bak) |
@@ -697,6 +698,23 @@ CompactTopBar(
   öncesi başlık önce, düğmeler ekranın çıkışı bitince değişiyordu). Başlık yalnızca sözcükleri değişince solar; geri
   düğmesi gelip giderken başlık yana kayar.
 
+### Telefonda tam ekran iş: `HideBottomNavigation`
+
+Kendi düğme çubuğu olan bir form ("Vazgeç / Kaydet"), kurulum adımı ya da içe aktarmadan önceki gözden geçirme
+telefonda açıkken ekran `HideBottomNavigation()` çağırır: alt gezinme çubuğu o sürece görünmez, ekran sistem
+çubuğuna kadar uzar ve kaydırınca hiçbir çubuk kayıp gelmez (Android'in tam ekran formları gibi; işin ortasında
+sekme değiştirmek de doğru olmazdı). Kabuğun `bottomBar` şeridi (çalar) yerinde kalır. `rememberShellContentPadding()`
+çubuğu saymaz. `enabled = false` ya da çağrının bileşimden çıkması çubuğu geri getirir; bırakılan ekranın çağrısı
+hemen sayılmaz olur. Tablette ve DeX'te etkisi yok.
+
+```kotlin
+if (formAcik) {
+    CompactTopBar(title = "Kitabı düzenle", onBack = { formAcik = false }, backIcon = TopBarBackIcon.Close)
+    HideBottomNavigation()
+    KitapFormu()
+}
+```
+
 ### Sayfa başlığı: `PageHeader`
 
 - Kenar çubuklu düzende (büyük pencere, DeX) başlığı büyük yazar, yanında alt başlık ve eylemler.
@@ -845,9 +863,9 @@ uçarken de yuvarlak kalsın diye biçimini ver: `detailSharedElement("kapak-$id
 ## Sürüm yayınlamak
 
 1. `CHANGELOG.md` dosyasına ne değiştiğini yaz, `gradle.properties` içindeki `VERSION_NAME`'i güncelle.
-2. Önce PR'ı birleştir, sonra GitHub'da **Releases → Draft a new release** ile etiketi (`2.8.0`) `main` üzerinde
-   oluştur; ya da `git tag 2.8.0 && git push origin 2.8.0`. Etiket birleştirmeden önce açılırsa eski kodu gösterir.
-3. JitPack ilk istekte derler (`jitpack.yml`, Java 17). Uygulamada sürümü `2.8.0` yapman yeterli.
+2. Önce PR'ı birleştir, sonra GitHub'da **Releases → Draft a new release** ile etiketi (`2.9.0`) `main` üzerinde
+   oluştur; ya da `git tag 2.9.0 && git push origin 2.9.0`. Etiket birleştirmeden önce açılırsa eski kodu gösterir.
+3. JitPack ilk istekte derler (`jitpack.yml`, Java 17). Uygulamada sürümü `2.9.0` yapman yeterli.
 
 Sürüm numaraları [SemVer](https://semver.org/lang/tr/) kuralına uyar: uyumu bozan değişiklik
 ana sürümü, yeni özellik ikinci sayıyı, düzeltme üçüncüyü artırır.
