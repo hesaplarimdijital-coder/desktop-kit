@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -39,6 +40,7 @@ import desktopkit.components.collectState
 import desktopkit.components.deskClickable
 import desktopkit.components.focusRing
 import desktopkit.components.stateBackground
+import desktopkit.components.verticalScrollbar
 import desktopkit.shell.LocalNavKind
 import desktopkit.shell.NavItem
 import desktopkit.shell.NavKind
@@ -150,7 +152,8 @@ fun MessageScreen(
 @Composable
 fun OverflowScreen(entries: List<NavItem>, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
     val dimens = DeskTheme.dimens
-    LazyColumn(modifier.fillMaxSize(), contentPadding = rememberShellContentPadding() + PaddingValues(vertical = dimens.gapS)) {
+    val list = rememberLazyListState()
+    LazyColumn(modifier.fillMaxSize().verticalScrollbar(list), state = list, contentPadding = rememberShellContentPadding() + PaddingValues(vertical = dimens.gapS)) {
         items(entries, key = { it.route }) { item -> ItemRow(item) { onSelect(item.route) } }
     }
 }
