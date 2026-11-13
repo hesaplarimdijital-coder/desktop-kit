@@ -121,6 +121,9 @@ fun DeskButton(
     val shape = RoundedCornerShape(dimens.radiusControl)
     @Suppress("NAME_SHADOWING") val primary = primary && !danger
     val target = when {
+        // disabled: no fill of its own (a primary one keeps a quiet one), tertiary text, a faint edge; not the
+        // enabled button at half strength, which read as a pale enabled one
+        !enabled -> if (primary) colors.hover else colors.surfaceRaised.copy(alpha = 0f)
         danger && state.pressed -> colors.danger.copy(alpha = 0.22f).compositeOver(colors.surfaceRaised)
         danger && state.hovered -> colors.danger.copy(alpha = 0.12f).compositeOver(colors.surfaceRaised)
         danger -> colors.surfaceRaised
@@ -132,6 +135,7 @@ fun DeskButton(
     }
     val background by animateInteractionColor(target)
     val content = when {
+        !enabled -> colors.textTertiary
         danger -> colors.danger
         primary -> colors.onAccent
         else -> colors.text
@@ -139,12 +143,16 @@ fun DeskButton(
     Row(
         modifier = modifier
             .defaultMinSize(minHeight = dimens.minTarget.coerceAtLeast(dimens.controlHeight))
-            // disabled: the whole button at half strength, fill and border too
-            .alpha(if (enabled) 1f else 0.5f)
             .pressScale(state.pressed)
             .focusRing(state, shape)
             .background(background, shape)
-            .then(if (primary) Modifier else Modifier.border(1.dp, if (danger) colors.danger.copy(alpha = 0.6f) else colors.borderStrong, shape))
+            .then(
+                when {
+                    !enabled -> Modifier.border(1.dp, colors.border, shape)
+                    primary -> Modifier
+                    else -> Modifier.border(1.dp, if (danger) colors.danger.copy(alpha = 0.6f) else colors.borderStrong, shape)
+                },
+            )
             .deskClickable(interaction, onClick, enabled = enabled, role = role)
             .padding(start = dimens.gapM, end = if (trailingIcon != null) dimens.gapS else dimens.gapM),
         verticalAlignment = Alignment.CenterVertically,
@@ -157,7 +165,7 @@ fun DeskButton(
         Text(text, style = DeskTheme.type.label, color = content, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (trailingIcon != null) {
             Spacer(Modifier.width(dimens.gapXs + 2.dp))
-            Icon(trailingIcon, contentDescription = null, tint = if (primary || danger) content else colors.textSecondary, modifier = Modifier.size(dimens.icon))
+            Icon(trailingIcon, contentDescription = null, tint = if (primary || danger || !enabled) content else colors.textSecondary, modifier = Modifier.size(dimens.icon))
         }
     }
 }
