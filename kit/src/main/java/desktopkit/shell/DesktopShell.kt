@@ -32,6 +32,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -89,6 +90,7 @@ import dev.chrisbanes.haze.HazeState
 import desktopkit.theme.forCompactWindow
 import desktopkit.theme.grow
 import desktopkit.theme.toMaterialTypography
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlin.math.roundToInt
 
 /** Navigation chrome around the current screen; screens show their own title only in [NavKind.Sidebar]. */
@@ -378,11 +380,14 @@ private fun ShellContent(
                 modifier = Modifier.widthIn(min = 220.dp, max = 380.dp))
         }
     }
+    val reselect = remember { ShellReselect() }
+    // the current screen's entry again: the screen hears it (OnReselect) and goes to its top
+    val go: (String) -> Unit = { route -> if (route == currentRoute) reselect.events.tryEmit(route) else navigator.navigate(route) }
     val select: (String) -> Unit = { route ->
         if (route == ShellSpec.MORE_ROUTE && spec.moreStyle == MoreStyle.Sheet && navKind == NavKind.BottomBar) {
             moreOpen = true
         } else {
-            navigator.navigate(route)
+            go(route)
         }
     }
 
@@ -398,6 +403,7 @@ private fun ShellContent(
         LocalShellOverlayHost provides overlayHost,
         LocalShellContentPadding provides padding,
         LocalShellBottomGlass provides sharedGlass,
+        LocalShellReselect provides reselect,
     ) {
         ShellLayout(
             navKind = navKind,
@@ -445,11 +451,11 @@ private fun ShellContent(
                                 .graphicsLayer { translationY = overlayHost.expandProgress() * size.height },
                         )
                     }
-                    NavKind.Rail -> NavRail(spec, currentRoute, navigator::navigate, brand = brand, navDrop = navDrop, iconBadges = iconBadges)
+                    NavKind.Rail -> NavRail(spec, currentRoute, go, brand = brand, navDrop = navDrop, iconBadges = iconBadges)
                     NavKind.Sidebar -> Sidebar(
                         spec = spec,
                         currentRoute = currentRoute,
-                        onSelect = navigator::navigate,
+                        onSelect = go,
                         collapsed = sidebarCollapsed,
                         onToggleCollapsed = { onSidebarCollapsedChange(!sidebarCollapsed) },
                         badges = badges,
@@ -493,13 +499,13 @@ private fun ShellContent(
                         ) {
                             spec.items.forEach { item ->
                                 composable(item.route) {
-                                    TabPage(transition, leaving = { leavingTab(item.route) }) {
+                                    TabPage(transition, leaving = { leavingTab(item.route) }, route = item.route) {
                                         ShellScreenFrame(metrics, scroll) { currentContent(item.route, navigator) }
                                     }
                                 }
                             }
                             composable(ShellSpec.MORE_ROUTE) {
-                                TabPage(transition, leaving = { leavingTab(ShellSpec.MORE_ROUTE) }) {
+                                TabPage(transition, leaving = { leavingTab(ShellSpec.MORE_ROUTE) }, route = ShellSpec.MORE_ROUTE) {
                                     ShellScreenFrame(metrics, scroll) {
                                         OverflowScreen(currentSpec.overflow(currentKind), onSelect = navigator::navigate)
                                     }
@@ -564,7 +570,7 @@ private val TAB_CORNER = 28.dp
  * width classes keeps the screen's state.
  */
 @Composable
-private fun TabPage(transition: Transition<EnterExitState>, leaving: () -> Boolean, content: @Composable () -> Unit) {
+private fun TabPage(transition: Transition<EnterExitState>, leaving: () -> Boolean, route: String, content: @Composable () -> Unit) {
     // composed again on the frame the transition starts, which is the frame the other tab is composed
     val moving = LocalNavKind.current == NavKind.BottomBar && transition.currentState != transition.targetState
     val page = DeskTheme.colors.background
@@ -582,7 +588,39 @@ private fun TabPage(transition: Transition<EnterExitState>, leaving: () -> Boole
             }
         }
         .background(page)
-    Box(Modifier.fillMaxSize().then(surface)) { ProvideScreenLeaving(leaving, content) }
+    Box(Modifier.fillMaxSize().then(surface)) {
+        CompositionLocalProvider(LocalTabRoute provides route) { ProvideScreenLeaving(leaving, content) }
+    }
+}
+
+/** Taps on the current screen's own entry (bottom bar, rail, sidebar), by route. */
+internal class ShellReselect {
+    val events = MutableSharedFlow<String>(extraBufferCapacity = 1)
+}
+
+internal val LocalShellReselect = staticCompositionLocalOf<ShellReselect?> { null }
+
+/** The route of the tab a screen belongs to. */
+internal val LocalTabRoute = staticCompositionLocalOf<String?> { null }
+
+/**
+ * Runs [action] when the user taps the entry of the screen already shown (in the bottom bar, the
+ * rail or the sidebar), as Android's own apps do: scroll a list back to its top, or go back to the
+ * screen's start from a page opened in it.
+ *
+ * ```
+ * val list = rememberLazyListState()
+ * OnReselect { list.animateScrollToItem(0) }
+ * ```
+ *
+ * Call it in the screen; it only hears its own tab's entry. Outside a [DesktopShell] nothing happens.
+ */
+@Composable
+fun OnReselect(action: suspend () -> Unit) {
+    val reselect = LocalShellReselect.current ?: return
+    val route = LocalTabRoute.current ?: return
+    val latest by rememberUpdatedState(action)
+    LaunchedEffect(reselect, route) { reselect.events.collect { if (it == route) latest() } }
 }
 
 /**
