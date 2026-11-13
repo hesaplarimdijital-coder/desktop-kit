@@ -444,7 +444,7 @@ fun GridCellScope.CoverCell(
             Box(Modifier.fillMaxSize().clip(coverShape).background(colors.surfaceRaised)) {
                 // a cover that flies to its detail page keeps these corners on the way
                 CompositionLocalProvider(LocalSharedElementShape provides coverShape) { cover() }
-                if (overlay > 0f) Box(Modifier.fillMaxSize().alpha(overlay).background(Color.Black.copy(alpha = 0.35f)))
+                if (overlay > 0f) Box(Modifier.fillMaxSize().alpha(overlay).background(colors.overlayScrim))
             }
             if (overlay > 0f && onPlay != null) {
                 Box(
@@ -471,8 +471,8 @@ fun GridCellScope.CoverCell(
                         .align(Alignment.TopStart)
                         .padding(8.dp)
                         .size(22.dp)
-                        .background(if (selected) colors.accent else Color.Black.copy(alpha = 0.3f), CircleShape)
-                        .border(1.5.dp, if (selected) colors.accent else Color.White.copy(alpha = 0.85f), CircleShape),
+                        .background(if (selected) colors.accent else colors.overlayScrim, CircleShape)
+                        .border(1.5.dp, if (selected) colors.accent else colors.onOverlay.copy(alpha = 0.85f), CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
                     if (selected) Icon(DeskIcons.Check, contentDescription = null, tint = colors.onAccent, modifier = Modifier.size(14.dp))

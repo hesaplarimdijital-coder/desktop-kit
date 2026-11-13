@@ -695,7 +695,7 @@ fun DeskSwitch(
         when {
             checked -> colors.onAccent
             colors.isDark -> colors.textSecondary
-            else -> Color.White
+            else -> colors.surface
         },
         selected = checked,
     )
