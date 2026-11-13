@@ -29,7 +29,8 @@ Standardı" belgesinde, sürümler arası geçiş [MIGRATION.md](MIGRATION.md)'d
   `plurals`; cümle kod içinde parça parça birleştirilmez. Ünlem ve "..." yok; üç nokta için "…".
 - Telefonda liste çubukların altından geçer: `rememberShellContentPadding()` listenin
   `contentPadding`'ine verilir. WebView ya da video gösteren ekran `PauseGlassBlur()` çağırır.
-- Liste–ayrıntı için `DetailTransition`; telefonda ayrıntının üst çubuğu `CompactTopBar` ile.
+- Liste–ayrıntı için `ListDetailLayout` (tablet genişliğinden yan yana, daha darda `DetailTransition`'ın tek
+  bölmesi); telefonda ayrıntının üst çubuğu `CompactTopBar` ile.
 - Satır animasyonu (`ListAppear`) yalnızca veri iskeletten sonra geldiğinde; anahtar olarak yükleme
   durumu verilir.
 - Kısayollar tek bir `ShortcutRegistry`'de; menü çubuğu, Meta+/ listesi ve komut paleti oradan
@@ -41,8 +42,9 @@ Standardı" belgesinde, sürümler arası geçiş [MIGRATION.md](MIGRATION.md)'d
 - Birleştirme ve etiket depo sahibinindir. Gönderilmiş geçmiş yeniden yazılmaz, zorla gönderilmez.
 - Gönderi yazarı: hesaplarim.dijital@gmail.com. CHANGELOG, README, MIGRATION ve PR açıklamaları
   Türkçe; kod ve yorumlar İngilizce.
-- Tabletin ve DeX'in görünüşü ve zamanlamaları sahibinin onayı olmadan değişmez. Görünüşü değiştiren
-  bir iş ayrı bir PR'da, ekran görüntüsü farklarıyla sunulur (`ci/screenshots-pr-<numara>` dalı).
+- Tabletin ve DeX'in görünüşü ve zamanlamaları sahibinin onayı olmadan değişmez. Onaylanmış görünüş
+  değişiklikleri sürümün kendi PR'ında, CHANGELOG'da "görünür" diye işaretlenip ekran görüntüsü farklarıyla
+  sunulur (`ci/screenshots-pr-<numara>` dalı); bir iş sürümlere bölünmez, sahibi istemedikçe.
 - Herkese açık bir API'ye parametre eklerken varsayılanlı ve sona eklenir; konumla çağıran kod
   bozulmaz. Bileşen dışı fonksiyonlarda `@JvmOverloads`.
 - Davranışı değişen her şeyin testi olur; bir hata önce onu gösteren bir testle kaydedilir.

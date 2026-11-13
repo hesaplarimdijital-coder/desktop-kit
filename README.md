@@ -65,7 +65,7 @@ Uygulama modülünün `build.gradle.kts` dosyası:
 
 ```kotlin
 dependencies {
-    implementation("com.github.hesaplarimdijital-coder:desktop-kit:2.6.0")
+    implementation("com.github.hesaplarimdijital-coder:desktop-kit:2.8.0")
     implementation("androidx.activity:activity-compose:1.13.0")
 }
 ```
@@ -168,7 +168,7 @@ val shortcuts = ShortcutRegistry(
 
 
 Noktalama kısayolları (`/ , . - = + [ ]`) yazdıkları karakterle de eşleşir: Türkçe Q klavyede "/" Shift+7'dir ve
-hiçbir tuş `Key.Slash` göndermez; Ctrl+/ yine çalışır (2.6.0). Başka bir tuşa karakter vermek için
+hiçbir tuş `Key.Slash` göndermez; Ctrl+/ yine çalışır (2.8.0). Başka bir tuşa karakter vermek için
 `KeyChord(Key.X, ctrl = true, char = '?')`.
 ## Görünümü uygulamaya göre değiştirmek
 
@@ -196,12 +196,19 @@ Değerlere doğrudan erişim için `DeskTheme.colors.text`, `DeskTheme.type.body
 | `HorizontalSplitPane`, `TwoPane` | Sürüklenebilir ve klavyeyle taşınabilir ayırıcı |
 | `ContextMenuArea`, `Modifier.contextMenuGesture` | Sağ tık, uzun basma, Menu tuşu, Shift+F10 |
 | `MenuPopup`, `MenuBarMenus`, `MenuEntry` | Kenarda taşmayan menüler |
-| `TooltipArea` | Yalnızca fareyle görünür, kısayolu da gösterir |
+| `TooltipArea` | İmleç durunca ve klavye odağında; kısayolu da gösterir. Simge düğmelerinde kendiliğinden |
 | `PageHeader`, `MessageScreen`, `OverflowScreen` | Hazır ekran parçaları. `PageHeader` başlığı yalnızca kenar çubuklu düzende gösterir (aşağıya bak). |
 | `CompactTopBar`, `TopBarAction` | Telefonda üst çubuğun başlığı, geri düğmesi ve simgeleri (aşağıya bak) |
 | `AppearanceSection`, `InputSection`, `ShortcutListSection`, `SettingsSection` | Hazır ayar bölümleri |
 | `DeskChip`, `ChipRow`, `FilterChips` | Filtre chip'leri: telefonda tek satır yana kayar, genişte sarar (aşağıya bak) |
 | `DetailTransition` | Liste → ayrıntı geçişi ve öngörülü geri hareketi (aşağıya bak) |
+| `ListDetailLayout` | Tablet genişliğinden itibaren liste ve ayrıntı yan yana, daha darda `DetailTransition` (aşağıya bak) |
+| `ShellPrimaryAction` | Ekranın ana eylemi: telefonda yüzen düğme, rayda ve kenar çubuğunda üstte (aşağıya bak) |
+| `PullToRefresh`, `SwipeAction` | Parmakla çekerek yenileme; liste satırını yana kaydırarak eylem (aşağıya bak) |
+| `TokenField`, `TokenSuggestion` | Çipli giriş (adresler) ve alanın altında öneri listesi (aşağıya bak: Formlar) |
+| `Modifier.verticalScrollbar` | Fareyle kaydırma çubuğu; tabloda, ızgarada, menüde, alt sayfada kendiliğinden |
+| `GridZoom`, `rememberGridZoom` | Kapakların büyüklüğü: Ctrl ile tekerlek, kıstırma, Ctrl ile + ve − |
+| `HeightClass`, `LocalHeightClass` | Pencerenin yükseklik sınıfı: yan çevrilmiş telefon telefon kalır |
 | `ExpandablePlayer` | Telefonda mini oynatıcıdan tam ekrana büyüyen oynatıcı, yana kaydırarak parça atlama (aşağıya bak) |
 | `MoreSheet`, `MoreButton`, `GlassBottomSheet`, `ActionGroup` | "⋯" eylemleri: telefonda cam alt sayfa, genişte menü |
 | `WorkstationLayout`, `InspectorPane`, `InspectorToggleButton` | Tablet ve DeX'te sekmeli, boyutlandırılabilir ayrıntı paneli |
@@ -267,7 +274,7 @@ fun Sarkilar() {
 - `rememberShellContentPadding()` çağırmayan ekranlar eskisi gibi çubukların arasına yerleşir; 0.2.0 ekranları
   değiştirmeden aynı görünür (yalnızca onlar çubuk kayarken yeniden ölçülür).
 - Tablet ve DeX'te boşluk sıfırdır; yalnızca `DesktopShell(floatingPlayer = true)` iken altta yüzen oynatıcının yeri gelir.
-- Ekran, düzenini `BoxWithConstraints` ya da başka bir alt bileşimde seçip boşluğu onun içinden isteyebilir (2.6.0'dan
+- Ekran, düzenini `BoxWithConstraints` ya da başka bir alt bileşimde seçip boşluğu onun içinden isteyebilir (2.8.0'dan
   önce boşluk o zaman iki kez ekleniyordu).
 - İçinde WebView, video (`SurfaceView`, `TextureView`) ya da harita olan ekran `PauseGlassBlur()` çağırır: o ekran
   açıkken cam bulanıklaştırmak yerine yarı saydam tonunu çizer. Bulanıklık içeriği her cam yüzey için bir kez daha
@@ -290,7 +297,7 @@ Telefonda bir listenin satırları, verisi liste göründükten sonra gelince s�
 `val gelis = rememberListAppear(yuklendi)` ve her satıra `Modifier.listAppear(gelis, index)`. Anahtar değişince
 (iskeletten sonra veri, bir aramanın sonuçları) yerinde olan ilk sekiz satır 15 ms arayla solup 12 dp yükselerek gelir,
 sonra gelenler (kaydırılan, eklenen) olduğu gibi yerindedir. Satırlarıyla birlikte görünen liste (yeniden açılan
-sekme, geri dönülen ekran, anahtarsız liste) satırlarını hemen gösterir (2.6.0). Genişte ve azaltılmış harekette
+sekme, geri dönülen ekran, anahtarsız liste) satırlarını hemen gösterir (2.8.0). Genişte ve azaltılmış harekette
 hiçbir şey oynamaz. View kodunda
 `ViewAnimators.bind(view).start(animator)`, Compose'da `rememberViewAnimators()`: ekran kapanınca ve yapılandırma
 değişince animatör durur ve son değerine atlar.
@@ -362,8 +369,10 @@ WorkstationLayout(
 )
 ```
 
-Ayırıcı sürüklenir ya da odaktayken ←/→ ile taşınır. Telefonda yalnızca `main` görünür. Paneli araç çubuğundan
-açıp kapatmak için `InspectorToggleButton(panel)`. Panel kapalı başlasın istersen `rememberInspectorState(prefs, defaultCollapsed = true)`:
+Ayırıcı sürüklenir ya da odaktayken ←/→ ile taşınır. Paneli araç çubuğundan açıp kapatmak için
+`InspectorToggleButton(panel)`. Telefonda ve dar pencerede (`showFrom`'un altında) `main` pencereyi alır; aynı düğme
+paneli onun üstüne alt sayfa olarak açar (`sheetTitle` başlığıyla), sayfa açıkken genişleyen pencere paneli yana
+alır. Panel kapalı başlasın istersen `rememberInspectorState(prefs, defaultCollapsed = true)`:
 kullanıcı bir kez açınca onun seçimi saklanır.
 
 `HorizontalSplitPane`'in ayırıcısı bölmelerin sınırında durur, geri sürüklenince hemen kıpırdar. Yerini pencereler
@@ -470,6 +479,27 @@ DetailTransition(
   Manifestte `<application android:enableOnBackInvokedCallback="true">` gerekir. Eski sürümlerde Geri yine kapatır.
 - Geri hareketini `DetailTransition` üstlenir (`CompactTopBar` içindeyken de); ayrıca `BackHandler` gerekmez.
 
+### Liste ve ayrıntı yan yana: `ListDetailLayout`
+
+```kotlin
+ListDetailLayout(
+    detail = acik,
+    onBack = { acik = null },
+    detailKey = { it.id },
+    prefs = prefs, splitKey = "kitaplar",                // bölücünün yeri saklanır
+    placeholder = { MessageScreen("Bir kitap seçin", DeskIcons.Albums) },
+    list = { KitapListesi(seciliId = acik?.id, onAc = { acik = it }) },
+) { kitap -> KitapAyrintisi(kitap) }
+```
+
+Tablet genişliğinden (`twoPanesFrom`, varsayılan Expanded) itibaren liste 360 dp (Large'dan 412) solda, seçilenin
+ayrıntısı sağda; bölücü sürüklenir. Seçim yokken ayrıntı bölmesi `placeholder`'ı gösterir, yeni seçim ayrıntıyı
+çapraz geçişle değiştirir. Daha dar pencerede, ya da yerleşime iki bölme sığmıyorsa (`minListWidth` +
+`minDetailWidth`; yanında açık bir ayrıntı paneli varken), `DetailTransition`'ın tek bölmesi ve hareketi. Pencere eşiği
+geçince (DeX'te boyutlandırma, tablet çevrilince) liste ve açık ayrıntı durumlarını korur: telefonda açık ayrıntı
+genişleyince listenin yanında açık kalır; ayrıntının altında kaldığı sürece liste kaydırma yerini korur. İki bölmede Geri uygulamanındır (`handleBackInTwoPanes = true` ayrıntıyı kapatır).
+Seçili satırı listede uygulama işaretler.
+
 ### Tabloda çoklu seçim
 
 ```kotlin
@@ -542,6 +572,58 @@ val liste = rememberLazyListState()
 OnReselect { liste.animateScrollToItem(0) }
 ```
 
+### Değişen gezinme: üst öğe, gösterildiği yerler, girişin menüsü
+
+```kotlin
+ShellSpec("Posta", sections = listOf(
+    NavSection(null, listOf(
+        NavItem("gelen", "Gelen", DeskIcons.Home, parent = "klasorler"),
+        NavItem("klasorler", "Klasörler", DeskIcons.Folder, showIn = setOf(NavKind.BottomBar, NavKind.Rail)),
+    )),
+    NavSection("ayse@ornek.org", collapsible = true, items = listOf(
+        NavItem("gonderilmis", "Gönderilmiş", DeskIcons.Folder, parent = "klasorler", showIn = setOf(NavKind.Sidebar)),
+        NavItem("projeler", "Projeler", DeskIcons.Folder, parent = "klasorler", showIn = setOf(NavKind.Sidebar)),
+        NavItem("projeler-2026", "2026", DeskIcons.Folder, parent = "projeler", showIn = setOf(NavKind.Sidebar)),
+    )),
+))
+DesktopShell(…, navMenu = { rota -> if (rota == "cop") listOf(MenuEntry.Item("Çöpü boşalt", ::bosalt)) else emptyList() })
+```
+
+- `ShellSpec` değişebilir (hesap eklendi, sunucuda klasör açıldı): kabuk grafiği bir kez kurar, yeni rotaları ekler,
+  gidenleri çıkarır; açık ekran, geri yığınları ve ekranların durumu kalır.
+- `parent`: kenar çubuğu öğeyi üst öğesinin altına girintili koyar. Öğesini göstermeyen gezinmede gösterilen en yakın
+  üst öğe işaretlidir. Telefonda Klasörler ekranından klasör `navigator.open("gonderilmis")` ile açılır: "Klasörler"
+  işaretli kalır, sayfanın geri düğmesi ve Geri Klasörler'e döner, "Klasörler"e yeniden dokunmak da.
+- `showIn`: öğeyi listeleyen gezinmeler; listelenmediği gezinmenin "Daha fazla"sında da yok.
+- `NavSection(collapsible = true)`: başlık bölümü açıp kapatır; kapalı bölüm işaretli girişi gösterir.
+- `navMenu`: girişin menüsü; sağ tık, uzun basma, Menü tuşu ve TalkBack eylemiyle açılır.
+
+### Ekranın ana eylemi: `ShellPrimaryAction`
+
+```kotlin
+ShellPrimaryAction("Yeni ileti", DeskIcons.Plus) { yaz() }      // ekranın içinde çağrılır
+```
+
+Telefonda alt çubuğun üstünde sonda yüzen vurgu düğmesi: liste en üstteyken etiketiyle, kaydırınca yalnız simgesiyle;
+çubuklarla iner, ekran klavyesi açıkken görünmez. Çubukların altından geçen liste onun bitiminde biter. Rayda üstte
+simge, kenar çubuğunda üstte etiketli düğme. Gösterilen ekranın çağrısı geçerli; ekran değişince düğme de değişir.
+
+### Çekerek yenileme ve kaydırma eylemleri
+
+```kotlin
+PullToRefresh(refreshing = esitleniyor, onRefresh = ::esitle) {
+    LazyColumn { items(iletiler, key = { it.id }) { ileti ->
+        DeskListRow(ileti.konu, subtitle = ileti.gonderen, onClick = { ac(ileti) },
+            swipeStart = SwipeAction("Arşivle", DeskIcons.Folder, { arsivle(ileti) }),
+            swipeEnd = SwipeAction("Okundu", DeskIcons.Check, { okundu(ileti) }, removesRow = false))
+    } }
+}
+```
+
+İkisi de yalnızca parmakla: fare ve klavye için aynı işler bir düğmede ve menüde durur. Yenileme diski, liste telefonun
+cam üst çubuğunun altından geçiyorsa çubuğun altından, değilse listenin kendi tepesinden iner; satır eşiği geçince eylemin rengini alır ve telefon titrer. Silme ya da arşivleme gibi
+satırı çıkaran bir eylemin "Geri al"ını bildirimle ver.
+
 ### Satırlar, ayarlar, düğmeler
 
 - `DeskListRow(subtitle = konu, preview = önizleme, previewMaxLines = 2)`: konunun altında önizleme;
@@ -611,7 +693,7 @@ CompactTopBar(
   (`DesktopShell` ve `DesktopKitRoot` sağlar).
 - `CompactTopBar(showOnRail = true)`: tablette (ray düzeninde) de geçerli olur. Ayarların üstüne açılan bir sayfa
   ("Hesap ekle") başlığını ve geri yolunu orada da gösterir. Kenar çubuklu düzen (DeX) hiç almaz.
-- Bırakılan ekranın çubuğu hemen çekilir: ekran değişirken başlık, geri düğmesi ve eylemler tek adımda değişir (2.6.0
+- Bırakılan ekranın çubuğu hemen çekilir: ekran değişirken başlık, geri düğmesi ve eylemler tek adımda değişir (2.8.0
   öncesi başlık önce, düğmeler ekranın çıkışı bitince değişiyordu). Başlık yalnızca sözcükleri değişince solar; geri
   düğmesi gelip giderken başlık yana kayar.
 
@@ -636,6 +718,16 @@ CheckboxRow("Tüm biçimler", ToggleableState.Indeterminate, onClick = { … })
 
 Klavyenin eylem tuşu sistemdeki işini yapar (Bitti klavyeyi kapatır, İleri sonraki alana geçer); `onImeAction`
 verilirse onun yerine o çalışır, tek satırda donanım Enter'ı da. `NumberField`'ın aralık uyarısı alanı genişletmez.
+
+İmlecin ve seçimin yeri gerekirse `DeskTextField(value: TextFieldValue, onValueChange)`. Adresler için çipli alan:
+
+```kotlin
+TokenField(alicilar, { alicilar = it }, label = "Kime", isValid = { "@" in it },
+    suggestions = { yazilan -> rehber.ara(yazilan).map { TokenSuggestion(it.adres, it.ad, it.adres) } })
+```
+
+Virgül, noktalı virgül ya da Enter çipi tamamlar, yapıştırılan liste bölünür, Backspace son çipi siler; öneriler
+oklarla gezilir, Enter seçer, Esc kapatır.
 
 Alanın etiketi, ipucu ve açıklaması TalkBack'e alanla birlikte okunur. Tek başına bir `DeskCheckbox` ya da
 `DeskSwitch` kullanılacaksa ona `Modifier.semantics { contentDescription = … }` ile ad ver; satır hâlleri bunu kendisi
@@ -697,8 +789,13 @@ DeskGrid(albümler, key = { it.id }, onItemClick = { albüm, _ -> aç(albüm) },
 
 Seçim kuralları tablonunkiyle aynı (Ctrl/Shift ile tıklama, Shift ile oklar, Ctrl+A, Esc; parmak dokunuşu açar,
 seçim modunda ya da seçim varken ekler/çıkarır; uzun basma menüyü açar ve kapağı seçer; Geri seçimi temizler). Oynat düğmesi
-farenin altında çıkar; TalkBack onu hücrenin eylemlerinde bulur, klavye için `itemMenu`'ye de "Oynat" koy (Menu
-tuşu menüyü açar).
+farenin altında ve klavye odağında çıkar; dokunmatikte başlığın yanında "⋮" var. TalkBack onu hücrenin eylemlerinde
+bulur. Izgara Tab'ın tek durağıdır, oklar kapaklar arasında gezer; Tab kapaktan da düğmelerinden de hemen çıkar.
+
+`DeskGrid(zoom = rememberGridZoom(prefs = prefs, key = "albumler"))` kapakları kullanıcının büyütüp küçültmesine
+bırakır: Ctrl ile tekerlek (ya da dokunmatik yüzeyde kıstırma), ekranda iki parmak, Ctrl ile + ve − (yazdıkları
+karakterle, Türkçe Q klavyede de; Ctrl+0 varsayılana döner); seçim saklanır. Seçilmedikçe ızgara varsayılanı izler
+(parmakla daha büyük).
 
 ### Sürükle bırak
 
@@ -748,9 +845,9 @@ uçarken de yuvarlak kalsın diye biçimini ver: `detailSharedElement("kapak-$id
 ## Sürüm yayınlamak
 
 1. `CHANGELOG.md` dosyasına ne değiştiğini yaz, `gradle.properties` içindeki `VERSION_NAME`'i güncelle.
-2. Önce PR'ı birleştir, sonra GitHub'da **Releases → Draft a new release** ile etiketi (`2.6.0`) `main` üzerinde
-   oluştur; ya da `git tag 2.6.0 && git push origin 2.6.0`. Etiket birleştirmeden önce açılırsa eski kodu gösterir.
-3. JitPack ilk istekte derler (`jitpack.yml`, Java 17). Uygulamada sürümü `2.6.0` yapman yeterli.
+2. Önce PR'ı birleştir, sonra GitHub'da **Releases → Draft a new release** ile etiketi (`2.8.0`) `main` üzerinde
+   oluştur; ya da `git tag 2.8.0 && git push origin 2.8.0`. Etiket birleştirmeden önce açılırsa eski kodu gösterir.
+3. JitPack ilk istekte derler (`jitpack.yml`, Java 17). Uygulamada sürümü `2.8.0` yapman yeterli.
 
 Sürüm numaraları [SemVer](https://semver.org/lang/tr/) kuralına uyar: uyumu bozan değişiklik
 ana sürümü, yeni özellik ikinci sayıyı, düzeltme üçüncüyü artırır.

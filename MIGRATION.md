@@ -1,11 +1,11 @@
-# 2.6.0'a geçiş
+# 2.8.0'a geçiş
 
-Bu rehber kiti kullanan uygulamaları en güncel sürüme, 2.6.0'a taşımak için. 0.1.3'ten gelenler baştan
+Bu rehber kiti kullanan uygulamaları en güncel sürüme, 2.8.0'a taşımak için. 0.1.3'ten gelenler baştan
 başlar; adımlardan sonra [görünümde fark edecekleri](#013ten-gelince-görünümde-fark-edecekleriniz) ayrıca
 yazılı. 1.0.0'dan geçenler 1. adımdan sonra doğrudan [1.0'dan 2.0'a](#10dan-20a) bölümüne atlayabilir. 2.0.0,
 2.1.0, 2.2.0, 2.3.0, 2.4.0, 2.4.1 ya da 2.5.0 kullananlar [2.0.0'dan 2.1.0'a](#200dan-210a),
 [2.1.0'dan 2.2.0'a](#210dan-220a), [2.2.0'dan 2.3.0'a](#220dan-230a), [2.3.0'dan 2.4.0'a](#230dan-240a),
-[2.4.0'dan 2.4.1'e](#240dan-241e), [2.4.1'den 2.5.0'a](#241den-250a) ve [2.5.0'dan 2.6.0'a](#250den-260a)
+[2.4.0'dan 2.4.1'e](#240dan-241e), [2.4.1'den 2.5.0'a](#241den-250a) ve [2.5.0'dan 2.8.0'a](#250den-280a)
 bölümlerinden yalnızca kendi sürümünden sonrakilere bakar.
 
 Sıra şöyle: önce derleme ortamı (kitin kendisi aynı adımları `7845eb5` gönderisinde attı, örnek olarak
@@ -14,7 +14,7 @@ oraya bakılabilir), sonra uygulamanın kendi yazdığı bileşenler kitinkilerl
 
 ## 1. Derleme ortamı
 
-| | 0.1.3 uygulamaları | 2.6.0 |
+| | 0.1.3 uygulamaları | 2.8.0 |
 | --- | --- | --- |
 | Android Gradle eklentisi (AGP) | 8.7.3 | 9.4.1 (en az 9.1.1) |
 | Gradle | 8.11.1 | 9.8.2 |
@@ -33,7 +33,7 @@ cihazlar uygulamayı kuramaz. Uygulamalar Play'de olmadığı için başka bir e
 Adımlar:
 
 1. `gradle/wrapper/gradle-wrapper.properties`: `distributionUrl=https\://services.gradle.org/distributions/gradle-9.8.2-bin.zip`
-2. `gradle/libs.versions.toml`: yukarıdaki sürümler ve `desktopKit = "2.6.0"`. En kolayı kitin kendi
+2. `gradle/libs.versions.toml`: yukarıdaki sürümler ve `desktopKit = "2.8.0"`. En kolayı kitin kendi
    `gradle/libs.versions.toml` dosyasındaki sürümleri almak.
 3. AGP 9 Kotlin'i kendisi derler (yerleşik Kotlin). Modüllerden `alias(libs.plugins.kotlin.android)`
    satırını sil, `kotlin.compose` kalsın. Kökteki `build.gradle.kts` dosyasında eklentiyi uygulamadan
@@ -361,11 +361,12 @@ kendi hareket edince seçer; oklar listeyi duran imlecin altında kaydırırken 
 - **Kitin paletini kendi koduna kopyalayıp uyarlayan uygulama** (Nağmedar'ın paleti kendi kodudur) değişikliği kitten
   almaz.
 
-## 2.5.0'dan 2.6.0'a
+## 2.5.0'dan 2.8.0'a
 
-Kod değişmeden derlenir; sürümü `2.6.0` yapmak yeter. Herkese açık her eklenti varsayılan değerli bir parametre ya da
-yeni bir fonksiyon. 2.5.0'a karşı derlenmiş bir kitaplık (başka bir modül) yeniden derlenmelidir: bazı bileşenlerin
-parametre listesi uzadı. Ne değiştiği [CHANGELOG](CHANGELOG.md#260-2026-11-13)'da; uygulamanın bakması gerekenler:
+Çoğunlukla kod değişmeden derlenir; sürümü `2.8.0` yapmak yeter (2.6.0 ve 2.7.0 yayımlanmadı). Herkese açık her
+eklenti varsayılan değerli bir parametre ya da yeni bir fonksiyon. 2.5.0'a karşı derlenmiş bir kitaplık (başka bir
+modül) yeniden derlenmelidir: bazı bileşenlerin parametre listesi uzadı. Ne değiştiği
+[CHANGELOG](CHANGELOG.md#280-2026-11-13)'da; uygulamanın bakması gerekenler:
 
 - **Hareket (görünür):** telefonda ayrıntı sayfası yerine taşmadan oturur; basılan denetim bırakınca dinlenme
   boyunu geçmez; gezinme hapı ve sekme çizgisi sekmez (`DeskMotion.spatial()` 0,85 yerine 0,9). Kendi
@@ -403,6 +404,58 @@ parametre listesi uzadı. Ne değiştiği [CHANGELOG](CHANGELOG.md#260-2026-11-1
 - **Ekran görüntüsü testleri:** telefonun üst çubuğunda başlık bir karede ötekinden farklı olabilir (geri düğmesi
   kayarak geliyor), hareket şeritlerinde satırlar ve ayrıntı farklı oynar.
 
-DeskMail'in `docs/KIT-ISTEKLERI.md` listesinden bu sürümde gelenler: 1, 2, 6, 8, 9, 10, 11, 12, 13, 15, 16, 17, 18,
-19, 20, 21. "Şimdilik" yolları kaldırılabilir; hangisinin neyle değiştiği CHANGELOG'da. Kalanlar (3, 4, 5, 7, 14, 22,
-23) sonraki sürümde.
+- **Gezinme grafiği:** kabuk grafiği bir kez kurar ve rotaları ona ekleyip çıkarır; `ShellSpec` değişince açık ekran
+  ve geri yığınları korunur. Rota kümesi değişince ekrana kendisi geri dönen uygulama (DeskMail'in `DeskMailApp`'i:
+  `ShellNavigator.navigate`) bunu kaldırabilir. `navController.graph`'ı kendisi kuran ya da değiştiren uygulama
+  varsa: kabuğun grafiği artık aynı nesnedir, düğümleri değişir. Başlangıç rotası değişirse grafik yine yeniden kurulur.
+- **`NavItem` ve `NavSection`:** veri sınıflarına `parent`, `showIn` ve `collapsible` eklendi (varsayılanlı, sonda).
+  `copy` ve bileşen sırası ile yazılmış bir kod aynen derlenir. Bir gezinmede gösterilmeyen öğe (`showIn`) onun "Daha
+  fazla"sında da yok; eskiden gösterilmeyen her ekranda "Daha fazla" işaretliydi, artık o ekranın en yakın gösterilen
+  üst öğesi (`parent`) ya da hiçbiri. `bottomBar`/`rail` listesinde, o gezinmede gösterilmeyen bir rota hata verir.
+- **`NavRail`, `Sidebar`, `BottomNavBar`, `PageTopBar`:** sonlarına `navMenu`, `action` ve `menus` parametreleri geldi.
+  Ray düzeninin üst çubuğunda menüler varsa "≡" görünür.
+- **`DesktopShell`:** yeni parametreler (`navMenu`, `heightClass`, `iconBadges`) listenin sonunda, `content`'in önünde;
+  parametreleri sırasıyla veren çağrılar aynen derlenir.
+- **İpuçları (görünür):** `DeskIconButton` kendi ipucunu gösterir (imleç durunca ve klavye odağında; `shortcut` ile
+  kısayolu da). Simge düğmesini `TooltipArea` ile saran uygulama sarmalayıcıyı kaldırıp kısayolu düğmeye verebilir
+  (`DeskIconButton(…, shortcut = "Space")`); kalırsa düğme ikinci bir ipucu açmaz. İpucu istemeyen düğme
+  `tooltip = false` alır. `TooltipArea`'ya `placement`, `showOnFocus` ve `enabled` eklendi.
+- **Klavye (görünür):** tablo, kapak ızgarası ve sekme şeridi Tab'ın tek durağıdır; içlerinde oklar gezer, Tab ve
+  Shift+Tab hemen dışarı çıkar. Satırın yıldız gibi hücre düğmeleri ve kapağın Oynat'ı ile "⋯"'si Tab durağı değil
+  (fareyle ve parmakla kalırlar). Tablonun sıralanabilir başlıkları Tab sırasında satırlardan önce gelir
+  (eskiden sonra). Her satırı, kapağı ya da sekmeyi Tab'la dolaşan bir test ya da kullanıcı alışkanlığı varsa değişir.
+  Açık alt sayfa odağı Tab'da da Shift+Tab'da da tutar, kapanınca odak eski yerine döner. Bu, `DesktopKitRoot` içinde
+  geçerli; kökü kullanmayan uygulamada her öğe eskisi gibi durak.
+- **Renkler (görünür):** `DeskColors`'a `controlBorder`, `overlayScrim`, `onOverlay` eklendi (varsayılanlı, sonda);
+  kendi paletini elle kuran uygulama `controlBorder`'ı 3:1 verecek biçimde doldurmalı. Kitin paletlerinde basılı ton
+  koyulaştı, açık temada üzerine gelme belirginleşti; metin alanlarının kenarı belirgin. Devre dışı `DeskButton` artık
+  yarı saydam değil, kendi görünüşü var.
+- **`DenseTable` (görünür):** başlık satır boyunda (pointer'da 28 yerine 32, touch'ta 48 yerine 56, telefonda 52 dp); seçili satırın
+  başında bir çubuk; `toggleOnClick` kipinde satırlarda onay kutusu ve başlıkta "Tümünü seç". Kaydırma çubuğu fareyle
+  görünür.
+- **`InspectorState.toggle()`:** dar pencerede (`showFrom`'un altında) artık paneli alt sayfa olarak açar ya da kapatır
+  (`sheetOpen`); genişte eskisi gibi `collapsed`'ı değiştirir. Dar pencerede `InspectorToggleButton`'ı gizleyen
+  uygulama artık gösterebilir.
+- **`DeskTextField(TextFieldValue)`:** yeni biçim; `String` alan biçim aynı.
+- **`deskClickable`:** uzun basmalı yeni bir biçimi var; eskisi aynı.
+- **Yükseklik sınıfı:** `DesktopKitRoot` `LocalHeightClass` verir; yan çevrilmiş telefonda kabuk telefonun yazısını
+  ve hareketini korur, oynatıcıyı içeriğin altına dizer (`floatingPlayer` orada uygulanmaz). `DeskMotion.tier`'ın
+  yükseklik alan biçimi var.
+- **Yeni bileşenler:** `ListDetailLayout`, `TokenField`, `PullToRefresh`, `SwipeAction` (`DeskListRow(swipeStart,
+  swipeEnd)`), `ShellPrimaryAction`, `Modifier.verticalScrollbar`, `GridZoom`/`rememberGridZoom`. Hangisinin hangi
+  "Şimdilik" yolunun yerine geçtiği aşağıda.
+
+DeskMail'in `docs/KIT-ISTEKLERI.md` listesinin 23 maddesi de bu sürümde. "Şimdilik" yolları kaldırılabilir:
+
+- 3: klasörler `NavItem(parent = "folders", showIn = setOf(NavKind.Sidebar))`; "Klasörler" ve "Ara"
+  `showIn = setOf(NavKind.BottomBar, NavKind.Rail)`; telefonda klasör `navigator.open(rota)` ile açılır; hesap
+  `NavSection(collapsible = true)`; klasör menüsü `DesktopShell(navMenu)`; rota kümesi değişince ekrana dönüş gerekmez.
+- 4: virgüllü düz alan yerine `TokenField(suggestions = { MailComposer.suggest(it) })`; yanıtta imleç için
+  `DeskTextField(TextFieldValue)`.
+- 5: "Yeni ileti" üst çubuktaki vurgulu simge yerine `ShellPrimaryAction`.
+- 7: `DeskListRow(swipeStart = SwipeAction(arşivle…), swipeEnd = SwipeAction(ertele…, removesRow = false))`.
+- 14: listeyi `PullToRefresh(eşitleniyor, onRefresh = eşitle)` ile sarmak; "Eşitle" düğmesi ve F5 kalır.
+- 22: tablo fareyle çerçeve çizerek seçer; uygulamanın yapacağı bir şey yok.
+- 23: `DeskTextField(value: TextFieldValue, onValueChange)`.
+
+Öteki maddeler (1, 2, 6, 8 – 13, 15 – 21) ve neyle değiştikleri CHANGELOG'da.

@@ -84,13 +84,15 @@ Renkler her zaman `DeskTheme.colors` üzerinden alınır; bileşen içinde `Colo
 | `surface`, `surfaceRaised` | kartlar, alanlar, menüler |
 | `hover`, `pressed` | etkileşim tonları |
 | `border` | ayırıcı çizgiler (dekoratif) |
-| `borderStrong` | alanların, düğmelerin kenarı |
+| `borderStrong` | düğmelerin, panellerin, menülerin kenarı (yalnızca ayırır) |
+| `controlBorder` | girdinin dinlenmedeki kenarı: metin alanı, anahtarın kapalı yolu (arka plana ve yüzeylere ≥ 3:1) |
 | `text`, `textSecondary`, `textTertiary` | yazının üç önemi |
 | `accent`, `onAccent`, `accentText` | tek vurgu: birincil düğme, seçim göstergesi, bağlantı |
 | `selection`, `onSelection` | seçili satır ve öğe |
 | `focusRing` | klavye odağı (≥ 3:1) |
 | `success`, `warning`, `danger` | durumlar |
 | `scrim` | katmanların arkası |
+| `overlayScrim`, `onOverlay` | resmin (kapağın) üstüne çizilen düğmenin altı ve kendisi |
 
 Vurgu rengi uygulamanın seçimidir ya da duvar kâğıdından gelir; `ensureContrast` her vurguyu yazı
 için 4,5:1'e, büyük öğeler için 3:1'e getirir. Odak ve seçim göstergeleri ekranın tek vurgusuna
@@ -116,7 +118,11 @@ yok. Pil tasarrufunda ve "Animasyonları kaldır" açıkken opak. İçinde WebVi
 | Sekmeler arası | 90 ms çıkış + 210 ms giriş (fade-through) | rayda aynı, kenar çubuğunda 150 ms çapraz geçiş |
 
 Satırların sırayla gelmesi (`ListAppear`) yalnızca veri liste göründükten sonra gelince (iskeletten
-sonra, aramanın sonuçları) oynar. Sonsuz döngü yalnızca iskeletin nefes alışında vardır.
+sonra, aramanın sonuçları) oynar. Sonsuz döngü yalnızca iskeletin nefes alışında vardır; bir iş sürerken
+dönen şey (belirsiz ilerleme çubuğu, yenileme diski) o iş bitince durur.
+
+Yan çevrilmiş telefon (yükseklik sınıfı Compact, 480 dp altı) rayı alır ama telefonun yazısını ve
+yaylarını korur.
 
 ## Yazılı istisnalar
 
@@ -142,11 +148,15 @@ köşesi, sistemin değeri) sabit kalır.
 | İş | Bileşen |
 |---|---|
 | Uygulama iskeleti | `DesktopKitRoot` + `DesktopShell` |
-| Liste ve ayrıntı | `DetailTransition` (telefonda tam ekran, genişte paylaşılan eksen) |
+| Liste ve ayrıntı | `ListDetailLayout` (tablet genişliğinden yan yana, daha darda `DetailTransition`) |
+| Ekranın ana eylemi | `ShellPrimaryAction` (telefonda yüzen, rayda ve kenar çubuğunda üstte) |
+| Çekerek yenileme, satırda kaydırma | `PullToRefresh`, `DeskListRow(swipeStart, swipeEnd)` (yalnızca parmakla) |
+| Adres, etiket girişi | `TokenField` |
 | Çok sütunlu veri | `DenseTable` (sıralama, çoklu seçim, sütun seçici, boş durum) |
 | Telefon listesi | `DeskListRow` |
-| Kapak ızgarası | `DeskGrid` + `CoverCell` |
-| Ayrıntı paneli | `WorkstationLayout` + `InspectorPane` |
+| Kapak ızgarası | `DeskGrid` + `CoverCell`, büyüklüğü için `rememberGridZoom` |
+| Kendi listende kaydırma çubuğu | `Modifier.verticalScrollbar(state)` (tablo, ızgara, menü, alt sayfa kendiliğinden) |
+| Ayrıntı paneli | `WorkstationLayout` + `InspectorPane` (dar pencerede alt sayfa) |
 | Kısa bildirim | `ToastState` + `ToastHost` (platformun `Toast`'u değil) |
 | Uyarı şeridi | `StatusBanner` |
 | Boş, hata, yapım aşaması | `MessageScreen` |

@@ -1,6 +1,6 @@
 {
   "dead-handler": {
-    "sample/src/main/java/desktopkit/sample/Catalog.kt": 9
+    "sample/src/main/java/desktopkit/sample/Catalog.kt": 8
   },
   "infinite": {
     "kit/src/main/java/desktopkit/components/Feedback.kt": 2
@@ -30,7 +30,6 @@
     "sample/src/main/java/desktopkit/sample/Player.kt": 1
   },
   "raw-color": {
-    "kit/src/main/java/desktopkit/components/Choice.kt": 1,
     "sample/src/main/java/desktopkit/sample/MainActivity.kt": 1,
     "sample/src/main/java/desktopkit/sample/SampleData.kt": 5
   }
