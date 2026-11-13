@@ -188,6 +188,20 @@ internal class ShellOverlayHost {
 
     /** The kit's text fields in the content: a tap elsewhere or a scroll closes the keyboard (touch). */
     val textFields = TextFields()
+
+    /** The sheet that is up and how to close it: a newer sheet closes it ([sheetOpened]). */
+    private var sheet: Pair<Any, () -> Unit>? = null
+
+    /** The sheet [token] opened: the one that was up closes. */
+    fun sheetOpened(token: Any, dismiss: () -> Unit) {
+        val previous = sheet
+        sheet = token to dismiss
+        if (previous != null && previous.first !== token) previous.second()
+    }
+
+    fun sheetClosed(token: Any) {
+        if (sheet?.first === token) sheet = null
+    }
 }
 
 /**

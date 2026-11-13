@@ -73,6 +73,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -245,7 +247,11 @@ private fun SheetActionRow(item: MenuEntry.Item, onClick: () -> Unit) {
  * reduced motion). Esc, Back and a tap on the scrim call [onDismiss]. At most 640 dp wide, centred.
  *
  * Inside [desktopkit.shell.DesktopShell] it is drawn in the shell's window over everything (and
- * blurs the screen behind it); elsewhere in a pop-up window.
+ * blurs the screen behind it); elsewhere in a pop-up window. There one sheet is open at a time: a
+ * sheet opened while another is up closes that one ([onDismiss]), so sheets never pile up.
+ *
+ * The handle is also the sheet's close button for TalkBack, Switch Access and the keyboard ("Close
+ * sheet"), and the scrim says what a tap on it does: the sheet can be closed without a gesture.
  */
 @Composable
 fun GlassBottomSheet(
@@ -283,6 +289,12 @@ fun GlassBottomSheet(
         OverlayLayer(host) { SheetSurface(way, tier, title, modifier, { latestDismiss() }, content, host.systemBottomPx) }
         ReturnFocusOnClose(host, visible)
         BackHandler(enabled = visible) { latestDismiss() }
+        // one sheet at a time: opening this one closes the one that was up
+        val token = remember { Any() }
+        DisposableEffect(host, visible) {
+            if (visible) host.sheetOpened(token) { latestDismiss() }
+            onDispose { if (visible) host.sheetClosed(token) }
+        }
     } else {
         val view = LocalView.current
         val frameTop = remember(view) {
@@ -364,6 +376,7 @@ private fun SheetSurface(
     val focus = remember { FocusRequester() }
     val shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
     val label = title ?: stringResource(R.string.dk_more_options)
+    val closeLabel = stringResource(R.string.dk_close_sheet)
     val haptics = rememberDeskHaptics()
     val latestDismiss by rememberUpdatedState(onDismiss)
     // pulled down on the handle, or anywhere on the sheet while its list is at the top
@@ -387,7 +400,12 @@ private fun SheetSurface(
                     alpha = progress.value.coerceIn(0f, 1f) * (1f - dragged)
                 }
                 .background(colors.scrim)
-                .pointerInputTap(onDismiss),
+                .pointerInputTap(onDismiss)
+                // what a tap on the dimmed screen does, for TalkBack
+                .semantics {
+                    contentDescription = closeLabel
+                    onClick(closeLabel) { latestDismiss(); true }
+                },
         )
         Column(
             modifier
@@ -435,9 +453,21 @@ private fun SheetSurface(
                 // the glass reaches behind the system navigation bar, the last row stays above it
                 .bottomInsetPadding(bottomInset),
         ) {
-            // the handle says "drag me"
-            Box(Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 6.dp), contentAlignment = Alignment.Center) {
-                Box(Modifier.size(width = 36.dp, height = 4.dp).background(colors.borderStrong, RoundedCornerShape(2.dp)))
+            // the handle says "drag me"; it is also the sheet's close button for TalkBack, Switch Access and the
+            // keyboard (the bar looks and sits as it did)
+            val handle = remember { MutableInteractionSource() }
+            val handleState = handle.collectState()
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier
+                        .size(width = 64.dp, height = 20.dp)
+                        .focusRing(handleState, RoundedCornerShape(10.dp))
+                        .deskClickable(handle, { latestDismiss() }, onClickLabel = closeLabel)
+                        .semantics { contentDescription = closeLabel },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(Modifier.padding(top = 4.dp).size(width = 36.dp, height = 4.dp).background(colors.borderStrong, RoundedCornerShape(2.dp)))
+                }
             }
             if (title != null) {
                 Text(title, style = DeskTheme.type.title, color = colors.text, maxLines = 2, overflow = TextOverflow.Ellipsis,

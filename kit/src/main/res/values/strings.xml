@@ -84,4 +84,5 @@
     <string name="dk_sorted_ascending">Sorted ascending</string>
     <string name="dk_sorted_descending">Sorted descending</string>
     <string name="dk_sort_by">Sort by %1$s</string>
+    <string name="dk_close_sheet">Close sheet</string>
 </resources>
