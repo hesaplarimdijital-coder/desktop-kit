@@ -23,6 +23,31 @@ enum class WidthClass(val minWidthDp: Int) {
     }
 }
 
+/**
+ * Window height classes (Material 3). A phone on its side is Compact in height (under 480 dp) while
+ * its width makes it Medium or Expanded: the shell then keeps the phone's sizes and motion, not the
+ * tablet's ([desktopkit.shell.DesktopShell]).
+ */
+enum class HeightClass(val minHeightDp: Int) {
+    Compact(0),
+    Medium(480),
+    Expanded(900);
+
+    companion object {
+        fun fromHeight(heightDp: Float): HeightClass = when {
+            heightDp >= Expanded.minHeightDp -> Expanded
+            heightDp >= Medium.minHeightDp -> Medium
+            else -> Compact
+        }
+    }
+}
+
+/**
+ * The [HeightClass] the surrounding [desktopkit.DesktopKitRoot] measured. Outside it [HeightClass.Expanded],
+ * so nothing changes for a layout that does not know it.
+ */
+val LocalHeightClass = androidx.compose.runtime.compositionLocalOf { HeightClass.Expanded }
+
 /** Navigation chrome used for a width class. */
 enum class NavKind {
     /** Compact: bottom bar, mini player above it. */

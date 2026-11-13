@@ -32,7 +32,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 
-/** The rows of a phone's list arrive in turn, later rows are simply there; a phone's press is lighter and bounces back. */
+/**
+ * The rows of a phone's list arrive in turn when its data comes in, later rows are simply there; a
+ * list that appears with its rows shows them at once. A phone's press is lighter and comes back
+ * without a bounce.
+ */
 @RunWith(AndroidJUnit4::class)
 @Config(qualifiers = "tr-w411dp-h891dp-hdpi")
 class ListAppearAndPressTest {
@@ -41,21 +45,32 @@ class ListAppearAndPressTest {
     val compose = createAndroidComposeRule<ComponentActivity>()
 
     private var rows by mutableIntStateOf(6)
+    private var loaded by mutableStateOf(false)
     private var pressed by mutableStateOf(false)
 
-    private fun list(tier: MotionTier) {
+    /** A list that shows its rows once [loaded]; [arrive] loads them a frame after the list appeared. */
+    private fun list(tier: MotionTier, arrive: Boolean = true) {
+        loaded = !arrive
         compose.mainClock.autoAdvance = false
         compose.setContent {
             DesktopKitTheme(inputMode = InputMode.Touch) {
                 CompositionLocalProvider(LocalMotionTier provides tier) {
-                    val appear = rememberListAppear()
+                    val appear = rememberListAppear(loaded)
                     Column {
-                        repeat(rows) { i ->
-                            Box(Modifier.listAppear(appear, i).fillMaxWidth().height(40.dp).background(Color.Red).testTag("row$i"))
+                        if (loaded) {
+                            repeat(rows) { i ->
+                                Box(Modifier.listAppear(appear, i).fillMaxWidth().height(40.dp).background(Color.Red).testTag("row$i"))
+                            }
                         }
                     }
                 }
             }
+        }
+        if (arrive) {
+            frame()
+            compose.runOnIdle { loaded = true }
+            // the recomposer wakes with the first frame, the rows are composed with the second
+            frame()
         }
     }
 
@@ -85,6 +100,15 @@ class ListAppearAndPressTest {
         frame()
         frame()
         assertEquals(6 * 40f, top("row6").value, 0.5f)
+    }
+
+    /** A tab opened again, a screen come back to: the rows were there with the list, and are at once. */
+    @Test
+    fun aListThatAppearsWithItsRowsShowsThemAtOnce() {
+        list(MotionTier.Gesture, arrive = false)
+        frame()
+        assertEquals(40f, top("row1").value, 0.5f)
+        assertEquals(3 * 40f, top("row3").value, 0.5f)
     }
 
     @Test
@@ -120,7 +144,7 @@ class ListAppearAndPressTest {
     private fun width(): Float = compose.onNodeWithTag("button").getBoundsInRoot().let { (it.right - it.left).value }
 
     @Test
-    fun aPhonesPressIsLighterAndBouncesBack() {
+    fun aPhonesPressIsLighterAndComesBackWithoutABounce() {
         press(MotionTier.Gesture)
         compose.runOnIdle { pressed = true }
         repeat(30) { frame() }
@@ -131,7 +155,7 @@ class ListAppearAndPressTest {
             frame()
             widest = maxOf(widest, width())
         }
-        assertTrue("letting go bounced a touch over the rest: $widest", widest > 100.02f)
+        assertTrue("letting go passed the rest size: $widest", widest <= 100.01f)
         assertEquals(100f, width(), 0.5f)
     }
 

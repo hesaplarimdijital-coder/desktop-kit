@@ -9,16 +9,19 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -31,6 +34,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -44,6 +48,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -76,6 +81,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import desktopkit.R
+import desktopkit.input.TabNavigation
 import desktopkit.input.contextMenuGesture
 import desktopkit.shell.LocalSharedElementShape
 import desktopkit.theme.DeskMotion
@@ -97,6 +103,9 @@ interface GridCellScope {
     val selected: Boolean
     val selecting: Boolean
     fun openMenu()
+
+    /** Whether the cell has a menu ([DeskGrid]'s itemMenu): only then is there a "⋯" to show. */
+    val hasMenu: Boolean get() = true
 }
 
 /** Accessibility actions a cell's content adds to its cell (a cover's Play), next to the menu's. */
@@ -108,6 +117,7 @@ private class CellScope(
     override val focused: Boolean,
     override val selected: Boolean,
     override val selecting: Boolean,
+    override val hasMenu: Boolean,
     private val onOpenMenu: () -> Unit,
 ) : GridCellScope {
     override fun openMenu() = onOpenMenu()
@@ -129,6 +139,9 @@ private class CellScope(
  *
  * Columns are as many as fit [minCellWidth]. Draw each cell with [cell], usually a [CoverCell].
  * [itemDrag] lets covers be dragged with a mouse to a [dropZone], as [DenseTable]'s rowDrag.
+ * [emptyContent] is shown across the grid when there are no items and nothing loads, usually a
+ * [desktopkit.screens.MessageScreen] saying why and what to do. With [zoom] the user makes the cells
+ * larger or smaller (Ctrl with the wheel, a pinch, Ctrl with + and −) and [minCellWidth] is its width.
  */
 @Composable
 fun <T> DeskGrid(
@@ -148,6 +161,8 @@ fun <T> DeskGrid(
     loading: Boolean = false,
     itemDrag: ((T, Int) -> DeskDragPayload?)? = null,
     clearSelectionOnBack: Boolean = true,
+    emptyContent: (@Composable () -> Unit)? = null,
+    zoom: GridZoom? = null,
     cell: @Composable GridCellScope.(item: T) -> Unit,
 ) {
     val multi = onSelectionChange != null
@@ -163,6 +178,22 @@ fun <T> DeskGrid(
     if (multi && clearSelectionOnBack) ClearSelectionOnBack(selection, touch, toggleOnClick) { update(TableSelection.clear()) }
     val columns = {
         state.layoutInfo.visibleItemsInfo.maxOfOrNull { it.column }?.plus(1) ?: 1
+    }
+    // the grid is one stop of the Tab key: the cell last focused, else the selected one, when in view, else
+    // the first cell in view; the arrows move among the cells (read when the focus moves, not composed)
+    val lastFocused = remember { RovingMemory() }
+    val latestItems by rememberUpdatedState(items)
+    val latestKey by rememberUpdatedState(key)
+    val latestSelected by rememberUpdatedState(selectedKey)
+    val latestSelection by rememberUpdatedState(selection)
+    val rovingKey: () -> Any? = remember(state) {
+        {
+            val keys = latestItems.mapTo(HashSet()) { latestKey(it) }
+            val active = tracker.focused ?: lastFocused.key ?: tracker.anchor ?: latestSelected ?: latestSelection.firstOrNull()
+            val visible = state.layoutInfo.visibleItemsInfo
+            if (active != null && active in keys && visible.any { it.key == active }) active
+            else visible.firstOrNull { it.key in keys }?.key
+        }
     }
     val gridModifier = if (!multi) Modifier else Modifier
         .pointerInput(Unit) {
@@ -224,52 +255,75 @@ fun <T> DeskGrid(
     val skeleton = loading && items.isEmpty()
     val pulse = if (skeleton) rememberSkeletonPulse() else null
     val loadingLabel = stringResource(R.string.dk_loading)
-    LazyVerticalGrid(
-        columns = GridCells.Adaptive(minCellWidth),
-        modifier = modifier
-            .fillMaxSize()
-            .then(gridModifier)
-            .then(if (!skeleton) Modifier else Modifier.semantics { contentDescription = loadingLabel }),
-        state = state,
-        contentPadding = contentPadding,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalArrangement = Arrangement.spacedBy(22.dp),
-    ) {
-        if (pulse != null) {
-            items(12) { SkeletonCover(pulse) }
+    // Tab leaves the grid at once, from a cover or one of its buttons: the grid is one stop (TabHop)
+    val hop = remember { TabHop() }
+    Box(modifier.fillMaxSize()) {
+        HopSpot(hop, hop.before)
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(zoom?.cellWidth ?: minCellWidth),
+            modifier = Modifier
+                .fillMaxSize()
+                .onFocusChanged { hop.inside = it.hasFocus }
+                .onPreviewKeyEvent { event -> hop.handle(event, focusManager) }
+                .verticalScrollbar(state)
+                .then(if (zoom == null) Modifier else Modifier.gridZoom(zoom))
+                .then(gridModifier)
+                .then(if (!skeleton) Modifier else Modifier.semantics { contentDescription = loadingLabel }),
+            state = state,
+            contentPadding = contentPadding,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(22.dp),
+        ) {
+            if (pulse != null) {
+                items(12) { SkeletonCover(pulse) }
+            }
+            if (items.isEmpty() && !skeleton && emptyContent != null) {
+                item(key = "desktopkit.empty", span = { GridItemSpan(maxLineSpan) }) {
+                    Box(Modifier.fillMaxWidth().heightIn(min = 320.dp), contentAlignment = Alignment.Center) { emptyContent() }
+                }
+            }
+            itemsIndexed(items, key = { _, item -> key(item) }) { index, item ->
+                val itemKey = key(item)
+                GridItem(
+                    modifier = Modifier.dragSource(enabled = itemDrag != null) { itemDrag?.invoke(item, index) },
+                    selected = itemKey in selection || (selectedKey != null && itemKey == selectedKey),
+                    // the check circles mark a selection being made: in the select mode, while a finger
+                    // picks items, or with several picked by mouse (one clicked cover is just selected)
+                    selecting = multi && (toggleOnClick || (if (touch) selection.isNotEmpty() else selection.size > 1)),
+                    menu = itemMenu?.let { menu -> { menu(item, index) } },
+                    menuLabel = itemMenuLabel,
+                    // the menu acts on the selection: a cover outside it becomes the selection
+                    onMenuOpen = if (!multi) null else ({ update(TableSelection.menu(selection, tracker.anchor, itemKey)) }),
+                    onFocused = { focused ->
+                        if (focused) {
+                            tracker.focused = itemKey
+                            lastFocused.key = itemKey
+                        } else if (tracker.focused == itemKey) {
+                            tracker.focused = null
+                        }
+                    },
+                    tabStop = { !TabNavigation.active || itemKey == rovingKey() },
+                    onClick = {
+                        // the press's pointer when there was one; TalkBack's double tap follows the layout
+                        val finger = tracker.finger ?: touch
+                        if (!multi) {
+                            onItemClick(item, index)
+                        } else if (finger && !toggleOnClick && selection.isEmpty() && !tracker.toggle && !tracker.range) {
+                            // a tap opens; for a finger, selecting is for the select mode
+                            onItemClick(item, index)
+                        } else {
+                            // while a finger is picking items, a tap adds or removes one
+                            val toggle = toggleOnClick || tracker.toggle || finger
+                            val range = !toggleOnClick && tracker.range
+                            update(TableSelection.click(keysInOrder(), selection, tracker.anchor, itemKey, toggle = toggle, range = range))
+                            if (!toggle && !range) onItemClick(item, index)
+                        }
+                        tracker.clicked()
+                    },
+                ) { cell(item) }
+            }
         }
-        itemsIndexed(items, key = { _, item -> key(item) }) { index, item ->
-            val itemKey = key(item)
-            GridItem(
-                modifier = Modifier.dragSource(enabled = itemDrag != null) { itemDrag?.invoke(item, index) },
-                selected = itemKey in selection || (selectedKey != null && itemKey == selectedKey),
-                // the check circles mark a selection being made: in the select mode, while a finger
-                // picks items, or with several picked by mouse (one clicked cover is just selected)
-                selecting = multi && (toggleOnClick || (if (touch) selection.isNotEmpty() else selection.size > 1)),
-                menu = itemMenu?.let { menu -> { menu(item, index) } },
-                menuLabel = itemMenuLabel,
-                // the menu acts on the selection: a cover outside it becomes the selection
-                onMenuOpen = if (!multi) null else ({ update(TableSelection.menu(selection, tracker.anchor, itemKey)) }),
-                onFocused = { focused -> if (focused) tracker.focused = itemKey else if (tracker.focused == itemKey) tracker.focused = null },
-                onClick = {
-                    // the press's pointer when there was one; TalkBack's double tap follows the layout
-                    val finger = tracker.finger ?: touch
-                    if (!multi) {
-                        onItemClick(item, index)
-                    } else if (finger && !toggleOnClick && selection.isEmpty() && !tracker.toggle && !tracker.range) {
-                        // a tap opens; for a finger, selecting is for the select mode
-                        onItemClick(item, index)
-                    } else {
-                        // while a finger is picking items, a tap adds or removes one
-                        val toggle = toggleOnClick || tracker.toggle || finger
-                        val range = !toggleOnClick && tracker.range
-                        update(TableSelection.click(keysInOrder(), selection, tracker.anchor, itemKey, toggle = toggle, range = range))
-                        if (!toggle && !range) onItemClick(item, index)
-                    }
-                    tracker.clicked()
-                },
-            ) { cell(item) }
-        }
+        HopSpot(hop, hop.after)
     }
 }
 
@@ -282,6 +336,7 @@ private fun GridItem(
     menuLabel: String?,
     onMenuOpen: (() -> Unit)?,
     onFocused: (Boolean) -> Unit,
+    tabStop: () -> Boolean,
     onClick: () -> Unit,
     content: @Composable GridCellScope.() -> Unit,
 ) {
@@ -306,6 +361,7 @@ private fun GridItem(
         modifier
             .onSizeChanged { height = it.height }
             .onFocusChanged { onFocused(it.isFocused) }
+            .focusProperties { canFocus = tabStop() }
             .contextMenuGesture(menu != null) { at -> open(IntOffset(at.x.roundToInt(), at.y.roundToInt())) }
             .onKeyEvent { event ->
                 val opens = event.type == KeyEventType.KeyDown && menu != null &&
@@ -324,7 +380,7 @@ private fun GridItem(
             },
     ) {
         CompositionLocalProvider(LocalCellActions provides cellActions) {
-            CellScope(state.hovered, state.pressed, state.focused, selected, selecting) { open(IntOffset(0, height)) }.content()
+            CellScope(state.hovered, state.pressed, state.focused, selected, selecting, hasMenu = menu != null) { open(IntOffset(0, height)) }.content()
         }
         if (menu != null) {
             key(menuState.generation) {
@@ -347,9 +403,10 @@ private fun GridItem(
  * on the title, e.g. [desktopkit.shell.detailSharedBounds] so it flies into the album's page; a
  * [desktopkit.shell.detailSharedElement] in [cover] keeps the cover's rounded corners in flight.
  *
- * TalkBack finds [onPlay] among the cell's actions ([playLabel], "Play" by default). The Play
- * button itself shows only under a mouse: from the keyboard, put Play in the grid's itemMenu too
- * (the Menu key opens it).
+ * TalkBack finds [onPlay] among the cell's actions ([playLabel], "Play" by default). Play and "⋯"
+ * show under a mouse and while the keyboard focus is on the cell (Tab reaches them then). On touch a
+ * "⋮" button at the end of the title opens the menu, so a finger has a way to it besides the long
+ * press, which not everyone finds ([showMore] false leaves it out; a grid without a menu has none).
  */
 @Composable
 fun GridCellScope.CoverCell(
@@ -369,7 +426,13 @@ fun GridCellScope.CoverCell(
     val ring = selected || focused || (hovered && pointer)
     val tier = LocalMotionTier.current
     val ringAlpha by animateFloatAsState(if (ring) 1f else 0f, DeskMotion.fade(tier, tween(DeskMotion.SHORT_MS)), label = "coverRing")
-    val overlay by animateFloatAsState(if (hovered && pointer) 1f else 0f, DeskMotion.fade(tier, tween(DeskMotion.SHORT_MS)), label = "coverOverlay")
+    // the mouse's hover, or the keyboard's focus (on the cover or on one of these buttons): Play and "⋯" over the cover
+    // (a finger gets "⋮" by the title). The buttons are the mouse's and the finger's: the keyboard has Enter and the menu key,
+    // and Tab passes them by (the grid is one stop)
+    var buttonFocused by remember { mutableStateOf(false) }
+    val overlay by animateFloatAsState(if ((hovered || focused || buttonFocused) && pointer) 1f else 0f,
+        DeskMotion.fade(tier, tween(DeskMotion.SHORT_MS)), label = "coverOverlay")
+    val touchMore = !pointer && showMore && hasMenu && !selecting
     val play = playLabel ?: stringResource(R.string.dk_play)
     val cellActions = LocalCellActions.current
     if (onPlay != null && cellActions != null) {
@@ -393,7 +456,7 @@ fun GridCellScope.CoverCell(
             Box(Modifier.fillMaxSize().clip(coverShape).background(colors.surfaceRaised)) {
                 // a cover that flies to its detail page keeps these corners on the way
                 CompositionLocalProvider(LocalSharedElementShape provides coverShape) { cover() }
-                if (overlay > 0f) Box(Modifier.fillMaxSize().alpha(overlay).background(Color.Black.copy(alpha = 0.35f)))
+                if (overlay > 0f) Box(Modifier.fillMaxSize().alpha(overlay).background(colors.overlayScrim))
             }
             if (overlay > 0f && onPlay != null) {
                 Box(
@@ -403,14 +466,25 @@ fun GridCellScope.CoverCell(
                         .alpha(overlay)
                         .size(40.dp)
                         .background(colors.accent, CircleShape)
+                        .onFocusChanged { buttonFocused = it.hasFocus }
+                        .focusProperties { canFocus = !TabNavigation.active }
                         .deskClickable(remember { MutableInteractionSource() }, onPlay, onClickLabel = play),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(DeskIcons.Play, contentDescription = play, tint = colors.onAccent, modifier = Modifier.size(18.dp))
                 }
             }
-            if (overlay > 0f && showMore) {
-                Box(Modifier.align(Alignment.TopEnd).padding(8.dp).alpha(overlay).background(colors.surfaceRaised.copy(alpha = 0.8f), RoundedCornerShape(dimens.radiusControl))) {
+            // no menu, no "⋯": a button that does nothing is not drawn
+            if (overlay > 0f && showMore && hasMenu) {
+                Box(
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .alpha(overlay)
+                        .background(colors.surfaceRaised.copy(alpha = 0.8f), RoundedCornerShape(dimens.radiusControl))
+                        .onFocusChanged { buttonFocused = it.hasFocus }
+                        .focusProperties { canFocus = !TabNavigation.active },
+                ) {
                     DeskIconButton(DeskIcons.MoreHorizontal, stringResource(R.string.dk_more_options), onClick = { openMenu() }, size = 28.dp)
                 }
             }
@@ -420,8 +494,8 @@ fun GridCellScope.CoverCell(
                         .align(Alignment.TopStart)
                         .padding(8.dp)
                         .size(22.dp)
-                        .background(if (selected) colors.accent else Color.Black.copy(alpha = 0.3f), CircleShape)
-                        .border(1.5.dp, if (selected) colors.accent else Color.White.copy(alpha = 0.85f), CircleShape),
+                        .background(if (selected) colors.accent else colors.overlayScrim, CircleShape)
+                        .border(1.5.dp, if (selected) colors.accent else colors.onOverlay.copy(alpha = 0.85f), CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
                     if (selected) Icon(DeskIcons.Check, contentDescription = null, tint = colors.onAccent, modifier = Modifier.size(14.dp))
@@ -429,11 +503,20 @@ fun GridCellScope.CoverCell(
             }
         }
         Spacer(Modifier.height(dimens.gapS - 4.dp))
-        Text(title, style = DeskTheme.type.label.copy(fontWeight = FontWeight.Medium), color = if (selected) colors.accentText else colors.text,
-            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 4.dp).then(titleModifier))
-        if (subtitle != null) {
-            Text(subtitle, style = DeskTheme.type.labelSmall, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 4.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(title, style = DeskTheme.type.label.copy(fontWeight = FontWeight.Medium), color = if (selected) colors.accentText else colors.text,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 4.dp).then(titleModifier))
+                if (subtitle != null) {
+                    Text(subtitle, style = DeskTheme.type.labelSmall, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 4.dp))
+                }
+            }
+            if (touchMore) {
+                Box(Modifier.focusProperties { canFocus = !TabNavigation.active }) {
+                    DeskIconButton(DeskIcons.MoreVertical, stringResource(R.string.dk_more_options), onClick = { openMenu() }, tooltip = false)
+                }
+            }
         }
     }
 }
@@ -448,4 +531,9 @@ private fun SkeletonCover(pulse: androidx.compose.runtime.State<Float>) {
         Spacer(Modifier.height(6.dp))
         SkeletonBlock(Modifier.fillMaxWidth(0.45f).height(8.dp), pulse)
     }
+}
+
+/** The key of the cell a grid last had the keyboard focus on; nothing redraws from it. */
+private class RovingMemory {
+    var key: Any? = null
 }

@@ -1,0 +1,36 @@
+{
+  "dead-handler": {
+    "sample/src/main/java/desktopkit/sample/Catalog.kt": 8
+  },
+  "infinite": {
+    "kit/src/main/java/desktopkit/components/Feedback.kt": 2
+  },
+  "off-scale-dp": {
+    "kit/src/main/java/desktopkit/components/Chips.kt": 9,
+    "kit/src/main/java/desktopkit/components/Choice.kt": 2,
+    "kit/src/main/java/desktopkit/components/CommandPalette.kt": 7,
+    "kit/src/main/java/desktopkit/components/DenseTable.kt": 1,
+    "kit/src/main/java/desktopkit/components/Dialogs.kt": 3,
+    "kit/src/main/java/desktopkit/components/DragAndDrop.kt": 4,
+    "kit/src/main/java/desktopkit/components/Feedback.kt": 6,
+    "kit/src/main/java/desktopkit/components/Forms.kt": 11,
+    "kit/src/main/java/desktopkit/components/Grid.kt": 8,
+    "kit/src/main/java/desktopkit/components/Inspector.kt": 4,
+    "kit/src/main/java/desktopkit/components/Loading.kt": 1,
+    "kit/src/main/java/desktopkit/components/Menus.kt": 4,
+    "kit/src/main/java/desktopkit/components/Sheets.kt": 1,
+    "kit/src/main/java/desktopkit/components/Slider.kt": 2,
+    "kit/src/main/java/desktopkit/components/SplitPane.kt": 1,
+    "kit/src/main/java/desktopkit/components/Structure.kt": 3,
+    "kit/src/main/java/desktopkit/components/Tooltip.kt": 1,
+    "kit/src/main/java/desktopkit/shell/NavigationChrome.kt": 22,
+    "sample/src/main/java/desktopkit/sample/Catalog.kt": 2,
+    "sample/src/main/java/desktopkit/sample/Files.kt": 2,
+    "sample/src/main/java/desktopkit/sample/Library.kt": 4,
+    "sample/src/main/java/desktopkit/sample/Player.kt": 1
+  },
+  "raw-color": {
+    "sample/src/main/java/desktopkit/sample/MainActivity.kt": 1,
+    "sample/src/main/java/desktopkit/sample/SampleData.kt": 5
+  }
+}

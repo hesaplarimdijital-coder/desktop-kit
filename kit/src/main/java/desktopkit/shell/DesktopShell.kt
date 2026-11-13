@@ -5,6 +5,7 @@ import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.Transition
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.AnimatedContentScope
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.EnterTransition
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.widthIn
@@ -32,6 +34,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -52,13 +56,17 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
+import androidx.navigation.compose.ComposeNavigator
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.createGraph
+import androidx.navigation.get
 import desktopkit.LocalRootInsets
 import desktopkit.components.ActionGroup
 import desktopkit.components.ActionGroupList
+import desktopkit.components.DeskButton
 import desktopkit.components.ToastState
 import desktopkit.components.ToastHost
 import desktopkit.components.GlassBottomSheet
@@ -66,11 +74,14 @@ import desktopkit.components.MenuBarMenus
 import desktopkit.components.MenuEntry
 import desktopkit.components.MenuSpec
 import desktopkit.input.hasHardwareKeyboard
-import desktopkit.screens.OverflowScreen
+import desktopkit.screens.OverflowSections
 import desktopkit.theme.DeskGlass
 import desktopkit.theme.DeskMotion
 import desktopkit.theme.DeskTheme
+import desktopkit.theme.GlassHolds
 import desktopkit.theme.GlassMode
+import desktopkit.theme.LocalGlassHolds
+import desktopkit.theme.effectiveGlassMode
 import desktopkit.theme.GlassThickness
 import desktopkit.theme.LocalDeskDimens
 import desktopkit.theme.LocalDeskType
@@ -84,9 +95,12 @@ import desktopkit.theme.rememberReducedMotion
 import desktopkit.theme.rememberSystemGlassMode
 import dev.chrisbanes.haze.HazeState
 import desktopkit.theme.forCompactWindow
+import desktopkit.theme.forShortWindow
 import desktopkit.theme.grow
 import desktopkit.theme.toMaterialTypography
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlin.math.roundToInt
+import kotlinx.coroutines.flow.first
 
 /** Navigation chrome around the current screen; screens show their own title only in [NavKind.Sidebar]. */
 val LocalNavKind = compositionLocalOf { NavKind.Sidebar }
@@ -120,7 +134,19 @@ class ShellNavigator(private val navController: NavHostController) {
         }
     }
 
+    /**
+     * Opens [route] over the screen shown, as a page of it: Back comes back to that screen, and its tab's entry
+     * stays marked when [route]'s [NavItem.parent] is that tab (a folder opened from the "Folders" screen on a
+     * phone). The tab's entry tapped again goes back to the tab's own screen.
+     */
+    fun open(route: String) {
+        navController.navigate(route) { launchSingleTop = true }
+    }
+
     fun back(): Boolean = navController.popBackStack()
+
+    /** Back to [route] when it is under the screen shown, in the same tab; false when it is not there. */
+    internal fun backTo(route: String): Boolean = navController.popBackStack(route, inclusive = false)
 }
 
 /**
@@ -150,6 +176,9 @@ class ShellNavigator(private val navController: NavHostController) {
  * Motion follows the window ([desktopkit.theme.MotionTier]): springs on a phone, the 0.2.0 timings
  * from tablet width up, none with reduced motion.
  *
+ * @param badges text next to the sidebar's entries ("4 812", "3 new"), by route.
+ * @param iconBadges a count or a dot on the entries' icons in the bottom bar, the rail and the collapsed
+ *   sidebar ([NavIconBadge]): unread mail on "Inbox" where there is no room for text.
  * @param bottomBar optional strip under the content (a player, a status bar); it receives the current
  *   [NavKind]. On a phone an [desktopkit.components.ExpandablePlayer] fits here.
  * @param hideNavigationWithKeyboard false keeps the bottom navigation bar above the open keyboard.
@@ -160,7 +189,8 @@ class ShellNavigator(private val navController: NavHostController) {
  *   on top of what the theme's `type` hook built; 0 keeps the theme's sizes everywhere.
  * @param compactSizes on phones, a 64 dp bottom bar and 52 dp touch rows instead of 72 and 56 dp;
  *   targets stay at least 48 dp. False keeps the touch sizes as they are.
- * @param menus menu bar menus, shown in the sidebar layout; [desktopkit.input.ShortcutRegistry.menus] builds them.
+ * @param menus menu bar menus, shown in the sidebar layout, and behind a "≡" button in the rail layout's top bar;
+ *   [desktopkit.input.ShortcutRegistry.menus] builds them.
  *   In a desktop window (DeX, Android 15+ desktop windowing) the menu bar fills the window's caption bar
  *   inside a [desktopkit.DesktopKitRoot]: the menus and the search field sit between the system's app chip
  *   and window buttons, and the rest of the bar still moves the window.
@@ -175,6 +205,11 @@ class ShellNavigator(private val navController: NavHostController) {
  * @param overlays drawn over the whole shell, bars included, with the shell's glass: the place for the
  *   [desktopkit.components.CommandPalette].
  * @param navDrop lets the sidebar's and the rail's entries take drops ([desktopkit.components.dragSource]).
+ * @param heightClass the window's height class, from [desktopkit.DesktopKitRoot] by default: a short window (a phone
+ *   on its side) keeps the phone's text sizes and motion, a lower top bar and a stacked player.
+ * @param navMenu the menu of an entry of the sidebar, the rail or the bottom bar, by route ("Mark all as read",
+ *   "Empty the bin"): a right click, a long press or the Menu key opens it, TalkBack offers it as an action. An
+ *   empty list: no menu for that entry.
  * @param content the screen for a route of [spec]. The "More" route is handled by the shell. On
  *   compact windows a screen can change the top bar with [CompactTopBar]; [LocalWidthClass] and
  *   [currentWidthClass] tell it the width class in use.
@@ -206,20 +241,26 @@ fun DesktopShell(
     toasts: ToastState? = null,
     overlays: @Composable () -> Unit = {},
     navDrop: NavDrop? = null,
+    navMenu: ((route: String) -> List<MenuEntry>)? = null,
+    heightClass: HeightClass = LocalHeightClass.current,
+    iconBadges: NavIconBadges = emptyMap(),
     content: @Composable (route: String, navigator: ShellNavigator) -> Unit,
 ) {
-    // tablet and DeX read one size larger; phones get the tighter compact sizes
+    // tablet and DeX read one size larger; phones get the tighter compact sizes. A phone on its side (a short
+    // window) is wide enough for the rail but keeps the phone's text, a lower top bar and the phone's motion.
     val navKindForTheme = NavKind.forWidth(widthClass)
+    val short = heightClass == HeightClass.Compact
     val baseType = DeskTheme.type
     val baseDimens = DeskTheme.dimens
-    val windowType = remember(baseType, navKindForTheme, largeWindowTextStep) {
-        if (navKindForTheme == NavKind.BottomBar) baseType else baseType.grow(largeWindowTextStep)
+    val windowType = remember(baseType, navKindForTheme, largeWindowTextStep, short) {
+        if (navKindForTheme == NavKind.BottomBar || short) baseType else baseType.grow(largeWindowTextStep)
     }
-    val windowDimens = remember(baseDimens, navKindForTheme, compactSizes) {
-        if (compactSizes && navKindForTheme == NavKind.BottomBar) baseDimens.forCompactWindow() else baseDimens
+    val windowDimens = remember(baseDimens, navKindForTheme, compactSizes, short) {
+        val sized = if (compactSizes && navKindForTheme == NavKind.BottomBar) baseDimens.forCompactWindow() else baseDimens
+        if (short) sized.forShortWindow() else sized
     }
     val reduced = rememberReducedMotion()
-    val tier = DeskMotion.tier(widthClass, reduced)
+    val tier = DeskMotion.tier(widthClass, reduced, heightClass)
     val systemGlass = rememberSystemGlassMode()
     val glassMode = if (!glass) GlassMode.Solid else LocalGlassMode.current ?: systemGlass
     CompositionLocalProvider(
@@ -237,6 +278,7 @@ fun DesktopShell(
                 sidebarCollapsed = sidebarCollapsed,
                 onSidebarCollapsedChange = onSidebarCollapsedChange,
                 badges = badges,
+                iconBadges = iconBadges,
                 brand = brand,
                 menus = menus,
                 onSearch = onSearch,
@@ -247,12 +289,14 @@ fun DesktopShell(
                 transitions = transitions,
                 hideBarsOnScroll = hideBarsOnScroll,
                 moreActions = moreActions,
-                floatingPlayer = floatingPlayer,
+                // too short for a bar floating over the content: the player is stacked under it
+                floatingPlayer = floatingPlayer && !short,
                 tier = tier,
                 glassMode = glassMode,
                 toasts = toasts,
                 overlays = overlays,
                 navDrop = navDrop,
+                navMenu = navMenu,
                 content = content,
             )
         }
@@ -269,6 +313,7 @@ private fun ShellContent(
     sidebarCollapsed: Boolean,
     onSidebarCollapsedChange: (Boolean) -> Unit,
     badges: NavBadges,
+    iconBadges: NavIconBadges,
     brand: (@Composable (Modifier) -> Unit)?,
     menus: List<MenuSpec>,
     onSearch: (() -> Unit)?,
@@ -285,11 +330,16 @@ private fun ShellContent(
     toasts: ToastState?,
     overlays: @Composable () -> Unit,
     navDrop: NavDrop?,
+    navMenu: ((route: String) -> List<MenuEntry>)?,
     content: @Composable (route: String, navigator: ShellNavigator) -> Unit,
 ) {
     val navigator = remember(navController) { ShellNavigator(navController) }
     val entry by navController.currentBackStackEntryAsState()
     val currentRoute = entry?.destination?.route ?: spec.startRoute
+    // read again whenever the current entry changes
+    val routeBelow = remember(entry) { navController.previousBackStackEntry?.destination?.route }
+    val openedOverParent = spec.isUnder(currentRoute, routeBelow)
+    val pageBack: (() -> Unit)? = if (openedOverParent) ({ navigator.back() }) else null
     val navKind = NavKind.forWidth(widthClass)
     val more = moreItem()
     val colors = DeskTheme.colors
@@ -309,6 +359,9 @@ private fun ShellContent(
     val currentKind by rememberUpdatedState(navKind)
     val currentTransitions by rememberUpdatedState(transitions)
     val currentTier by rememberUpdatedState(tier)
+    // read by each tab's page: a tab that is not the current route is being left (see LocalScreenLeaving)
+    val latestRoute by rememberUpdatedState(currentRoute)
+    val leavingTab: (String) -> Boolean = remember { { route -> latestRoute != route } }
     // read when a transition starts, so a new width class or setting applies to the next one
     val enter: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition =
         remember { { shellEnter(currentTransitions, currentKind, currentTier) } }
@@ -321,11 +374,54 @@ private fun ShellContent(
     val predictiveExit: AnimatedContentTransitionScope<NavBackStackEntry>.(Int) -> ExitTransition =
         remember { { edge -> shellPredictiveExit(currentTransitions, currentKind, currentTier, edge) ?: NavigationPredictiveExit } }
     val topBarHost = remember { CompactTopBarHost() }
+    val primaryHost = remember { PrimaryActionHost() }
+    val primary = primaryHost.current
     val scroll = remember { ShellScrollState() }
     val metrics = remember { ShellChromeMetrics() }
     val overlayHost = remember { ShellOverlayHost() }
     val glassSource = remember { HazeState() }
+    val glassHolds = remember { GlassHolds() }
     val padding = remember(metrics, density) { shellPaddingValues(metrics, density) }
+    // One graph for the shell's life (a new start route aside): routes the spec gains are added to it, so a new folder
+    // or account keeps the open screen, the back stacks and their state (DeskMail's request 3). A new graph would send
+    // the shell back to its start and forget every screen's state. Routes the spec loses stay in the graph: a back stack
+    // saved with one of them in it (a folder opened in the "Folders" tab, then another tab chosen) is restored without
+    // a crash, and the gone screen takes itself away as soon as it shows (GoneScreen).
+    val tabPage = remember<@Composable AnimatedContentScope.(String) -> Unit> {
+        { route ->
+            TabPage(transition, leaving = { leavingTab(route) }, route = route) {
+                ShellScreenFrame(metrics, scroll) {
+                    when {
+                        route == ShellSpec.MORE_ROUTE -> OverflowSections(moreSections(currentSpec, currentKind), onSelect = navigator::navigate)
+                        currentSpec.item(route) == null -> GoneScreen(shown = { latestRoute == route }) {
+                            navController.popBackStack(route, inclusive = true)
+                        }
+                        else -> currentContent(route, navigator)
+                    }
+                }
+            }
+        }
+    }
+    val graph = remember(navController, spec.startRoute) {
+        navController.createGraph(startDestination = spec.startRoute) {
+            spec.items.forEach { item -> composable(item.route) { tabPage(item.route) } }
+            composable(ShellSpec.MORE_ROUTE) { tabPage(ShellSpec.MORE_ROUTE) }
+        }
+    }
+    val routes = spec.items.map { it.route }
+    // added here, in the composition, so a screen the app opens at once with the new spec is there already
+    remember(graph, routes) {
+        val composeNavigator = navController.navigatorProvider[ComposeNavigator::class]
+        routes.filter { graph.findNode(it) == null }.forEach { route ->
+            graph.addDestination(ComposeNavigator.Destination(composeNavigator) { _ -> tabPage(route) }.apply { this.route = route })
+        }
+        routes
+    }
+    // the back stacks saved under a gone route (a gone folder that was a tab of its own) are let go
+    LaunchedEffect(graph, routes) {
+        val kept = routes.toSet() + ShellSpec.MORE_ROUTE + spec.startRoute
+        graph.mapNotNull { it.route }.filter { it !in kept }.forEach { navController.clearBackStack(it) }
+    }
     // the root leaves the system navigation bar at the bottom to the shell, which draws its chrome behind it
     val rootInsets = LocalRootInsets.current
     DisposableEffect(rootInsets) {
@@ -365,11 +461,22 @@ private fun ShellContent(
                 modifier = Modifier.widthIn(min = 220.dp, max = 380.dp))
         }
     }
+    val reselect = remember { ShellReselect() }
+    // the current screen's entry again: the screen hears it (OnReselect) and goes to its top
+    // the marked entry while a page opened in its tab is shown (ShellNavigator.open): back to the tab's own screen
+    val marked = spec.marked(navKind, currentRoute)
+    val go: (String) -> Unit = { route ->
+        when {
+            route == currentRoute -> reselect.events.tryEmit(route)
+            route == marked && navigator.backTo(route) -> Unit
+            else -> navigator.navigate(route)
+        }
+    }
     val select: (String) -> Unit = { route ->
         if (route == ShellSpec.MORE_ROUTE && spec.moreStyle == MoreStyle.Sheet && navKind == NavKind.BottomBar) {
             moreOpen = true
         } else {
-            navigator.navigate(route)
+            go(route)
         }
     }
 
@@ -381,9 +488,12 @@ private fun ShellContent(
         LocalWidthClass provides widthClass,
         LocalCompactTopBarHost provides topBarHost,
         LocalGlassSource provides glassSource,
+        LocalGlassHolds provides glassHolds,
         LocalShellOverlayHost provides overlayHost,
         LocalShellContentPadding provides padding,
         LocalShellBottomGlass provides sharedGlass,
+        LocalShellReselect provides reselect,
+        LocalPrimaryActionHost provides primaryHost,
     ) {
         ShellLayout(
             navKind = navKind,
@@ -400,16 +510,20 @@ private fun ShellContent(
                     }
                 } else {
                     val title = if (currentRoute == ShellSpec.MORE_ROUTE) more.label else spec.item(currentRoute)?.label ?: spec.appTitle
-                    // CompactTopBar registers nothing on wider windows; checked here as well
-                    val screen = if (navKind == NavKind.BottomBar) topBarHost.current else null
+                    // CompactTopBar registers nothing in the sidebar layout, and on the rail only with showOnRail (checked
+                    // here as well: on the frame a window widens, the phone's calls are still there)
+                    val screen = topBarHost.current?.takeIf { navKind == NavKind.BottomBar || it.showOnRail }
                     PageTopBar(
                         title = screen?.title ?: title,
                         onSearch = if (screen?.showSearch == false) null else onSearch,
-                        onBack = screen?.onBack,
+                        // a page opened over its parent (ShellNavigator.open) has a Back button of its own
+                        onBack = screen?.onBack ?: pageBack,
                         backIcon = screen?.backIcon ?: TopBarBackIcon.Back,
                         actions = screen?.actions.orEmpty(),
                         scrolled = navKind == NavKind.BottomBar && scroll.scrolled,
                         glass = navKind == NavKind.BottomBar,
+                        // the menu bar's menus behind a "≡" where there is no menu bar (the rail: a tablet, a DeX window)
+                        menus = if (navKind == NavKind.Rail) menus else emptyList(),
                         modifier = Modifier.onSizeChanged { metrics.topPx = it.height },
                     )
                 }
@@ -420,6 +534,8 @@ private fun ShellContent(
                         BottomNavBar(
                             spec, currentRoute, select,
                             hasMoreActions = moreActions.isNotEmpty(),
+                            iconBadges = iconBadges,
+                            navMenu = navMenu,
                             modifier = Modifier
                                 .onSizeChanged {
                                     scroll.maxOffsetPx = it.height.toFloat()
@@ -429,15 +545,29 @@ private fun ShellContent(
                                 .graphicsLayer { translationY = overlayHost.expandProgress() * size.height },
                         )
                     }
-                    NavKind.Rail -> NavRail(spec, currentRoute, navigator::navigate, brand = brand, navDrop = navDrop)
+                    NavKind.Rail -> NavRail(
+                        spec, currentRoute, go, brand = brand, navDrop = navDrop, iconBadges = iconBadges, navMenu = navMenu,
+                        action = primary?.let { action -> { PrimaryActionButton(action, extended = false, height = 48.dp) } },
+                    )
                     NavKind.Sidebar -> Sidebar(
                         spec = spec,
                         currentRoute = currentRoute,
-                        onSelect = navigator::navigate,
+                        onSelect = go,
                         collapsed = sidebarCollapsed,
                         onToggleCollapsed = { onSidebarCollapsedChange(!sidebarCollapsed) },
                         badges = badges,
                         navDrop = navDrop,
+                        iconBadges = iconBadges,
+                        navMenu = navMenu,
+                        action = primary?.let { action ->
+                            { collapsed ->
+                                if (collapsed) {
+                                    PrimaryActionButton(action, extended = false, height = 40.dp)
+                                } else {
+                                    DeskButton(action.label, action.onClick, Modifier.fillMaxWidth(), icon = action.icon, primary = true)
+                                }
+                            }
+                        },
                     )
                 }
             },
@@ -458,48 +588,50 @@ private fun ShellContent(
                     Box(
                         Modifier
                             .fillMaxSize()
-                            .glassSource(glassSource, glassMode)
+                            // not recorded while a screen pauses the blur (PauseGlassBlur: a WebView, a video)
+                            .glassSource(glassSource, effectiveGlassMode(glassMode, paused = glassHolds.count > 0))
                             .background(colors.background)
                             .nestedScroll(scroll.connection)
                             .dismissKeyboardOnTouch(overlayHost.textFields, keyboardUp = { keyboardUp }),
                     ) {
                         NavHost(
                             navController = navController,
-                            startDestination = spec.startRoute,
+                            graph = graph,
                             enterTransition = enter,
                             exitTransition = exit,
                             popEnterTransition = enter,
                             popExitTransition = exit,
                             predictivePopEnterTransition = predictiveEnter,
                             predictivePopExitTransition = predictiveExit,
-                        ) {
-                            spec.items.forEach { item ->
-                                composable(item.route) {
-                                    TabPage(transition) {
-                                        ShellScreenFrame(metrics, scroll) { currentContent(item.route, navigator) }
-                                    }
-                                }
-                            }
-                            composable(ShellSpec.MORE_ROUTE) {
-                                TabPage(transition) {
-                                    ShellScreenFrame(metrics, scroll) {
-                                        OverflowScreen(currentSpec.overflow(currentKind), onSelect = navigator::navigate)
-                                    }
-                                }
-                            }
-                        }
+                        )
                     }
                 }
             },
             overlay = {
                 Box(Modifier.fillMaxSize().onGloballyPositioned { overlayHost.coordinates = it }) {
-                    // toasts sit above the bars and the player, under sheets and the expanded player
+                    // the phone's floating action button (ShellPrimaryAction), above the bars and the player and with them
+                    if (navKind == NavKind.BottomBar) {
+                        val barsBottom: () -> Int = {
+                            metrics.navPx + metrics.playerPx + systemBottom() - scroll.offsetPx.roundToInt().coerceIn(0, metrics.navPx)
+                        }
+                        PhoneActionButton(
+                            action = primary,
+                            shown = !(imeVisible && imeTakesSpace),
+                            extended = !scroll.scrolled,
+                            metrics = metrics,
+                            expandProgress = { overlayHost.expandProgress() },
+                            modifier = Modifier.align(Alignment.BottomEnd).bottomInsetPadding(barsBottom),
+                        )
+                    } else {
+                        SideEffect { metrics.actionPx = 0 }
+                    }
+                    // toasts sit above the bars, the player and the action button, under sheets and the expanded player
                     if (toasts != null) {
                         val toastBottom: () -> Int = {
                             val system = systemBottom()
                             when {
                                 navKind == NavKind.BottomBar ->
-                                    metrics.navPx + metrics.playerPx + system - scroll.offsetPx.roundToInt().coerceIn(0, metrics.navPx)
+                                    metrics.navPx + metrics.playerPx + metrics.actionPx + system - scroll.offsetPx.roundToInt().coerceIn(0, metrics.navPx)
                                 floating -> metrics.playerPx + metrics.floatingMarginPx + system
                                 else -> metrics.playerPx + system
                             }
@@ -546,7 +678,7 @@ private val TAB_CORNER = 28.dp
  * width classes keeps the screen's state.
  */
 @Composable
-private fun TabPage(transition: Transition<EnterExitState>, content: @Composable () -> Unit) {
+private fun TabPage(transition: Transition<EnterExitState>, leaving: () -> Boolean, route: String, content: @Composable () -> Unit) {
     // composed again on the frame the transition starts, which is the frame the other tab is composed
     val moving = LocalNavKind.current == NavKind.BottomBar && transition.currentState != transition.targetState
     val page = DeskTheme.colors.background
@@ -564,7 +696,53 @@ private fun TabPage(transition: Transition<EnterExitState>, content: @Composable
             }
         }
         .background(page)
-    Box(Modifier.fillMaxSize().then(surface)) { content() }
+    Box(Modifier.fillMaxSize().then(surface)) {
+        CompositionLocalProvider(LocalTabRoute provides route) { ProvideScreenLeaving(leaving, content) }
+    }
+}
+
+/**
+ * A screen whose route the spec no longer has (a folder deleted on the server): nothing of the app's is drawn for it, and
+ * once it is the screen shown (now, or when a saved back stack brings it back) it goes with [leave], uncovering the screen
+ * it was opened over.
+ */
+@Composable
+private fun GoneScreen(shown: () -> Boolean, leave: () -> Unit) {
+    val latestLeave by rememberUpdatedState(leave)
+    LaunchedEffect(Unit) {
+        snapshotFlow { shown() }.first { it }
+        latestLeave()
+    }
+}
+
+/** Taps on the current screen's own entry (bottom bar, rail, sidebar), by route. */
+internal class ShellReselect {
+    val events = MutableSharedFlow<String>(extraBufferCapacity = 1)
+}
+
+internal val LocalShellReselect = staticCompositionLocalOf<ShellReselect?> { null }
+
+/** The route of the tab a screen belongs to. */
+internal val LocalTabRoute = staticCompositionLocalOf<String?> { null }
+
+/**
+ * Runs [action] when the user taps the entry of the screen already shown (in the bottom bar, the
+ * rail or the sidebar), as Android's own apps do: scroll a list back to its top, or go back to the
+ * screen's start from a page opened in it.
+ *
+ * ```
+ * val list = rememberLazyListState()
+ * OnReselect { list.animateScrollToItem(0) }
+ * ```
+ *
+ * Call it in the screen; it only hears its own tab's entry. Outside a [DesktopShell] nothing happens.
+ */
+@Composable
+fun OnReselect(action: suspend () -> Unit) {
+    val reselect = LocalShellReselect.current ?: return
+    val route = LocalTabRoute.current ?: return
+    val latest by rememberUpdatedState(action)
+    LaunchedEffect(reselect, route) { reselect.events.collect { if (it == route) latest() } }
 }
 
 /**
@@ -592,15 +770,19 @@ private fun SystemBand(navKind: NavKind, scroll: ShellScrollState) {
     }
 }
 
-/** The screens the phone's bottom bar leaves out, by sidebar section, as entries of the "⋯" sheet. */
-internal fun moreSheetGroups(spec: ShellSpec, kind: NavKind, navigator: ShellNavigator): List<ActionGroup> {
+/** The screens the chrome of [kind] leaves to "More", by sidebar section (the footer last, untitled). */
+internal fun moreSections(spec: ShellSpec, kind: NavKind): List<NavSection> {
     val left = spec.overflow(kind).map { it.route }.toSet()
-    val sections = spec.sections.map { section -> section.title to section.items.filter { it.route in left } } +
-        listOf(null to listOfNotNull(spec.footer).filter { it.route in left })
-    return sections.filter { it.second.isNotEmpty() }.map { (title, items) ->
-        ActionGroup(title, items.map { item -> MenuEntry.Item(item.label, { navigator.navigate(item.route) }, icon = item.icon) })
-    }
+    return (spec.sections + NavSection(null, listOfNotNull(spec.footer)))
+        .map { section -> NavSection(section.title, section.items.filter { it.route in left }) }
+        .filter { it.items.isNotEmpty() }
 }
+
+/** The screens the phone's bottom bar leaves out, by sidebar section, as entries of the "⋯" sheet. */
+internal fun moreSheetGroups(spec: ShellSpec, kind: NavKind, navigator: ShellNavigator): List<ActionGroup> =
+    moreSections(spec, kind).map { section ->
+        ActionGroup(section.title, section.items.map { item -> MenuEntry.Item(item.label, { navigator.navigate(item.route) }, icon = item.icon) })
+    }
 
 private const val FADE_OUT_MS = 90
 private const val FADE_IN_MS = 210

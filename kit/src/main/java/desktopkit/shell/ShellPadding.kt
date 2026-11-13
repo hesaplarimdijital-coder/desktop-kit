@@ -52,6 +52,9 @@ internal class ShellChromeMetrics {
      */
     var systemBottomPx: () -> Int by mutableStateOf({ 0 })
 
+    /** The phone's floating action button with its margin (ShellPrimaryAction), 0 without one. */
+    var actionPx by mutableIntStateOf(0)
+
     val topPadPx: Int get() = if (underTop) topPx else 0
 
     val bottomPadPx: Int
@@ -65,7 +68,8 @@ internal class ShellChromeMetrics {
 /** The covered edges as padding; read while measuring, so a change re-measures without recomposing. */
 private class ShellPaddingValues(private val metrics: ShellChromeMetrics, private val density: Density) : PaddingValues {
     override fun calculateTopPadding(): Dp = with(density) { metrics.topPadPx.toDp() }
-    override fun calculateBottomPadding(): Dp = with(density) { metrics.bottomPadPx.toDp() }
+    // a list under the bars ends above the floating action button too, so its last row can be read
+    override fun calculateBottomPadding(): Dp = with(density) { (metrics.bottomPadPx + if (metrics.underBottom) metrics.actionPx else 0).toDp() }
     override fun calculateLeftPadding(layoutDirection: LayoutDirection): Dp = 0.dp
     override fun calculateRightPadding(layoutDirection: LayoutDirection): Dp = 0.dp
     override fun toString() = "ShellPaddingValues(top=${metrics.topPadPx}px, bottom=${metrics.bottomPadPx}px)"
@@ -129,12 +133,18 @@ operator fun PaddingValues.plus(other: PaddingValues): PaddingValues = object : 
 @Composable
 internal fun ShellScreenFrame(metrics: ShellChromeMetrics, scroll: ShellScrollState, content: @Composable () -> Unit) {
     val screen = remember { ShellScreenState() }
+    // Read here as well as while measuring. A screen that asks for the padding from a subcomposition
+    // (BoxWithConstraints, SubcomposeLayout) asks while this frame is being measured: the change can
+    // no longer re-measure the frame (Compose drops a node's own re-measure request while it measures),
+    // and the padding stayed doubled for good (DeskMail, 2.4.0). Read in composition, the change
+    // recomposes the frame and the new layout below measures again on the next frame.
+    val handled = screen.handlers > 0
     CompositionLocalProvider(LocalShellScreen provides screen) {
         Box(
             Modifier
                 .fillMaxSize()
                 .layout { measurable, constraints ->
-                    if (screen.handlers > 0) {
+                    if (handled || screen.handlers > 0) {
                         val placeable = measurable.measure(constraints)
                         return@layout layout(placeable.width, placeable.height) { placeable.place(0, 0) }
                     }
@@ -145,7 +155,10 @@ internal fun ShellScreenFrame(metrics: ShellChromeMetrics, scroll: ShellScrollSt
                     val inner = constraints.copy(minHeight = constraints.minHeight.coerceAtMost(maxHeight), maxHeight = maxHeight)
                     val placeable = measurable.measure(inner)
                     val height = if (constraints.hasBoundedHeight) constraints.maxHeight else placeable.height + top + bottom
-                    layout(placeable.width, height) { placeable.place(0, top) }
+                    // asked for during this very measure (see above): the screen pads itself, so it starts at the
+                    // window's top for the one frame until it is measured again with the whole window
+                    val y = if (screen.handlers > 0) 0 else top
+                    layout(placeable.width, height) { placeable.place(0, y) }
                 },
         ) { content() }
     }
@@ -179,6 +192,20 @@ internal class ShellOverlayHost {
 
     /** The kit's text fields in the content: a tap elsewhere or a scroll closes the keyboard (touch). */
     val textFields = TextFields()
+
+    /** The sheet that is up and how to close it: a newer sheet closes it ([sheetOpened]). */
+    private var sheet: Pair<Any, () -> Unit>? = null
+
+    /** The sheet [token] opened: the one that was up closes. */
+    fun sheetOpened(token: Any, dismiss: () -> Unit) {
+        val previous = sheet
+        sheet = token to dismiss
+        if (previous != null && previous.first !== token) previous.second()
+    }
+
+    fun sheetClosed(token: Any) {
+        if (sheet?.first === token) sheet = null
+    }
 }
 
 /**

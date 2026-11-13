@@ -1,6 +1,10 @@
 package desktopkit.shell
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.VisibilityThreshold
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -14,6 +18,30 @@ import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.collapse
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.expand
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -59,11 +87,17 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import desktopkit.R
 import desktopkit.components.DeskIconButton
+import desktopkit.components.MenuEntry
+import desktopkit.components.MenuPopup
+import desktopkit.components.MenuSpec
+import desktopkit.components.TooltipArea
+import desktopkit.components.TooltipPlacement
 import desktopkit.components.DeskDragPayload
 import desktopkit.components.DeskIcons
 import desktopkit.components.dropZone
@@ -75,6 +109,7 @@ import desktopkit.components.collectState
 import desktopkit.components.deskClickable
 import desktopkit.components.focusRing
 import desktopkit.components.pressScale
+import desktopkit.components.secondaryClick
 import desktopkit.components.stateBackground
 import desktopkit.theme.DeskGlass
 import desktopkit.theme.DeskMotion
@@ -87,6 +122,67 @@ import desktopkit.input.showShortcutHints
 
 /** Item counts and badges shown next to sidebar entries ("4 812", "4 new"), by route. */
 typealias NavBadges = Map<String, String>
+
+/**
+ * A mark on a navigation entry's icon in the phone's bottom bar, the rail and the collapsed sidebar:
+ * a count of new things ([count] above 0; "99+" past 99) or, with a [count] of 0, a dot. TalkBack
+ * reads [description] after the entry's name ("Inbox, 4 unread"); without one it says the count
+ * ("4 new") or "new". In the open sidebar the entry's text badge ([NavBadges]) says it instead.
+ */
+@Immutable
+data class NavIconBadge(val count: Int = 0, val description: String? = null)
+
+/** [NavIconBadge]s by route. */
+typealias NavIconBadges = Map<String, NavIconBadge>
+
+/** [item]'s badge; "More" gets a dot when a screen it holds has one. */
+private fun badgeOf(item: NavItem, badges: NavIconBadges, spec: ShellSpec, kind: NavKind): NavIconBadge? =
+    badges[item.route] ?: if (item.route == ShellSpec.MORE_ROUTE && spec.overflow(kind).any { badges[it.route] != null }) NavIconBadge() else null
+
+/** What TalkBack says after an entry's name for [badge]. */
+@Composable
+private fun badgeDescription(badge: NavIconBadge): String = badge.description
+    ?: if (badge.count > 0) pluralStringResource(R.plurals.dk_badge_new, badge.count, badge.count) else stringResource(R.string.dk_badge_dot)
+
+/**
+ * The [badge] at the top end corner of a navigation icon of [iconSize]: a small accent pill with
+ * the count, or a dot. Drawn over the icon (it takes no room), outlined in [ring] so it stands
+ * apart from the icon under it.
+ */
+@Composable
+private fun BoxScope.IconBadge(badge: NavIconBadge?, iconSize: Dp, ring: Color) {
+    if (badge == null) return
+    val colors = DeskTheme.colors
+    val half = iconSize / 2
+    if (badge.count > 0) {
+        val text = if (badge.count > 99) "99+" else badge.count.toString()
+        Box(
+            Modifier
+                .align(Alignment.Center)
+                // its start edge a little inside the icon's end, its middle at the icon's top
+                .offset(x = half + 4.dp, y = -half)
+                .wrapContentSize(unbounded = true)
+                .heightIn(min = 16.dp)
+                .defaultMinSize(minWidth = 16.dp)
+                .border(1.5.dp, ring, RoundedCornerShape(50))
+                .background(colors.accent, RoundedCornerShape(50))
+                .padding(horizontal = 4.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(text, style = DeskTheme.type.caption.copy(fontSize = 10.sp, lineHeight = 14.sp, fontWeight = FontWeight.SemiBold),
+                color = colors.onAccent, maxLines = 1)
+        }
+    } else {
+        Box(
+            Modifier
+                .align(Alignment.Center)
+                .offset(x = half, y = -half + 1.dp)
+                .size(9.dp)
+                .border(1.5.dp, ring, CircleShape)
+                .background(colors.accent, CircleShape),
+        )
+    }
+}
 
 /**
  * Lets the sidebar's and the rail's entries take drops: tracks and albums dragged onto
@@ -131,9 +227,12 @@ fun BottomNavBar(
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
     hasMoreActions: Boolean = false,
+    iconBadges: NavIconBadges = emptyMap(),
+    navMenu: ((route: String) -> List<MenuEntry>)? = null,
 ) {
     val colors = DeskTheme.colors
     val label = stringResource(R.string.dk_main_navigation)
+    val marked = spec.marked(NavKind.BottomBar, currentRoute)
     val sheet = spec.moreStyle == MoreStyle.Sheet
     val needsMore = spec.overflow(NavKind.BottomBar).isNotEmpty() || (sheet && hasMoreActions)
     val items = spec.shown(NavKind.BottomBar) + if (!needsMore) emptyList() else listOf(if (sheet) moreSheetItem() else moreItem())
@@ -150,15 +249,17 @@ fun BottomNavBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             items.forEach { item ->
-                BottomBarItem(item, selected = isSelected(item, currentRoute, items), onClick = { onSelect(item.route) })
+                BottomBarItem(item, selected = item.route == marked, badge = badgeOf(item, iconBadges, spec, NavKind.BottomBar),
+                    menu = entriesOf(navMenu, item), onClick = { onSelect(item.route) })
             }
         }
     }
 }
 
 @Composable
-private fun RowScope.BottomBarItem(item: NavItem, selected: Boolean, onClick: () -> Unit) {
+private fun RowScope.BottomBarItem(item: NavItem, selected: Boolean, badge: NavIconBadge?, menu: List<MenuEntry>, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
+    val menuState = remember { EntryMenu() }
     val state = interaction.collectState()
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
@@ -171,12 +272,15 @@ private fun RowScope.BottomBarItem(item: NavItem, selected: Boolean, onClick: ()
             .heightIn(min = dimens.bottomBarHeight)
             .fillMaxHeight()
             .semantics { this.selected = selected }
-            .deskClickable(interaction, onClick, role = Role.Tab),
+            .entryMenu(menuState, menu)
+            .deskClickable(interaction, onClick, onLongClick = menuState.opener(menu), role = Role.Tab),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
+        EntryMenuPopup(menuState, menu)
         NavIndicator(selected, state, pill, Modifier.width(56.dp).height(30.dp)) {
             Icon(item.icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(dimens.icon))
+            IconBadge(badge, dimens.icon, ring = colors.chrome)
         }
         Spacer(Modifier.height(4.dp))
         Text(
@@ -185,6 +289,7 @@ private fun RowScope.BottomBarItem(item: NavItem, selected: Boolean, onClick: ()
             color = labelColor,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.badgeSemantics(item.shortLabel, badge),
         )
     }
 }
@@ -200,7 +305,7 @@ private fun NavIndicator(
     state: desktopkit.components.InteractionState,
     shape: RoundedCornerShape,
     modifier: Modifier,
-    content: @Composable () -> Unit,
+    content: @Composable BoxScope.() -> Unit,
 ) {
     val colors = DeskTheme.colors
     val fraction by animateFloatAsState(if (selected) 1f else 0f, DeskMotion.fade(LocalMotionTier.current, DeskMotion.spatial()), label = "navIndicator")
@@ -239,13 +344,16 @@ fun NavRail(
     modifier: Modifier = Modifier,
     brand: (@Composable (Modifier) -> Unit)? = null,
     navDrop: NavDrop? = null,
+    iconBadges: NavIconBadges = emptyMap(),
+    navMenu: ((route: String) -> List<MenuEntry>)? = null,
+    action: (@Composable () -> Unit)? = null,
 ) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
     val label = stringResource(R.string.dk_main_navigation)
     val main = spec.railRoutes.mapNotNull(spec::item)
-    val footer = listOfNotNull(if (spec.overflow(NavKind.Rail).isEmpty()) null else moreItem(), spec.footer)
-    val all = main + footer
+    val footer = listOfNotNull(if (spec.overflow(NavKind.Rail).isEmpty()) null else moreItem(), spec.footer?.takeIf { NavKind.Rail in it.showIn })
+    val marked = spec.marked(NavKind.Rail, currentRoute)
     Row(modifier.fillMaxHeight()) {
         Column(
             modifier = Modifier
@@ -257,21 +365,30 @@ fun NavRail(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             brand?.invoke(Modifier.padding(vertical = dimens.gapS).size(28.dp))
+            // the screen's main action (ShellPrimaryAction) above the entries
+            if (action != null) {
+                Box(Modifier.padding(top = dimens.gapXs, bottom = dimens.gapS)) { action() }
+            }
             Column(
                 modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).selectableGroup(),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                main.forEach { item -> RailItem(item, isSelected(item, currentRoute, all), navDrop) { onSelect(item.route) } }
+                main.forEach { item ->
+                    RailItem(item, item.route == marked, navDrop, badgeOf(item, iconBadges, spec, NavKind.Rail), entriesOf(navMenu, item)) { onSelect(item.route) }
+                }
             }
-            footer.forEach { item -> RailItem(item, isSelected(item, currentRoute, all), navDrop) { onSelect(item.route) } }
+            footer.forEach { item ->
+                RailItem(item, item.route == marked, navDrop, badgeOf(item, iconBadges, spec, NavKind.Rail), entriesOf(navMenu, item)) { onSelect(item.route) }
+            }
         }
         VerticalRule(Modifier.fillMaxHeight())
     }
 }
 
 @Composable
-private fun RailItem(item: NavItem, selected: Boolean, navDrop: NavDrop?, onClick: () -> Unit) {
+private fun RailItem(item: NavItem, selected: Boolean, navDrop: NavDrop?, badge: NavIconBadge?, menu: List<MenuEntry>, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
+    val menuState = remember { EntryMenu() }
     val state = interaction.collectState()
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
@@ -284,13 +401,16 @@ private fun RailItem(item: NavItem, selected: Boolean, navDrop: NavDrop?, onClic
             .heightIn(min = dimens.minTarget.coerceAtLeast(52.dp))
             .navDropZone(navDrop, item.route, pill)
             .semantics { this.selected = selected }
-            .deskClickable(interaction, onClick, role = Role.Tab)
+            .entryMenu(menuState, menu)
+            .deskClickable(interaction, onClick, onLongClick = menuState.opener(menu), role = Role.Tab)
             .padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
+        EntryMenuPopup(menuState, menu)
         NavIndicator(selected, state, pill, Modifier.width(48.dp).height(28.dp)) {
             Icon(item.icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(dimens.icon))
+            IconBadge(badge, dimens.icon, ring = colors.chrome)
         }
         Spacer(Modifier.height(2.dp))
         Text(
@@ -300,7 +420,7 @@ private fun RailItem(item: NavItem, selected: Boolean, navDrop: NavDrop?, onClic
             textAlign = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 4.dp),
+            modifier = Modifier.padding(horizontal = 4.dp).badgeSemantics(item.shortLabel, badge),
         )
     }
 }
@@ -317,10 +437,16 @@ fun Sidebar(
     badges: NavBadges,
     modifier: Modifier = Modifier,
     navDrop: NavDrop? = null,
+    iconBadges: NavIconBadges = emptyMap(),
+    navMenu: ((route: String) -> List<MenuEntry>)? = null,
+    action: (@Composable (collapsed: Boolean) -> Unit)? = null,
 ) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
     val label = stringResource(R.string.dk_sidebar)
+    val marked = spec.marked(NavKind.Sidebar, currentRoute)
+    // the collapsible sections the user shut, by title
+    var shut by rememberSaveable { mutableStateOf(emptySet<String>()) }
     // the panel slides open and shut on the emphasized curve; labels fade in once there is room for them
     val width by animateDpAsState(
         if (collapsed) dimens.sidebarCollapsedWidth else dimens.sidebarWidth,
@@ -329,7 +455,9 @@ fun Sidebar(
     )
     val span = (dimens.sidebarWidth - dimens.sidebarCollapsedWidth).value
     val open = if (span <= 0f) 1f else ((width - dimens.sidebarCollapsedWidth).value / span).coerceIn(0f, 1f)
-    val footer = spec.footer
+    val footer = spec.footer?.takeIf { NavKind.Sidebar in it.showIn }
+    // the entries' inset from the sidebar's edges, narrower while collapsed
+    val inset = lerp(6.dp, dimens.gapS, open)
     Row(modifier.fillMaxHeight()) {
         Column(
             modifier = Modifier
@@ -339,23 +467,41 @@ fun Sidebar(
                 .background(colors.chrome)
                 .semantics { paneTitle = label },
         ) {
+            // the screen's main action (ShellPrimaryAction) above the entries, the icon alone while collapsed
+            if (action != null) {
+                Box(Modifier.padding(start = inset, end = inset, top = dimens.gapS)) {
+                    action(collapsed)
+                }
+            }
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = lerp(6.dp, dimens.gapS, open), vertical = dimens.gapS)
+                    .padding(horizontal = inset, vertical = dimens.gapS)
                     .selectableGroup(),
             ) {
                 spec.sections.forEach { section ->
-                    if (section.items.isEmpty()) return@forEach
+                    val items = section.items.filter { NavKind.Sidebar in it.showIn }
+                    if (items.isEmpty()) return@forEach
                     val title = section.title
+                    val foldable = section.collapsible && title != null
+                    // shut only while the sidebar is open: collapsed it shows no header to open the section again
+                    val folded = !collapsed && section.collapsible && title != null && title in shut
                     if (!collapsed && title != null) {
-                        SectionCaption(title, Modifier.padding(start = 10.dp, top = dimens.gapM, bottom = 4.dp).alpha(labelAlpha(open)))
+                        if (foldable) {
+                            SectionHeader(title, folded, Modifier.alpha(labelAlpha(open))) {
+                                shut = if (folded) shut - title else shut + title
+                            }
+                        } else {
+                            SectionCaption(title, Modifier.padding(start = CAPTION_INSET, top = dimens.gapM, bottom = 4.dp).alpha(labelAlpha(open)))
+                        }
                     } else {
                         Spacer(Modifier.height(dimens.gapS))
                     }
-                    section.items.forEach { item ->
-                        SidebarItem(item, item.route == currentRoute, collapsed, badges[item.route], open, navDrop) { onSelect(item.route) }
+                    // a shut section still shows its marked entry, so the sidebar always says where the user is
+                    items.filter { !folded || it.route == marked }.forEach { item ->
+                        SidebarItem(item, item.route == marked, collapsed, badges[item.route], open, navDrop, iconBadges[item.route],
+                            depth = spec.depth(item), menu = entriesOf(navMenu, item)) { onSelect(item.route) }
                     }
                 }
             }
@@ -367,8 +513,8 @@ fun Sidebar(
                 if (!collapsed) {
                     Box(Modifier.weight(1f)) {
                         if (footer != null) {
-                            SidebarItem(footer, currentRoute == footer.route, collapsed = false, badge = badges[footer.route], open = open,
-                                navDrop = navDrop) { onSelect(footer.route) }
+                            SidebarItem(footer, footer.route == marked, collapsed = false, badge = badges[footer.route], open = open,
+                                navDrop = navDrop, iconBadge = iconBadges[footer.route], menu = entriesOf(navMenu, footer)) { onSelect(footer.route) }
                         }
                     }
                 }
@@ -380,8 +526,8 @@ fun Sidebar(
             }
             if (collapsed && footer != null) {
                 Box(Modifier.padding(start = 6.dp, end = 6.dp, bottom = 6.dp)) {
-                    SidebarItem(footer, currentRoute == footer.route, collapsed = true, badge = badges[footer.route], open = open,
-                        navDrop = navDrop) { onSelect(footer.route) }
+                    SidebarItem(footer, footer.route == marked, collapsed = true, badge = badges[footer.route], open = open,
+                        navDrop = navDrop, iconBadge = iconBadges[footer.route], menu = entriesOf(navMenu, footer)) { onSelect(footer.route) }
                 }
             }
         }
@@ -398,8 +544,12 @@ private fun labelAlpha(open: Float): Float = ((open - 0.5f) * 2f).coerceIn(0f, 1
  */
 @Composable
 private fun SidebarItem(item: NavItem, selected: Boolean, collapsed: Boolean, badge: String?, open: Float = if (collapsed) 0f else 1f,
-                        navDrop: NavDrop? = null, onClick: () -> Unit) {
+                        navDrop: NavDrop? = null, iconBadge: NavIconBadge? = null, depth: Int = 0, menu: List<MenuEntry> = emptyList(),
+                        onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
+    val menuState = remember { EntryMenu() }
+    // an item under another is indented a step for each parent the sidebar shows (folders in folders)
+    val indent = INDENT_STEP * depth.coerceAtMost(MAX_DEPTH)
     val state = interaction.collectState()
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
@@ -410,39 +560,52 @@ private fun SidebarItem(item: NavItem, selected: Boolean, collapsed: Boolean, ba
     // a collapsed item centres its icon; the same start padding keeps it still while the panel opens
     val collapsedStart: Dp = ((dimens.sidebarCollapsedWidth - 12.dp - dimens.icon) / 2).coerceAtLeast(0.dp)
     val showLabel = !collapsed && open > 0.5f
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = dimens.navItemHeight.coerceAtLeast(dimens.minTarget))
-            .padding(vertical = 1.dp)
-            .navDropZone(navDrop, item.route, shape)
-            .focusRing(state, shape)
-            .background(indicator, shape)
-            .semantics {
-                this.selected = selected
-                if (collapsed) contentDescription = item.label
+    // the icon's mark only while the sidebar is collapsed: open, the entry's text badge says it
+    val shownIconBadge = if (collapsed) iconBadge else null
+    val iconBadgeText = shownIconBadge?.let { badgeDescription(it) }
+    val row = @Composable {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = dimens.navItemHeight.coerceAtLeast(dimens.minTarget))
+                .padding(vertical = 1.dp)
+                .navDropZone(navDrop, item.route, shape)
+                .focusRing(state, shape)
+                .background(indicator, shape)
+                .semantics {
+                    this.selected = selected
+                    if (collapsed) contentDescription = if (iconBadgeText != null) "${item.label}, $iconBadgeText" else item.label
+                }
+                .entryMenu(menuState, menu)
+                .deskClickable(interaction, onClick, onLongClick = menuState.opener(menu), role = Role.Tab)
+                .padding(start = lerp(collapsedStart, 10.dp + indent, open), end = if (showLabel) 10.dp else 0.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Start,
+        ) {
+            EntryMenuPopup(menuState, menu)
+            Box(contentAlignment = Alignment.Center) {
+                Icon(item.icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(dimens.icon))
+                IconBadge(shownIconBadge, dimens.icon, ring = colors.chrome)
             }
-            .deskClickable(interaction, onClick, role = Role.Tab)
-            .padding(start = lerp(collapsedStart, 10.dp, open), end = if (showLabel) 10.dp else 0.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Start,
-    ) {
-        Icon(item.icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(dimens.icon))
-        if (showLabel) {
-            Spacer(Modifier.width(10.dp))
-            Row(Modifier.weight(1f).alpha(labelAlpha(open)), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = item.label,
-                    style = if (selected) DeskTheme.type.bodyStrong else DeskTheme.type.body,
-                    color = labelColor,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                if (badge != null) Text(badge, style = DeskTheme.type.caption, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (showLabel) {
+                Spacer(Modifier.width(10.dp))
+                Row(Modifier.weight(1f).alpha(labelAlpha(open)), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = item.label,
+                        style = if (selected) DeskTheme.type.bodyStrong else DeskTheme.type.body,
+                        color = labelColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (badge != null) Text(badge, style = DeskTheme.type.caption, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
         }
     }
+    // collapsed, the entry is a bare icon: its name shows beside it (mouse rest, keyboard focus). The same tree either way,
+    // so the entry keeps its focus and its state while the sidebar opens or shuts
+    TooltipArea(item.label, placement = TooltipPlacement.End, enabled = collapsed) { row() }
 }
 
 // ---------------------------------------------------------------- top bars
@@ -465,6 +628,7 @@ fun PageTopBar(
     actions: List<TopBarAction> = emptyList(),
     scrolled: Boolean = false,
     glass: Boolean = false,
+    menus: List<MenuSpec> = emptyList(),
 ) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
@@ -505,32 +669,50 @@ fun PageTopBar(
             modifier = Modifier.fillMaxWidth().heightIn(min = dimens.topBarHeight).padding(end = dimens.gapS),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            AnimatedContent(
-                targetState = TopBarHeading(title, if (onBack != null) backIcon else null),
-                // the old title is gone before the new one fades in: two titles never overlap
-                transitionSpec = {
-                    if (tier == MotionTier.Reduced) fadeIn(tween(0)) togetherWith fadeOut(tween(0))
-                    else fadeIn(tween(TOP_BAR_FADE_MS, delayMillis = TOP_BAR_FADE_OUT_MS)) togetherWith fadeOut(tween(TOP_BAR_FADE_OUT_MS))
-                },
-                contentAlignment = Alignment.CenterStart,
-                label = "topBarHeading",
-                modifier = Modifier.weight(1f),
-            ) { heading ->
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(start = if (heading.back != null) dimens.gapXs else dimens.pagePadding),
-                    verticalAlignment = Alignment.CenterVertically,
+            // The back button slides in or out before the title, and the title moves along with it. The title
+            // only fades when its words change: 2.4.0 faded the whole heading out and in when only the button
+            // came or went ("Gelen" › "← Gelen" on opening a message, DeskMail's request 18).
+            val withBack = onBack != null
+            // the button keeps its icon while it slides away
+            val lastBack = remember { arrayOf(backIcon) }
+            if (withBack) lastBack[0] = backIcon
+            val lastBackIcon = lastBack[0]
+            val slide = DeskMotion.fade(tier, DeskMotion.open<IntSize>(IntSize.VisibilityThreshold))
+            val inset by animateDpAsState(
+                if (withBack) 0.dp else (dimens.pagePadding - dimens.gapXs).coerceAtLeast(0.dp),
+                DeskMotion.fade(tier, DeskMotion.open(Dp.VisibilityThreshold)),
+                label = "topBarTitleInset",
+            )
+            Row(Modifier.weight(1f).padding(start = dimens.gapXs), verticalAlignment = Alignment.CenterVertically) {
+                AnimatedVisibility(
+                    visible = withBack,
+                    enter = expandHorizontally(slide, expandFrom = Alignment.Start) + fadeIn(DeskMotion.fade(tier, tween(TOP_BAR_FADE_MS))),
+                    exit = shrinkHorizontally(slide, shrinkTowards = Alignment.Start) + fadeOut(DeskMotion.fade(tier, tween(TOP_BAR_FADE_OUT_MS))),
+                    label = "topBarBack",
                 ) {
-                    if (heading.back != null) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         TopBarIconButton(
-                            icon = if (heading.back == TopBarBackIcon.Close) DeskIcons.Close else DeskIcons.ArrowLeft,
-                            label = stringResource(if (heading.back == TopBarBackIcon.Close) R.string.dk_close else R.string.dk_back),
+                            icon = if (lastBackIcon == TopBarBackIcon.Close) DeskIcons.Close else DeskIcons.ArrowLeft,
+                            label = stringResource(if (lastBackIcon == TopBarBackIcon.Close) R.string.dk_close else R.string.dk_back),
                             onClick = { latestOnBack?.invoke() },
                             size = 48.dp,
                         )
                         Spacer(Modifier.width(dimens.gapXs))
                     }
-                    Text(heading.title, style = DeskTheme.type.headline, color = colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f))
+                }
+                AnimatedContent(
+                    targetState = title,
+                    // the old title is gone before the new one fades in: two titles never overlap
+                    transitionSpec = {
+                        if (tier == MotionTier.Reduced) fadeIn(tween(0)) togetherWith fadeOut(tween(0))
+                        else fadeIn(tween(TOP_BAR_FADE_MS, delayMillis = TOP_BAR_FADE_OUT_MS)) togetherWith fadeOut(tween(TOP_BAR_FADE_OUT_MS))
+                    },
+                    contentAlignment = Alignment.CenterStart,
+                    label = "topBarTitle",
+                    modifier = Modifier.weight(1f).padding(start = inset),
+                ) { heading ->
+                    Text(heading, style = DeskTheme.type.headline, color = colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth())
                 }
             }
             shown.forEach { action ->
@@ -538,12 +720,10 @@ fun PageTopBar(
             }
             if (overflow.isNotEmpty()) TopBarOverflow(overflow)
             if (onSearch != null) DeskIconButton(DeskIcons.Search, stringResource(R.string.dk_search), onSearch)
+            if (menus.isNotEmpty()) TopBarMenus(menus)
         }
     }
 }
-
-@Immutable
-private data class TopBarHeading(val title: String, val back: TopBarBackIcon?)
 
 private const val TOP_BAR_FADE_MS = 150
 private const val TOP_BAR_FADE_OUT_MS = 90
@@ -651,10 +831,90 @@ fun KeyCap(text: String, modifier: Modifier = Modifier) {
     }
 }
 
-/** "More" is selected while the current screen is one of those it lists. */
-private fun isSelected(item: NavItem, currentRoute: String?, shown: List<NavItem>): Boolean =
-    if (item.route == ShellSpec.MORE_ROUTE) {
-        currentRoute == ShellSpec.MORE_ROUTE || shown.none { it.route == currentRoute }
-    } else {
-        item.route == currentRoute
+/**
+ * TalkBack reads an entry with a [badge] as its [label] and the badge ("Inbox, 4 unread"); the text
+ * stays as it is for everything else.
+ */
+@Composable
+private fun Modifier.badgeSemantics(label: String, badge: NavIconBadge?): Modifier {
+    if (badge == null) return this
+    val said = "$label, ${badgeDescription(badge)}"
+    return semantics { contentDescription = said }
+}
+
+/** The menu of an entry ([DesktopShell]'s navMenu); "More" has none. */
+private fun entriesOf(navMenu: ((String) -> List<MenuEntry>)?, item: NavItem): List<MenuEntry> =
+    if (navMenu == null || item.route == ShellSpec.MORE_ROUTE) emptyList() else navMenu(item.route)
+
+/** Where an entry's menu is open (from its top-left corner), and the entry's height. */
+@Stable
+private class EntryMenu {
+    var at by mutableStateOf<IntOffset?>(null)
+    var height = 0
+
+    fun open() {
+        at = IntOffset(0, height)
     }
+
+    /** The long press that opens [menu], none without entries. */
+    fun opener(menu: List<MenuEntry>): (() -> Unit)? = if (menu.isEmpty()) null else ::open
+}
+
+/** A right click, the Menu key (or Shift+F10) and TalkBack's action open an entry's [menu]. */
+@Composable
+private fun Modifier.entryMenu(state: EntryMenu, menu: List<MenuEntry>): Modifier {
+    if (menu.isEmpty()) return this
+    val label = stringResource(R.string.dk_more_options)
+    return this
+        .onSizeChanged { state.height = it.height }
+        .secondaryClick(true) { state.at = it }
+        .onKeyEvent { event ->
+            val opens = event.type == KeyEventType.KeyDown && (event.key == Key.Menu || (event.key == Key.F10 && event.isShiftPressed))
+            if (opens) state.open()
+            opens
+        }
+        .semantics { customActions = listOf(CustomAccessibilityAction(label) { state.open(); true }) }
+}
+
+@Composable
+private fun EntryMenuPopup(state: EntryMenu, menu: List<MenuEntry>) {
+    if (menu.isEmpty()) return
+    val at = state.at
+    MenuPopup(visible = at != null, onDismiss = { state.at = null }, entries = if (at != null) menu else emptyList(), offset = at ?: IntOffset.Zero)
+}
+
+/** The title of a sidebar section that opens and shuts (an account): a click, Enter or TalkBack's expand and collapse. */
+@Composable
+private fun SectionHeader(title: String, folded: Boolean, modifier: Modifier, onToggle: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val state = interaction.collectState()
+    val colors = DeskTheme.colors
+    val dimens = DeskTheme.dimens
+    val shape = RoundedCornerShape(dimens.radiusControl)
+    Row(
+        modifier
+            .padding(top = dimens.gapS)
+            .fillMaxWidth()
+            .heightIn(min = dimens.minTarget)
+            .focusRing(state, shape)
+            .background(stateBackground(state), shape)
+            .semantics {
+                heading()
+                if (folded) expand { onToggle(); true } else collapse { onToggle(); true }
+            }
+            .deskClickable(interaction, onToggle)
+            .padding(start = CAPTION_INSET, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        SectionCaption(title, Modifier.weight(1f))
+        Icon(if (folded) DeskIcons.ChevronRight else DeskIcons.ChevronDown, contentDescription = null, tint = colors.textTertiary,
+            modifier = Modifier.size(dimens.icon))
+    }
+}
+
+/** Where a sidebar section's title starts, in line with its entries' icons. */
+private val CAPTION_INSET = 10.dp
+
+/** How far an item under another is indented in the sidebar, for each parent; deeper than [MAX_DEPTH] stays there. */
+private val INDENT_STEP = 16.dp
+private const val MAX_DEPTH = 4

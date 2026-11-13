@@ -10,6 +10,8 @@ import androidx.compose.foundation.background
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -163,6 +165,44 @@ val LocalGlassSource = staticCompositionLocalOf<HazeState?> { null }
  */
 val LocalGlassMode = staticCompositionLocalOf<GlassMode?> { null }
 
+/**
+ * How many things in the shell's content ask the glass not to blur right now ([PauseGlassBlur]).
+ * Read in snapshots: only the glass surfaces and the shell's glass source follow a change.
+ */
+@Stable
+internal class GlassHolds {
+    var count by mutableIntStateOf(0)
+}
+
+/** The [GlassHolds] of the surrounding shell. */
+internal val LocalGlassHolds = staticCompositionLocalOf<GlassHolds?> { null }
+
+/**
+ * While this is in composition, the surrounding [desktopkit.shell.DesktopShell]'s glass draws its
+ * translucent tint ([GlassMode.Translucent]) instead of blurring the content, and the content is
+ * no longer recorded for the blur.
+ *
+ * For a screen showing a view that cannot be drawn more than once a frame: a `WebView`, a
+ * `SurfaceView` or `TextureView` (video, maps). The blur draws the content once for the window and
+ * once more for every glass surface over it, each time at another size and clip; a WebView takes
+ * each draw for a new viewport and throws its tiles away, so while it scrolled under the glass bars
+ * it flickered between whole, partial and blank, about 60 times a second (DeskMail, Galaxy S24).
+ * Call it in the screen (or only while such a view is shown, with [enabled]); the rest of the app
+ * keeps its blur. Nothing else in the shell is composed again when it comes or goes.
+ */
+@Composable
+fun PauseGlassBlur(enabled: Boolean = true) {
+    val holds = LocalGlassHolds.current ?: return
+    DisposableEffect(holds, enabled) {
+        if (enabled) holds.count++
+        onDispose { if (enabled) holds.count-- }
+    }
+}
+
+/** The mode a glass surface draws in: [mode], or the translucent tint while the blur is paused. */
+internal fun effectiveGlassMode(mode: GlassMode, paused: Boolean): GlassMode =
+    if (mode == GlassMode.Blur && paused) GlassMode.Translucent else mode
+
 /** The [GlassMode] this device allows now; follows battery saver and the animation setting live. */
 @Composable
 fun rememberSystemGlassMode(): GlassMode {
@@ -216,6 +256,20 @@ fun Modifier.glass(
     mode: GlassMode = DeskGlass.mode,
     enabled: Boolean = true,
     rest: Color = Color.Transparent,
+): Modifier {
+    // a screen showing a WebView or a video can pause the blur (PauseGlassBlur)
+    val drawn = if (mode == GlassMode.Blur) effectiveGlassMode(mode, paused = (LocalGlassHolds.current?.count ?: 0) > 0) else mode
+    return glassIn(material, shape, source, drawn, enabled, rest)
+}
+
+@Composable
+private fun Modifier.glassIn(
+    material: GlassMaterial,
+    shape: Shape,
+    source: HazeState?,
+    mode: GlassMode,
+    enabled: Boolean,
+    rest: Color,
 ): Modifier = when {
     !enabled -> if (rest == Color.Transparent) this else background(rest, shape)
     mode == GlassMode.Blur && source != null -> {

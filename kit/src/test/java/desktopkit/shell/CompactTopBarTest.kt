@@ -194,6 +194,91 @@ class CompactTopBarTest {
         compose.onNodeWithTag("counter-music").assertTextEquals("music: 2")
     }
 
+    /** DeskMail's request 15: a page opened over Settings shows its own title and way back on a tablet's rail too. */
+    @Test
+    fun aPageCanShowItsBarOnTheRail() {
+        var onRail by mutableStateOf(true)
+        compose.setContent {
+            DesktopKitTheme(themeMode = ThemeMode.Dark, inputMode = InputMode.Touch) {
+                TestShell(WidthClass.Expanded, startRoute = "documents", content = { _, _ ->
+                    CompactTopBar(title = "Hesap ekle", onBack = { backs++ }, showOnRail = onRail)
+                    Text("içerik")
+                })
+            }
+        }
+        compose.waitForIdle()
+        compose.onNodeWithText("Hesap ekle").assertIsDisplayed()
+        pressSystemBack()
+        assertEquals(1, backs)
+        onRail = false
+        compose.waitForIdle()
+        compose.onNodeWithText("Hesap ekle").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Back").assertDoesNotExist()
+    }
+
+    /**
+     * DeskMail's request 18: the bar of a screen being left gave way only once its way out had played,
+     * so the title changed first and the back button and actions a quarter of a second later.
+     */
+    @Test
+    fun aLeftScreensBarGivesWayAtOnce() {
+        compose.setContent {
+            DesktopKitTheme(themeMode = ThemeMode.Dark, inputMode = InputMode.Touch) {
+                TestShell(WidthClass.Compact, startRoute = "documents", transitions = ShellTransitions.Default, content = { route, _ ->
+                    if (route == "documents") {
+                        CompactTopBar(title = "Arşiv", onBack = {}, actions = listOf(TopBarAction(DeskIcons.Info, "Yeni ileti", {})))
+                        Text("arşiv-ekranı")
+                    } else {
+                        Text("ekran-$route")
+                    }
+                })
+            }
+        }
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("Yeni ileti").assertIsDisplayed()
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithText("Ana sayfa").performClick()
+        repeat(3) {
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+        }
+        // the old screen is still on its way out ...
+        compose.onNodeWithText("arşiv-ekranı").assertExists()
+        // ... and the bar is already the new screen's: its actions are gone and its title is on its way in (the
+        // bottom bar's label and the title); the back button slides away with the title moving into its place
+        compose.onNodeWithContentDescription("Yeni ileti").assertDoesNotExist()
+        compose.onAllNodesWithText("Ana sayfa").assertCountEquals(2)
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("Back").assertDoesNotExist()
+    }
+
+    /** The same title with a back button coming: the title moves aside, it does not fade out and in. */
+    @Test
+    fun theSameTitleDoesNotFadeWhenTheBackButtonComes() {
+        var back by mutableStateOf(false)
+        compose.setContent {
+            DesktopKitTheme(themeMode = ThemeMode.Dark, inputMode = InputMode.Touch) {
+                TestShell(WidthClass.Compact, startRoute = "documents", content = { _, _ ->
+                    CompactTopBar(title = "Gelen", onBack = if (back) ({}) else null)
+                })
+            }
+        }
+        compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+        back = true
+        repeat(20) {
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+            // a fade would compose the outgoing and the incoming heading together
+            compose.onAllNodesWithText("Gelen").assertCountEquals(1)
+        }
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("Back").assertIsDisplayed()
+        compose.onNodeWithText("Gelen").assertIsDisplayed()
+    }
+
     @Test
     fun overflowKeepsPrimaryActionsInTheBar() {
         fun action(label: String, primary: Boolean = false) = TopBarAction(DeskIcons.Info, label, {}, primary = primary)

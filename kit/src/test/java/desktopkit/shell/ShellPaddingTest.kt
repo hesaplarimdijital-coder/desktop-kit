@@ -2,6 +2,7 @@ package desktopkit.shell
 
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
@@ -76,6 +77,27 @@ class ShellPaddingTest {
         near(56.dp, values.calculateTopPadding(), "top padding")
         near(114.dp, values.calculateBottomPadding(), "bottom padding")
         assertEquals(0.dp, values.calculateLeftPadding(LayoutDirection.Ltr))
+    }
+
+    /**
+     * DeskMail chose its layout in a BoxWithConstraints and asked for the padding inside it: the
+     * request came while the shell measured the screen, and 2.4.0 padded the screen as well, so the
+     * list started a top bar's height too low and ended a bottom bar's height too high, for good.
+     */
+    @Test
+    fun aScreenAskingFromASubcompositionIsNotPaddedTwice() {
+        var padding: PaddingValues? = null
+        shell {
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                padding = rememberShellContentPadding()
+                Box(Modifier.fillMaxSize().testTag("screen"))
+            }
+        }
+        val root = compose.onRoot().getBoundsInRoot()
+        val screen = compose.onNodeWithTag("screen").getBoundsInRoot()
+        near(root.top, screen.top, "screen top")
+        near(root.bottom, screen.bottom, "screen bottom")
+        near(56.dp, padding!!.calculateTopPadding(), "top padding")
     }
 
     @Test

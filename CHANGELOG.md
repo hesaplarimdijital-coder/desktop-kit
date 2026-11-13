@@ -1,5 +1,286 @@
 # Değişiklikler
 
+## 2.8.0 (2026-11-13)
+
+Tasarım standardının denetimi ("Desktop Kit Tasarım Standardı" belgesinin son bölümü) ve DeskMail'in kitten
+istedikleri (`docs/KIT-ISTEKLERI.md`), tek sürümde: DeskMail'in 23 maddesinin hepsi, denetimin yedi yüksek bulgusunun
+hepsi ve orta ve düşük bulguların çoğu (kalanlar denetim bölümünün sonunda). 2.6.0 ve 2.7.0 yayımlanmadı; ikiye bölünmüş iş burada
+birleşti. Uygulamalar çoğunlukla kod değişmeden derlenir; görünüşte ve klavyede değişenler ve dikkat isteyen birkaç
+imza [MIGRATION.md](MIGRATION.md#250den-280a)'de. Kod değişmeden de uygulamanın görünüşünü ya da klavyesini
+değiştirenler aşağıda "görünür" diye işaretli.
+
+### Hatalar
+
+- **Dolgu iki kat oluyordu** (DeskMail 12): ekran düzenini `BoxWithConstraints` içinde seçip
+  `rememberShellContentPadding()`'i oradan isteyince istek kabuk ekranı ölçerken geliyordu. Compose bir düğümün
+  ölçülürken kendisine yaptığı yeniden ölçme isteğini yok sayar; kabuk ekranı da dolgulayıp öyle bırakıyordu: liste
+  bir üst çubuk boyu aşağıda başlıyor, bir alt çubuk boyu yukarıda bitiyordu. Kabuk sayacı artık bileşimde de okur:
+  değişince kendini yeniden bileşir, ekran bir sonraki karede pencerenin tamamıyla ölçülür; o tek karede ekran
+  pencerenin üstünden başlar. Test: `ShellPaddingTest.aScreenAskingFromASubcompositionIsNotPaddedTwice`.
+- **Bölücü sınırın dışına taşıyordu** (DeskMail 13): `HorizontalSplitPane` sürüklemeyi duruma ekleyip sınırı yalnızca
+  ölçerken uyguluyordu; en küçük genişliği geçen sürükleme saymaya devam ediyor, geri sürüklerken o kadar yol boşa
+  gidiyordu. Durum sınırları her yerleşimden öğrenir; sürükleme, ok tuşları ve TalkBack'in `setProgress`'i onların
+  içinde kalır. Sağdan sola düzende oklar ve sürükleme ters yöne çalışır. Bölücünün TalkBack adı verilmezse
+  "Bölmeleri boyutlandır". `rememberSplitState(genislik, prefs, anahtar)` yerini `DeskPreferences`'ta saklar
+  (sürükleme ya da tuş bitince). Test: `SplitPaneTest`.
+- **Telefonun üst çubuğu ekran değişirken iki kez değişiyordu** (DeskMail 18, S24 kayıtları): bırakılan ekranın
+  `CompactTopBar` çağrısı ekranın çıkışı bitene kadar kalıyordu; başlık rota ile hemen, geri düğmesi ve eylemler
+  çeyrek saniye sonra değişiyor, başlık her seferinde solup yeniden geliyordu ("← Klasörler" ve eski ekranın kalemi,
+  sonra boş çubuk, sonra "Klasörler"). Bırakılmakta olan ekranın çağrısı artık sayılmaz: geçerli rota olmayan sekme,
+  ayrıntı açıkken liste, uygulamanın kapattığı ayrıntı (`LocalScreenLeaving`). Karar uygulamanın durumuna bakar,
+  animasyona değil: Geri hareketiyle parmağın çektiği ekran çubuğunu hareket bırakılana kadar korur. Başlık artık
+  bütün hâlinde solmaz: geri düğmesi başlığın önüne kayarak gelir, başlık yana kayar; başlık yalnızca sözcükleri
+  değişince solup gelir ("Gelen" › "← Gelen" artık solmuyor). Testler: `CompactTopBarTest.aLeftScreensBarGivesWayAtOnce`,
+  `theSameTitleDoesNotFadeWhenTheBackButtonComes`.
+- **Tam sayfa yerine otururken taşıyordu** (DeskMail 19): ayrıntı sayfası 0,9 sönümlü yayla geliyordu; telefonun
+  genişliğini geçen bir sayfa yerini 2 piksel geçip geri dönüyordu (85 ms), yazıyla dolu sayfada titreme gibi
+  okunuyordu. Yeni `DeskMotion.page()` (1,0; 800) yerini geçmez, biraz daha sert olduğu için aşağı yukarı aynı sürede
+  varır; ayrıntının kayması ve arkasındaki listenin derinliği ile perdesi bunu kullanır. Uçan küçük öğeler `open()`'da
+  kalır.
+- **Cam ve WebView** (DeskMail 20): kabuk içeriği cam için kaydeder, her cam yüzey onu bir kez daha, kendi boyunda ve
+  kırpmasında çizer. WebView her çizimi yeni bir görüntü alanı sanıp karolarını atıyordu: S24'te cam çubukların
+  altından kaydırılan ileti saniyede 59 kez tam, eksik ve boş arasında gidip geliyordu. `PauseGlassBlur()` (isteğe
+  bağlı `enabled`) onu çağıran ekran açıkken camı yarı saydam tonuna çevirir ve içeriği kaydetmeyi bırakır; geri
+  kalan uygulama bulanıklığını korur, kabuğun başka hiçbir yeri yeniden bileşmez. Pil tasarrufundaki opak yüzeyler
+  opak kalır. Test: `GlassPauseTest`.
+- **Ayrıntı açılınca listenin durumu gidiyordu** (DeskMail 9): telefonda ayrıntı listenin üstüne tamamen gelince
+  liste bileşimden çıkıyordu, `AnimatedContent` da çıkardığının kayıtlı durumunu saklamıyor: geri dönünce kaydırma
+  konumu, açık bölümler, yazılmış süzgeç sıfırlanıyordu (Ayarlar'da aşağı kaydırıp günlüğü açınca Ayarlar en başa
+  dönüyordu). Liste artık bir `SaveableStateHolder` içinde durur, Navigation'ın ekranlar için yaptığı gibi; her
+  genişlikte. Test: `DetailListStateTest`.
+
+### DeskMail'in istekleri
+
+- **Değişen gezinme** (DeskMail 3, hepsi):
+  - Kabuk gezinme grafiğini bir kez kurar; `ShellSpec`'e eklenen rotalar grafiğe eklenir. Yeni klasör ya da hesap açık
+    ekranı, geri yığınlarını ve her ekranın durumunu korur; başlangıç ekranı bir an görünmez. Başlangıç rotası
+    değişirse grafik yeniden kurulur. Çıkan bir rotanın ekranı gösterildiği anda kendini kapatır, altındaki ekran
+    görünür; gezinme onu listelemez. Kayıtlı bir geri yığınında kalmış olsa da (telefonda Klasörler'den açılan, sonra
+    başka sekmeye geçilip silinen klasör) o sekmeye dönmek çökmez.
+  - `NavItem(parent)`: kenar çubuğu öğeyi üst öğesinin altına girintili koyar; öğesini göstermeyen gezinme (telefonda
+    bir klasör) onun gösterilen en yakın üst öğesini işaretler, "Daha fazla"yı değil. `ShellNavigator.open(rota)`
+    ekranı gösterilenin üstüne açar (telefonda Klasörler › klasör): sayfanın kendi geri düğmesi olur, Geri geri gelir,
+    sekmenin girişine yeniden dokunmak sekmenin kendi ekranına döner.
+  - `NavItem(showIn)`: öğeyi hangi gezinmelerin listelediği. Klasörler yalnız kenar çubuğunda, "Klasörler" ve "Ara"
+    yalnız alt çubukta ve rayda; bir gezinmede olmayan öğe onun "Daha fazla"sında da yok.
+  - `DesktopShell(navMenu)`: kenar çubuğu, ray ve alt çubuk girişinin menüsü ("Tümünü okundu say", "Çöpü boşalt"):
+    sağ tık, uzun basma, Menü tuşu, TalkBack eylemi.
+  - `NavSection(collapsible = true)`: hesabın başlığı bölümü açıp kapatır (TalkBack'in aç/kapat eylemleriyle);
+    kapalı bölüm işaretli girişi göstermeye devam eder. Daraltılmış kenar çubuğunda (yalnız simgeler) bölümü açacak
+    başlık olmadığından bölümün bütün girişleri görünür.
+  - "Daha fazla" ekranı ekranları bölüm başlıklarının altında listeler; iki hesabın "Gelen"i artık alt alta durmuyor.
+  - Test: `NavStructureTest`.
+- **Çipli adres alanı ve öneriler** (DeskMail 4): `TokenField` adresleri çip olarak tutar: virgül, noktalı virgül ya
+  da Enter çipi tamamlar, yapıştırılan liste bölünür, Backspace boş alanda son çipi siler, geçersiz adres işaretlenir
+  ("Geçersiz"), her çipin × düğmesi ve TalkBack eylemi vardır; yazarken alanın altında oklarla gezilen, Enter'la
+  seçilen, Esc'le kapanan öneri listesi (`suggestions`; yalnızca yazılan değişince istenir, uygulama bir veritabanına
+  bakabilir). Yapıştırılan listede iki kez geçen adres tek çip olur. Test: `TextInputRequestsTest`.
+- **Telefonda yüzen birincil düğme** (DeskMail 5): `ShellPrimaryAction(etiket, simge, onClick)`, ekranın çağırdığı
+  ana eylem. Telefonda alt çubuğun ve oynatıcının üstünde, sonda yüzen vurgu renkli düğme: çubuklar kaydırmayla
+  çekilirken onlarla iner, liste en üstteyken etiketiyle, kaydırılınca yalnız simgesiyle durur, ekran klavyesi
+  açıkken ve büyüyen oynatıcının altında görünmez; çubukların altından geçen listeler onun bitiminde biter,
+  bildirimler onun üstünde durur. Rayda üstte vurgu renkli simge (ipucuyla), kenar çubuğunda üstte etiketli düğme
+  (kapalıyken simge). Test: `PrimaryActionTest`.
+- **Liste satırında kaydırma eylemleri** (DeskMail 7): `DeskListRow(swipeStart, swipeEnd)` `SwipeAction` alır. Satır
+  parmağı izler, altındaki eylemi açar; genişliğinin %35'ini geçince eylem rengini alır (tehlikeliyse kırmızı),
+  simgesi büyür, telefon titrer; orada ya da hızlı bir fırlatmayla bırakılınca çalışır. Satırı listeden çıkaran eylem
+  (`removesRow`, arşivle, sil) satırı dışarıda bırakır, ötekisi (okundu say) geri getirir. Seçim kipinde ve fareyle
+  yok; TalkBack her eylemi adıyla sunar. Geri alma uygulamanın bildirimindedir. Test: `SwipeActionsTest`.
+- **Çekerek yenileme** (DeskMail 14): `PullToRefresh(refreshing, onRefresh) { liste }`. Listenin tepesinden aşağı
+  çeken parmak bir disk indirir: liste telefonun cam üst çubuğunun altından geçiyorsa çubuğun altından, değilse
+  (üstünde bir alan ya da sekmeler varken) listenin kendi tepesinden; disk listenin dışına çizilmez. Yayı çekişle
+  dolar; yay tamamlanınca (bir titreşimle) bırakmak `onRefresh`'i çalıştırır, disk yenileme sürerken döner, sonra
+  çekilir. Uygulama kendi başına yenilerken de iner. Çekiş direnir, yukarı itmek önce diski kaldırır; fare, dokunmatik
+  yüzey ve klavye etkilemez. Azaltılmış harekette disk yerine atlar. TalkBack dönen diski "Yenileniyor" diye okur.
+  Test: `PullToRefreshTest`.
+- **Tabloda çerçeveyle seçme** (DeskMail 22): seçili olmayan bir satırdan (ya da satırların altından) sürüklenen fare
+  bir çerçeve çizer, değdiği satırları seçer; Ctrl ekleyip çıkarır, Shift ekler, kenara yaklaşınca liste kayar, Esc
+  çerçeveyi bırakıp önceki seçimi geri koyar. Seçili satır seçimi beklemeden sürükler (`rowDrag`). Test:
+  `TableKeyboardAndFrameTest`.
+- **Metin alanında imleç ve seçim** (DeskMail 23): `DeskTextField(value: TextFieldValue, onValueChange)` imlecin ve
+  seçimin yerini bildirir ve alır (yanıtta imleci alıntının üstüne koymak, öneriyi seçince imleci sona almak).
+
+- **Rozetler alt çubukta ve rayda** (DeskMail 1): `DesktopShell(iconBadges = mapOf(rota to NavIconBadge(sayı,
+  açıklama)))` simgenin köşesine vurgu renginde küçük bir sayı (99'dan sonra "99+") ya da sayı 0 ise nokta koyar;
+  alt çubukta, rayda ve kapalı kenar çubuğunda. Açık kenar çubuğu yazılı rozeti (`badges`) gösterir. "Daha fazla"nın
+  tuttuğu bir ekranın rozeti varsa "Daha fazla"da nokta olur. TalkBack girişin adını ve rozeti okur ("Gelen, 4
+  okunmamış"; açıklama yoksa "4 yeni"). Test: `NavIconBadgeTest`.
+- **Tabloda vurgu, simge hücresi, hücreye tıklama** (DeskMail 2): `DenseTable(rowEmphasis)` satırı baştan sona kalın
+  ve yazı renginde yapar (okunmamış ileti). `TableColumn(cell)` hücreyi uygulama çizer (yıldız, ataç, rozet); değer
+  sıralamaya ve TalkBack'e kalır. `TableColumn(onCellClick, cellClickLabel)` hücreyi satırı açmayan kendi düğmesi
+  yapar (yerinde yıldızlama), üzerine gelme, basılı ve odak durumlarıyla. Test: `DenseTableRequestsTest`.
+- **Şeritte ikinci eylem** (DeskMail 6): `StatusBanner(secondaryActionLabel, onSecondaryAction)`; telefonda iki eylem
+  metnin altında, sığmazsa alt alta.
+- **Liste satırında önizleme** (DeskMail 8): `DeskListRow(subtitleMaxLines, preview, previewMaxLines)`.
+- **Türkçe klavyede "/"** (DeskMail 10): noktalama kısayolları (`/ , . - = + [ ]`) yazdıkları karakterle de eşleşir;
+  Ctrl, Meta ve sol Alt bir yana, tutulan tuşların yazdığı karaktere bakılır, Shift ve AltGr o karakteri yazmak için
+  basılı olabilir. Kitin Ctrl+/ kısayolu (kısayol listesi) Türkçe Q klavyede de çalışır. `KeyChord(char = …)` başka
+  bir tuşa karakter verir. Test: `KeyChordCharTest`.
+- **Ayrıntı paneli kapalı başlayabilir** (DeskMail 11): `rememberInspectorState(defaultCollapsed = true)`; kullanıcı
+  bir kez açınca saklanan seçim geçerli.
+- **Rayda sayfa başlığı** (DeskMail 15): `CompactTopBar(showOnRail = true)` tablette (ray düzeninde) de başlığı, geri
+  düğmesini ve sistemin Geri'sini alır; kenar çubuklu düzen (DeX) hiç almaz.
+- **Boş ekranda vurgulu düğme** (DeskMail 16): `MessageScreen(actionPrimary = true)`. Başlığı TalkBack için başlık.
+- **Ayar satırı düğme, sakıncalı düğme** (DeskMail 17): `SettingRow(onClick)` satırın tamamını bir düğme yapar,
+  sonunda ok; üzerine gelme, basılı durum ve odak halkası satırın kenarlarından biraz taşar, böylece yazısı öteki
+  satırlarla aynı hizada kalır; denetim artık isteğe bağlı. `DeskButton(danger = true)`: yazı, simge ve kenar
+  tehlike renginde, üzerine gelme ve basılı durum o renkle; hiçbir zaman dolu değil.
+- **Bildirimin süresi** (DeskMail 21): `ToastState.show(durationMillis = …)` tam o kadar durur; TalkBack kullanan biri
+  için ötekiler gibi uzar.
+
+### Denetimden: yüksek bulgular
+
+- **Liste ve ayrıntı yan yana** (1): `ListDetailLayout(detail, onBack, list) { ayrıntı }` tablet genişliğinden
+  (`twoPanesFrom`, varsayılan Expanded) itibaren listeyi ve seçilenin ayrıntısını yan yana koyar; liste 360 dp
+  (Large'dan itibaren 412), aradaki bölücü sürüklenir, `prefs` ve `splitKey` ile yeri saklanır. Hiçbir şey seçili
+  değilken ayrıntı bölmesi `placeholder`'ı gösterir; yeni seçim ayrıntıyı çapraz geçişle değiştirir (art arda seçimlerde
+  geçişteki her ayrıntı kendi durumunu tutar). Daha dar pencerede, ya da pencere geniş olduğu hâlde yerleşime iki
+  bölmenin en küçük genişlikleri (`minListWidth` + `minDetailWidth`) sığmıyorsa (yanında açık bir ayrıntı paneli),
+  `DetailTransition` gibi tek bölme. Liste ve açık ayrıntı pencere eşiği geçerken (DeX'te yeniden boyutlandırma,
+  tablet çevrilince) durumlarıyla taşınır; liste görünmediği sürece de (telefonda ayrıntının altında) kaydırma yerini
+  ve yazılanı korur. Test: `ListDetailLayoutTest`.
+- **Tab tuşu ve odak** (2, görünür): tablo, kapak ızgarası ve sekme şeridi Tab'ın tek durağıdır: tabloda ve ızgarada
+  en son odaklanan (yoksa seçili, görünürse; yoksa görünen ilk) satır ya da kapak, şeritte seçili sekme. İçlerinde
+  oklar, Home, End ve sayfa tuşları gezer (sağdan sola şeritte Home sağdaki ilk sekmeye gider). Tab ve Shift+Tab
+  hemen dışarı çıkar, satırın ya da kapağın kendi düğmesinden de: yıldız hücresi, Oynat ve "⋯" Tab durağı değildir;
+  uzun tablo bir sonraki durak için satır satır aranmaz. Tablonun sıralanabilir başlıkları Tab sırasında satırlardan
+  önce gelir. Açık alt sayfa klavye odağını tutar: Tab ve Shift+Tab arkadaki ekrana geçmez; sayfa kapanınca odak
+  açılmadan önceki yerine döner. Testler: `TableKeyboardAndFrameTest`, `FocusStopsTest`.
+- **Kaydırma çubuğu** (3, görünür): fare ya da dokunmatik yüzeyle (DeX, klavyeli kapak) listenin sonunda ince bir çubuk nerede
+  olunduğunu ve içeriğin ne kadarının göründüğünü gösterir; liste kayarken ve imleç üstündeyken görünür, sonra solar,
+  imlecin altında kalınlaşır, sürüklenir; çubuğun boşluğuna basmak oraya gider. Dokunmatikte yok. `DenseTable`,
+  `DeskGrid`, palet, menüler, alt sayfalar ve "Daha fazla" ekranında kendiliğinden; uygulama kendi listesine
+  `Modifier.verticalScrollbar(state)` koyar. Çubuğa basmak satır tıklaması, çerçeve ya da sürükleme değildir. Test:
+  `ScrollbarTest`.
+- **İpuçları** (4, görünür): simge düğmeleri kendini adlandırır: imleç durunca (yarım saniye) ve klavye odağında ad,
+  varsa kısayolla (`DeskIconButton(shortcut)`); bir ipucu açıkken komşusuna geçen imleç hemen görür. Kapalı kenar
+  çubuğunun girişleri adlarını yanlarında gösterir. `TooltipArea(placement, showOnFocus, enabled)`; uygulamanın kendi
+  `TooltipArea`'sı içindeki simge düğmesi ikinci bir ipucu açmaz. Test: `TooltipTest`.
+- **Kontrollerin kenarı** (5, görünür): yeni `controlBorder` rolü, girdinin dinlenmedeki kenarı: açık, koyu ve OLED temada
+  arka plana, kroma ve yüzeylere en az 3:1 (`borderStrong` 1,4:1'di). Metin alanları, çipli alan ve anahtarın kapalı
+  yolu bunu kullanır; düğmeler, paneller, menüler `borderStrong`'da kalır. Elle kurulan paletler eskisi gibi
+  `borderStrong` alır. Test: `PaletteContrastTest.inputsCanBeFoundByTheirEdge`.
+
+- **Alt sayfa jestsiz kapanır, tek sayfa açık kalır** (6): tutamak aynı zamanda sayfanın kapatma
+  düğmesidir ("Sayfayı kapat"): odaklanır, odak halkası var, TalkBack, Anahtar Erişimi ve Tab ulaşır; görünüşü ve
+  yeri aynı. Perde, üzerine dokununca ne olacağını TalkBack'e söyler. Kabuğun içinde bir sayfa açılırken açık olan
+  sayfa kapanır. Köşeye görünür bir × bilerek konmadı: tutamak bu işi kitin sayfalarının görünüşünü değiştirmeden
+  görüyor. Test: `SheetAccessTest`.
+- **Görünür komutlar** (7, görünür): `DeskListRow(moreButton = true)` satırın sonuna menüyü açan "⋯" koyar. Kapak
+  hücresinde Oynat ve "⋯" klavye odağında da görünür; dokunmatikte başlığın yanında "⋮" düğmesi var. "⋯" ve "⋮"
+  yalnızca menüsü olan kapakta.
+
+### Denetimden: orta ve düşük bulgular
+
+- **Fareyle sürükleme beklemeden** (8): seçili satır ve kapak fareyle hemen sürüklenir; parmağın beklemesi
+  dokunmatikte kaldı.
+- **Baseline Profile** (9): `kit/src/main/baseline-prof.txt` kitin kodunu kurulumda derletir: ilk tablo kaydırması,
+  ilk alt sayfa ve ilk paylaşılan öğe yorumlanarak çalışmaz. Cihazda ölçülmedi (macrobenchmark cihaz ister).
+- **Yükseklik sınıfı** (10, görünür): `HeightClass` (480 dp altı Compact, 900'den Expanded) `DesktopKitRoot`'tan
+  `LocalHeightClass` olarak gelir; pencerenin yüksekliğinden, ekran klavyesinin bıraktığından değil (bir alana
+  dokununca telefon kısa pencere sayılmaz). Yan çevrilmiş telefon (S24, 780 × 360 dp) rayı alır ama tabletin büyük yazısını,
+  zamanlı hareketini ve içeriğin üstünde yüzen oynatıcıyı almaz: telefonun yazısı ve yayları, 8 dp alçak üst çubuk
+  (hedeften küçük olmadan), içeriğin altına dizilen oynatıcı. Test: `HeightClassTest`.
+- **Dar pencerede ayrıntı paneli** (11): `WorkstationLayout`'un `showFrom`'undan dar pencerede `InspectorToggleButton`
+  paneli ana bölmenin üstüne alt sayfa olarak açar (`InspectorState.sheetOpen`, başlığı `sheetTitle`); sayfa açıkken
+  genişleyen pencere paneli yana alır. Eskiden panel o genişlikte hiç yoktu. Test: `InspectorSheetTest`.
+- **Bildirim imleç ve odak için bekler** (12): imleç bildirimin üstündeyken ya da klavye odağı içindeyken süre
+  durur, sonra kaldığı yerden sayar. DeX'te "Geri al" fareyle ulaşılmadan gidiyordu. Dokunmatikte kapatma düğmesi
+  48 dp (40'tı); simge aynı boyda. Test: `ToastTimingTest`.
+- **Uzun değer ortadan kısalır** (13): `TableColumn(ellipsis = TextOverflow.MiddleEllipsis)`; dosya adı uzantısını,
+  yol son klasörünü korur.
+- **Üzerine gelme, basılı ve devre dışı** (14, görünür): `pressed` üzerine gelmenin bir adım ötesinde (koyuda 1,16:1, 1,06:1'di);
+  açık temada üzerine gelme sayfada görünür (1,14:1, 1,10:1'di), basılı onun da ötesinde. Devre dışı `DeskButton` kendi
+  dolgusunu almaz (birincilse sakin bir dolgu), yazısı üçüncül, kenarı soluk; etkin düğmenin yarı saydamı değil.
+- **Rayda menü çubuğunun menüleri** (15, görünür): menü çubuğu yalnız kenar çubuklu düzende; tablette ve Expanded DeX
+  penceresinde Dosya, Düzen ve ötekiler ulaşılamıyordu. Ray düzeninin üst çubuğunda "≡" ("Menüler") menülerin
+  başlıklarını listeler, başlık menüsünü açar. Test: `RailMenusTest`.
+- **Boş durum** (18): `DenseTable(emptyContent)` ve `DeskGrid(emptyContent)`; satır yokken ve bir şey yüklenmiyorken
+  gösterilir. Boş tablo yalnızca başlığından ibaretti.
+- **Gösterilen ekranın girişine yeniden dokunma** (19): `OnReselect { … }` ekranın kendi girişine yeniden dokunulunca
+  çalışır: listeyi başa kaydırmak, ekranın başına dönmek için. Test: `ReselectTest`.
+- **Tablonun başlığı ve seçimi** (21, görünür): başlık satır boyunda; seçili satırın renginin yanında başında bir çubuk var;
+  seçim kipinde (`toggleOnClick`) her satırda onay kutusu, başlıkta üç durumlu "Tümünü seç". Tablo başlıkları
+  TalkBack için başlıktır; sıralanan sütun yönünü söyler ("Artan sırada"), sıralanabilir olan dokununca ne
+  olacağını ("Gönderen sütununa göre sırala").
+- **Dokunma hedefi** (22, görünür): dokunmatikte sekmenin kapatma düğmesi 48 dp (32'ydi); bildirimin kapatma düğmesi 48 dp
+  (40'tı).
+- **Ham renkler** (26, görünür): bileşenlerde `Color(0x…)` kalmadı: resmin üstüne çizilen için `overlayScrim` ve `onOverlay`
+  rolleri, vurgu seçicinin onayı için `DeskPalette.onSwatch`; açık temada anahtarın topu yüzey rengi.
+- **Kapak ızgarasının büyüklüğü:** `DeskGrid(zoom = rememberGridZoom(prefs = prefs, key = "albumler"))` kapakları kullanıcının
+  büyütüp küçültmesine bırakır: Ctrl ile fare tekerleği (ya da dokunmatik yüzeyde kıstırma), ekranda iki parmak,
+  Ctrl ile + ve − (Ctrl+0 varsayılana döner), TalkBack'in "Kapakları büyüt/küçült" eylemleri. Tuşlar yazdıkları
+  karakterle eşleşir (Türkçe Q'da − kendi tuşunda, + Shift+4'te), tuş takımınınkiler de. Boy çeyrek çeyrek değişir,
+  4 dp ızgarasına oturur, saklanır. Kullanıcı bir boy seçmedikçe ızgara varsayılanı izler (parmakla daha büyük);
+  seçtiği boy varsayılan değişince kalır, Ctrl+0 onu unutur. Test: `GridZoomTest`.
+- **Komut paleti** (PER-3): liste başlıkları, sonuçları ve "hepsini göster" satırlarını her harfte kendi türlerine
+  göre yeniden kullanır.
+- **Metinler:** İngilizce "Close the player" → "Collapse the player" (oynatıcı yalnızca küçülüyor; Türkçesi doğruydu).
+  Türkçe ayarlarda görünüm bölümü "Görünüş"; "Görünüm" menü çubuğundaki menü olarak kaldı.
+
+Kalanlar: pencere başına başlık (`setTaskDescription`), sürükleme imleçleri, şeritlerde kaydırma okları, sistemin
+kontrast ayarı, bölücü sürüklenirken Esc, katı katmanlarda kenar ve gölgenin ikisi birden (25), işaretçi kipinde
+11 sp alt satırlar (24), test matrisindeki eksik pencere boyları (23), `Shortcut`'un `Command`'a genişlemesi (15'in
+geri kalanı).
+
+### Hareket
+
+
+Standardın hareket kararları; telefonda ve genişte:
+
+- `DeskMotion.spatial()` 0,85 yerine 0,9: gezinme hapı ve sekme çizgisi sekmez.
+- `pressScale`: telefonda bırakılan denetim dinlenme boyunu geçmez; basma her yerde aynı hızlı yayla geri gelir
+  (telefonda bırakınca hafifçe taşıyordu). Basmanın derinliği aynı.
+- `ListAppear`: satırlar yalnızca veri liste göründükten sonra gelince sırayla gelir (`rememberListAppear`'ın
+  anahtarları değişince: iskeletten sonra, aramanın sonuçları). Satırlarıyla birlikte görünen liste (yeniden açılan
+  sekme, geri dönülen ekran, anahtarsız liste) satırlarını hemen gösterir; 2.5.0 her listenin ilk görünüşünü
+  oynatıyordu. Testler: `ListAppearAndPressTest`.
+- `DeskMotion.page()` (yukarıda): ayrıntı sayfası yerini geçmeden oturur.
+- Kaydırma eylemli satır `gesture()` yayıyla bırakılır; yüzen düğme `open()` ile büyüyerek gelir, `fastSpatial()` ile
+  gider; çekerek yenilemenin diski `page()` ile yerine oturur ya da çekilir, yalnızca yenileme sürerken döner.
+  Azaltılmış harekette hepsi atlar.
+
+### Tasarım standardı
+
+
+- `DESIGN.md`: pencere sınıfları, boşluk ölçeği, ölçüler, köşeler, yazı, renk rolleri, cam, hareket, hangi iş için
+  hangi bileşen ve kitte bugün 4 dp ızgarasının dışında kalan değerler, nedenleriyle.
+- `AGENTS.md`: kitle uygulama yazan ya da kitte çalışan yapay zekâ yardımcıları için ortam ve kurallar.
+- `.github/pull_request_template.md`: standardın kontrol listesi.
+- `tools/design_check.py` CI'da ilk adım: tema dışında ham renk, `Toast.makeText`, boş `onClick`, iskelet dışında
+  sonsuz animasyon, 4 dp ızgarasının dışında ölçü, "!" ile biten ya da "..." içeren metin. Bugün olanlar
+  `tools/design_baseline.json`'da (115); fazlası derlemeyi durdurur ve yeni satırları gösterir.
+
+### Örnek uygulama
+
+
+Yapay zekâ yardımıyla yazılan uygulamaların ilk kopyaladığı yer:
+
+- Dosya ayrıntısının eylemleri platformun `Toast`'unu kullanıyordu; Sil hiçbir şey yapmıyordu, Yeniden adlandır boş
+  bir menü girişiydi. Sil (ayrıntının üst çubuğu, tablonun menüsü) dosyaları "Geri al"lı bir bildirimle çöpe taşır;
+  örneğin yapmadığı eylemler bunu kitin bildirimiyle, adıyla söyler; Yeniden adlandır kaldırıldı.
+- Boyut sütunu metni sıralıyordu, "1.2 GB" "12 KB"tan önce geliyordu; artık baytları sıralar. Uzun adlar ortadan
+  kısalır.
+- Oynatıcının Duraklat düğmeleri bir şey yapmıyordu: tek oynat/duraklat durumu, simge ve ad basınca ne olacağını
+  söyler.
+- Hakkında penceresi "Desktop Kit 2.0" diyordu: kitin sürümünü derlemeden (`gradle.properties`) alır.
+- Manifest masaüstü penceresine varsayılan boyunu ve Android'in en küçüğünü (386 × 352 dp) verir.
+- Dosyalar ekranı, bırakma bildirimleri ve oynatıcı Türkçe ve İngilizce (metin kaynakları, sayılar için `plurals`,
+  kodda parça parça kurulan cümle yok). Bileşen kataloğunun örnek etiketleri İngilizce kaldı.
+- Dosyalar ekranı tablet genişliğinden itibaren listeyi ve dosyanın ayrıntısını yan yana gösterir (`ListDetailLayout`,
+  bölücünün yeri saklanır), seçim yokken "Burada görmek için bir dosya seçin"; parmakla aşağı çekilince yenilenir;
+  ayrıntı panelinin düğmesi her genişlikte var, dar pencerede paneli alt sayfa olarak açar.
+- Albümler ızgarası `rememberGridZoom()` ile büyütülüp küçültülür.
+
+### Doğrulama, neyi kapsıyor
+
+Kitin testleri (Robolectric): yukarıda adı geçen yeni testler ve var olanların hepsi, her gönderide CI'da yeşil.
+Hiçbir değişiklik bir cihazda ya da emülatörde denenmedi. DeskMail'in kayıtlarında görülen üç sorunun (üst çubuk,
+yayın taşması, WebView) kitteki nedeni koddan ve kayıtların kare kare dökümünden çıkarıldı; düzeltmenin cihazdaki
+sonucu DeskMail kite geçince görülecek. Ekran görüntüleri görünüş değişiklikleri yüzünden (kenarlar, tonlar, tablo
+başlığı, raydaki "≡", kaydırma çubuğu yok: görüntüler dinlenmede) farklı çıkar; referanslar CI'ın çektikleriyle
+güncellendi. 2.4.1 (#10) ve 2.5.0 (#13) `main`'e birleşmeden bu PR birleştirilemez: üstlerine kuruldu.
+
 ## 2.5.0 (2026-11-13)
 
 Komut paletinde bir grubun gerisi artık görünür: yalnız en iyi altısı gösterilen grubun altındaki satır kaç eşleşmesi

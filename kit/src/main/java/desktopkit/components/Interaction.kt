@@ -4,9 +4,9 @@ import androidx.compose.animation.Animatable
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -85,6 +85,30 @@ fun Modifier.deskClickable(
         enabled = enabled,
         onClickLabel = onClickLabel,
         role = role,
+        onClick = onClick,
+    )
+
+/** [deskClickable] with a long press as well: a finger held on it, or TalkBack's double tap and hold. */
+fun Modifier.deskClickable(
+    interactionSource: MutableInteractionSource,
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)?,
+    enabled: Boolean = true,
+    role: Role? = Role.Button,
+    onClickLabel: String? = null,
+    onLongClickLabel: String? = null,
+): Modifier = if (onLongClick == null) deskClickable(interactionSource, onClick, enabled, role, onClickLabel) else this
+    .pointerHoverIcon(PointerIcon.Hand)
+    .hoverable(interactionSource, enabled)
+    .focusMemory()
+    .combinedClickable(
+        interactionSource = interactionSource,
+        indication = null,
+        enabled = enabled,
+        onClickLabel = onClickLabel,
+        role = role,
+        onLongClickLabel = onLongClickLabel,
+        onLongClick = onLongClick,
         onClick = onClick,
     )
 
@@ -193,8 +217,9 @@ private class InteractionFade(initial: Color, private var selected: Boolean) {
 /**
  * Touch feedback in place of a ripple: the element shrinks slightly while a finger holds it and
  * springs back on release. Only in touch mode; with a mouse (DeX) nothing moves, as on a desktop.
- * On a phone the press is three quarters as deep as [scale] (0.97 by default) and letting go
- * bounces back a touch over the rest; wider up it is [scale] and a plain spring both ways.
+ * On a phone the press is three quarters as deep as [scale] (0.97 by default); wider up it is
+ * [scale]. Both come back on the same quick spring without passing the rest size (2.5.0 and
+ * earlier bounced a phone's control a touch over it on release: a control is not a toy).
  */
 @Composable
 fun Modifier.pressScale(pressed: Boolean, scale: Float = 0.96f): Modifier {
@@ -202,11 +227,10 @@ fun Modifier.pressScale(pressed: Boolean, scale: Float = 0.96f): Modifier {
     val tier = LocalMotionTier.current
     val phone = tier == MotionTier.Gesture
     // a phone's press is three quarters as deep (0.96 → 0.97: the finger covers the control, the
-    // shrink is felt more than seen), and letting go bounces back a touch over the rest
+    // shrink is felt more than seen)
     val down = if (phone) 1f - (1f - scale) * 0.75f else scale
     val target = if (pressed && touch) down else 1f
-    val spec = if (phone && !pressed) spring(dampingRatio = 0.75f, stiffness = 1200f, visibilityThreshold = 0.001f)
-    else DeskMotion.fade(tier, DeskMotion.fastSpatial())
+    val spec = DeskMotion.fade(tier, DeskMotion.fastSpatial<Float>())
     val value by animateFloatAsState(target, spec, label = "pressScale")
     return this.graphicsLayer {
         scaleX = value

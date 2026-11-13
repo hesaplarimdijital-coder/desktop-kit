@@ -94,6 +94,16 @@ data class DeskColors(
     /** Second brand colour (Material "secondary"). */
     val brandSecondary: Color,
     val scrim: Color,
+    /**
+     * The edge of an input at rest (a text field, a switch's off track): at least 3:1 against the
+     * background and the surfaces, so the control can be found where it is (WCAG 1.4.11). [borderStrong]
+     * stays for the edges that only part things (buttons, panels, menus).
+     */
+    val controlBorder: Color = borderStrong,
+    /** Darkens artwork under what is drawn on it (a cover's Play button, its check circle). */
+    val overlayScrim: Color = Color(0x59000000),
+    /** Icons and edges drawn on artwork, over [overlayScrim]. */
+    val onOverlay: Color = Color(0xFFFFFFFF),
 )
 
 object DeskPalette {
@@ -106,6 +116,9 @@ object DeskPalette {
     }
 
     private val DarkOnAccent = Color(0xFF0E1420)
+
+    /** The check on a colour swatch (the accent chooser): the swatches are all light enough for it. */
+    val onSwatch: Color = DarkOnAccent
 
     fun dark(accent: Accent): DeskColors {
         val hover = Color(0xFF262C34)
@@ -121,7 +134,8 @@ object DeskPalette {
             surface = Color(0xFF171B20),
             surfaceRaised = Color(0xFF1F252C),
             hover = hover,
-            pressed = Color(0xFF2A3038),
+            // a step past hover, so a press shows under the pointer (1.16:1 to hover; 1.06:1 before)
+            pressed = Color(0xFF30363F),
             border = Color(0xFF20262D),
             borderStrong = Color(0xFF2A3038),
             text = Color(0xFFE6E9ED),
@@ -138,6 +152,7 @@ object DeskPalette {
             danger = Color(0xFFFF7A6E),
             brandSecondary = Color(0xFFFF7A6E),
             scrim = Color(0x99000000),
+            controlBorder = Color(0xFF6A7480),
         )
     }
 
@@ -147,7 +162,7 @@ object DeskPalette {
         surface = Color(0xFF0A0C0F),
         surfaceRaised = Color(0xFF161A1F),
         hover = Color(0xFF1C2127),
-        pressed = Color(0xFF242A31),
+        pressed = Color(0xFF2A3038),
         border = Color(0xFF1A1F25),
         borderStrong = Color(0xFF262C34),
         selection = ensureContrast(accent.oledSelection, Color(0xFF959FAB), lighten = false),
@@ -155,7 +170,8 @@ object DeskPalette {
     )
 
     fun light(accent: Accent): DeskColors {
-        val hover = Color(0xFFEDF0F4)
+        // hover shows on the page (1.14:1 to it; 1.10:1 before), a press a step further
+        val hover = Color(0xFFE9EDF2)
         // the deep tone carries white text and is read as text on hover
         val deep = ensureContrast(ensureContrast(mixSrgb(accent.base, Color.Black, 0.55f), Color.White, lighten = false), hover, lighten = false)
         val selection = mixSrgb(accent.base, Color.White, 0.22f)
@@ -167,7 +183,7 @@ object DeskPalette {
             surface = Color(0xFFFFFFFF),
             surfaceRaised = Color(0xFFFFFFFF),
             hover = hover,
-            pressed = Color(0xFFE2E5EA),
+            pressed = Color(0xFFDADEE4),
             border = Color(0xFFE2E5EA),
             borderStrong = Color(0xFFD6DAE0),
             text = Color(0xFF12161B),
@@ -185,6 +201,7 @@ object DeskPalette {
             danger = Color(0xFFB4382B),
             brandSecondary = Color(0xFFE0574B),
             scrim = Color(0x6612161B),
+            controlBorder = Color(0xFF7E8794),
         )
     }
 }

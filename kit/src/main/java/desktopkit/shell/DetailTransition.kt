@@ -48,6 +48,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -85,7 +86,7 @@ import kotlinx.coroutines.launch
  *
  * - opening ([detail] becomes non-null): on a phone as Android's own list → detail: the detail,
  *   opaque from its first frame, slides in from the end edge over the list on the
- *   [desktopkit.theme.DeskMotion.open] spring; the list behind it is not faded, it sinks to 95 %
+ *   [desktopkit.theme.DeskMotion.page] spring (no overshoot); the list behind it is not faded, it sinks to 95 %
  *   and darkens under a scrim, so its text never shows through the detail. With a
  *   [detailSharedCard] the card carries the way and the rest fades through: the list is gone
  *   before the detail starts to appear. From tablet width up the 0.2.0 shared axis: the detail
@@ -134,6 +135,9 @@ fun <T : Any> DetailTransition(
     val latestOnBack by rememberUpdatedState(onBack)
     val latestDetail by rememberUpdatedState(detail)
     val cards = remember { DetailSharedState() }
+    // the list leaves composition once a detail covers it; its remembered state (scroll position, open
+    // sections, a typed filter) waits here for its return, as Navigation keeps a screen's
+    val saveable = rememberSaveableStateHolder()
     val page = colors.background
     val behind = colors.pressed
     val scrim = colors.scrim
@@ -177,6 +181,9 @@ fun <T : Any> DetailTransition(
                 if (shared != null && animated) DetailSharedScopes(shared, this, tier, side, cards) else null
             }
             val held = phone && dropped && target?.let(detailKey) != seekable.currentState?.let(detailKey)
+            // a side is being left once the app has moved on from it (a top bar it set gives way at once)
+            val sideKey = target?.let(detailKey)
+            ProvideScreenLeaving({ latestDetail?.let(detailKey) != sideKey }) {
             CompositionLocalProvider(
                 LocalDetailSharedScopes provides (if (held) null else scopes),
                 // the list's cards register at rest too: the opening decides on its first frame whether a card carries it
@@ -190,11 +197,11 @@ fun <T : Any> DetailTransition(
                     // scrim is drawn over the whole window, the margins left by the sinking list included.
                     val behindDetail: (EnterExitState) -> Float = { state -> if (state == EnterExitState.Visible || !(phone && animated)) 0f else 1f }
                     val depth = this.transition.animateFloat(
-                        transitionSpec = { if (gestureClose) tween(GESTURE_MS, easing = DeskMotion.Standard) else DeskMotion.open(FRACTION) },
+                        transitionSpec = { if (gestureClose) tween(GESTURE_MS, easing = DeskMotion.Standard) else DeskMotion.page(FRACTION) },
                         label = "listDepth",
                     ) { behindDetail(it) }
                     val dim = this.transition.animateFloat(
-                        transitionSpec = { if (gestureClose) tween(GESTURE_MS, easing = AfterTheFinger) else DeskMotion.open(FRACTION) },
+                        transitionSpec = { if (gestureClose) tween(GESTURE_MS, easing = AfterTheFinger) else DeskMotion.page(FRACTION) },
                         label = "listScrim",
                     ) { behindDetail(it) }
                     // opaque, so the shade left behind a closed detail never shows through the list
@@ -219,7 +226,7 @@ fun <T : Any> DetailTransition(
                                         scaleY = scale
                                     }
                                 },
-                        ) { list() }
+                        ) { saveable.SaveableStateProvider(LIST_STATE_KEY) { list() } }
                     }
                 } else {
                     // the detail as the app has it now: the transition holds the object it was opened with, and an
@@ -245,6 +252,7 @@ fun <T : Any> DetailTransition(
                             .background(page),
                     ) { detailContent(shown) }
                 }
+            }
             }
         }
     }
@@ -369,6 +377,9 @@ fun <T : Any> DetailTransition(
     }
 }
 
+/** The key the list's saved state is kept under while a detail covers it. */
+private const val LIST_STATE_KEY = "desktopkit.DetailTransition.list"
+
 /** How far the finger seeks the closing; the rest ([1 - GESTURE_END]) is the detail's way out once let go. */
 private const val GESTURE_END = 0.85f
 
@@ -460,7 +471,9 @@ private fun <T> AnimatedContentTransitionScope<T?>.detailTransform(
         // from the end edge over the list on the opening spring; the list is not faded, it sinks and
         // darkens under it. Back the same way round. With a card the card carries the way and the rest
         // fades through: the side going away is gone before the other starts to appear.
-        val slide = DeskMotion.open(IntOffset.VisibilityThreshold)
+        // a whole page does not overshoot: on the 0.9 spring a page slid 2 px past its place and back as it
+        // landed, which over a page of text read as a shiver (DeskMail's request 19, S24 recording)
+        val slide = DeskMotion.page(IntOffset.VisibilityThreshold)
         val fadeIn = fadeIn(tween(FADE_IN_MS, delayMillis = FADE_OUT_MS, easing = DeskMotion.StandardDecelerate))
         val fadeOut = fadeOut(tween(FADE_OUT_MS, easing = DeskMotion.StandardAccelerate))
         return if (opening) {

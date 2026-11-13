@@ -17,11 +17,12 @@
     <string name="dk_key_space">Boşluk</string>
     <string name="dk_menu_view">Görünüm</string>
     <string name="dk_menu_help">Yardım</string>
+    <string name="dk_menus">Menüler</string>
     <string name="dk_toggle_sidebar">Kenar çubuğunu göster veya gizle</string>
     <string name="dk_shortcut_list">Klavye kısayolları</string>
 
     <!-- Ayar bölümleri -->
-    <string name="dk_settings_appearance">Görünüm</string>
+    <string name="dk_settings_appearance">Görünüş</string>
     <string name="dk_settings_theme">Tema</string>
     <string name="dk_theme_system">Sistem</string>
     <string name="dk_theme_light">Açık</string>
@@ -50,6 +51,9 @@
     <string name="dk_inspector_show">Ayrıntı panelini göster</string>
     <string name="dk_inspector_hide">Ayrıntı panelini gizle</string>
     <string name="dk_resize_inspector">Ayrıntı panelini boyutlandır</string>
+    <string name="dk_resize">Bölmeleri boyutlandır</string>
+    <string name="dk_grid_larger">Kapakları büyüt</string>
+    <string name="dk_grid_smaller">Kapakları küçült</string>
     <string name="dk_key_esc">Esc</string>
 
     <!-- 2.0: formlar, geri bildirim, yapı -->
@@ -63,9 +67,11 @@
     <string name="dk_number_increase">Artır</string>
     <string name="dk_notification">Bildirim</string>
     <string name="dk_selection_clear">Seçimi kaldır</string>
+    <string name="dk_select_all">Tümünü seç</string>
     <string name="dk_tab_close">Sekmeyi kapat</string>
     <string name="dk_tabs">Sekmeler</string>
     <string name="dk_loading">Yükleniyor</string>
+    <string name="dk_refreshing">Yenileniyor</string>
     <string name="dk_accent_system">Duvar kâğıdı</string>
     <string name="dk_palette">Komut paleti</string>
     <string name="dk_palette_best">En iyi eşleşme</string>
@@ -75,4 +81,15 @@
     <string name="dk_palette_show_all">%1$d sonucun hepsini göster</string>
     <string name="dk_new_window">Yeni pencere</string>
     <string name="dk_play">Oynat</string>
+    <plurals name="dk_badge_new">
+        <item quantity="one">%d yeni</item>
+        <item quantity="other">%d yeni</item>
+    </plurals>
+    <string name="dk_badge_dot">Yeni</string>
+    <string name="dk_sorted_ascending">Artan sırada</string>
+    <string name="dk_sorted_descending">Azalan sırada</string>
+    <string name="dk_sort_by">%1$s sütununa göre sırala</string>
+    <string name="dk_close_sheet">Sayfayı kapat</string>
+    <string name="dk_token_invalid">Geçersiz</string>
+    <string name="dk_token_remove">Kaldır</string>
 </resources>

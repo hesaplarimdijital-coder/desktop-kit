@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
@@ -43,6 +44,7 @@ import desktopkit.components.BelowAnchorPositionProvider
 import desktopkit.components.DeskIcons
 import desktopkit.components.MenuEntry
 import desktopkit.components.MenuPopup
+import desktopkit.components.MenuSpec
 import desktopkit.components.TooltipArea
 import desktopkit.components.TooltipBubble
 import desktopkit.components.collectState
@@ -81,13 +83,16 @@ fun currentWidthClass(): WidthClass = LocalWidthClass.current
 
 /**
  * Replaces the compact (phone) top bar's title, adds a back/close button and action icons while
- * this is in composition. No effect on Medium and wider layouts (DeX unchanged). The last one
- * composed wins; leaving composition restores the default.
+ * this is in composition. No effect on Medium and wider layouts (DeX unchanged) unless
+ * [showOnRail]: then the rail layout's top bar (tablets, split screen) takes it too, for a page
+ * opened over another one ("Add account" over Settings) whose own title and way back would
+ * otherwise show nowhere there. The sidebar layout never does. The last one composed wins; leaving
+ * composition restores the default.
  *
  * - [title]: shown instead of the route's label (null keeps it); single line, cross-fades when it changes.
  * - [onBack]: adds a 48 dp back (arrow) or close (cross, [backIcon]) button before the title, and
  *   the system Back gesture calls it while this is the active top bar. Nothing is registered on
- *   wider layouts, where Back keeps its usual meaning.
+ *   wider layouts (unless [showOnRail], on the rail), where Back keeps its usual meaning.
  * - [actions]: icon buttons before the search button; with more than three, the first two (primary
  *   ones first) stay and the rest go into a "more" (⋮) menu.
  * - [showSearch]: false hides the shell's search button.
@@ -99,14 +104,20 @@ fun CompactTopBar(
     backIcon: TopBarBackIcon = TopBarBackIcon.Back,
     actions: List<TopBarAction> = emptyList(),
     showSearch: Boolean = true,
+    showOnRail: Boolean = false,
 ) {
     val host = LocalCompactTopBarHost.current ?: return
-    if (LocalWidthClass.current != WidthClass.Compact) return
+    val kind = NavKind.forWidth(LocalWidthClass.current)
+    if (kind == NavKind.Sidebar || (kind == NavKind.Rail && !showOnRail)) return
     val latestOnBack by rememberUpdatedState(onBack)
     val stableBack: () -> Unit = remember { { latestOnBack?.invoke() } }
-    val override = TopBarOverride(title, if (onBack != null) stableBack else null, backIcon, actions, showSearch)
-    val entry = remember(host) { CompactTopBarHost.Entry(override) }
-    SideEffect { entry.value = override }
+    val override = TopBarOverride(title, if (onBack != null) stableBack else null, backIcon, actions, showSearch, showOnRail)
+    val leaving = LocalScreenLeaving.current
+    val entry = remember(host) { CompactTopBarHost.Entry(override, leaving) }
+    SideEffect {
+        entry.value = override
+        entry.leaving = leaving
+    }
     DisposableEffect(host, entry) {
         host.add(entry)
         onDispose { host.remove(entry) }
@@ -123,20 +134,33 @@ internal data class TopBarOverride(
     val backIcon: TopBarBackIcon,
     val actions: List<TopBarAction>,
     val showSearch: Boolean,
+    val showOnRail: Boolean = false,
 )
 
-/** The [CompactTopBar] calls in composition, oldest first; the newest one is shown. */
+/**
+ * The [CompactTopBar] calls in composition, oldest first; the newest one of a screen that is not
+ * leaving is shown.
+ *
+ * A screen being left stays composed until its way out has played. 2.4.0 kept its call until then:
+ * the title changed with the route at once, the back button and the actions only once the old screen
+ * was gone, so the bar changed twice and its heading faded out and in twice (DeskMail's request 18).
+ * A call made by a screen that is being left ([LocalScreenLeaving]) no longer counts, so the whole bar
+ * changes in one step, together with the title.
+ */
 @Stable
 internal class CompactTopBarHost {
-    class Entry(initial: TopBarOverride) {
+    class Entry(initial: TopBarOverride, leaving: () -> Boolean) {
         var value by mutableStateOf(initial)
+        var leaving by mutableStateOf(leaving)
     }
 
     private val entries = mutableStateListOf<Entry>()
 
-    val current: TopBarOverride? get() = entries.lastOrNull()?.value
+    private val shown: Entry? get() = entries.lastOrNull { !it.leaving() }
 
-    fun isActive(entry: Entry): Boolean = entries.lastOrNull() === entry
+    val current: TopBarOverride? get() = shown?.value
+
+    fun isActive(entry: Entry): Boolean = shown === entry
 
     fun add(entry: Entry) {
         entries.add(entry)
@@ -148,6 +172,22 @@ internal class CompactTopBarHost {
 }
 
 internal val LocalCompactTopBarHost = staticCompositionLocalOf<CompactTopBarHost?> { null }
+
+/**
+ * Whether the screen around is being left: a tab that is no longer the current route, the list
+ * while a detail is open, a detail the app has closed ([DetailTransition]). Read in snapshots, so a
+ * reader follows the change. The answer follows the app's state, not the animation: a screen the
+ * finger is pulling away with the Back gesture counts as left only once the gesture is let go.
+ */
+internal val LocalScreenLeaving = staticCompositionLocalOf<() -> Boolean> { { false } }
+
+/** [LocalScreenLeaving] for content inside this one, which is also being left when [leaving] says so. */
+@Composable
+internal fun ProvideScreenLeaving(leaving: () -> Boolean, content: @Composable () -> Unit) {
+    val outer = LocalScreenLeaving.current
+    val combined = remember(outer, leaving) { { outer() || leaving() } }
+    CompositionLocalProvider(LocalScreenLeaving provides combined, content = content)
+}
 
 /** Icons shown in the top bar at most, the "more" button included. */
 internal const val MAX_TOP_BAR_ICONS = 3
@@ -224,6 +264,38 @@ internal fun TopBarOverflow(actions: List<TopBarAction>) {
             visible = open,
             onDismiss = { open = false },
             entries = actions.map { MenuEntry.Item(it.label, it.onClick, icon = it.icon, enabled = it.enabled) },
+            offset = IntOffset(0, height),
+        )
+    }
+}
+
+/**
+ * The menu bar's menus in a window too narrow for the bar (the rail's top bar, an Expanded DeX window): a "≡"
+ * button lists their titles, and a title opens its menu there.
+ */
+@Composable
+internal fun TopBarMenus(menus: List<MenuSpec>) {
+    var open by remember { mutableStateOf(false) }
+    var chosen by remember { mutableStateOf<MenuSpec?>(null) }
+    var height by remember { mutableIntStateOf(0) }
+    Box(Modifier.onSizeChanged { height = it.height }) {
+        TopBarIconButton(DeskIcons.Menu, stringResource(R.string.dk_menus), onClick = { open = true })
+        MenuPopup(
+            visible = open,
+            onDismiss = { open = false },
+            entries = menus.map { menu ->
+                MenuEntry.Item(menu.title, {
+                    open = false
+                    chosen = menu
+                })
+            },
+            offset = IntOffset(0, height),
+        )
+        val menu = chosen
+        MenuPopup(
+            visible = menu != null,
+            onDismiss = { chosen = null },
+            entries = menu?.entries?.invoke().orEmpty(),
             offset = IntOffset(0, height),
         )
     }

@@ -149,8 +149,8 @@ class MainActivity : ComponentActivity() {
                             val songs = songsIn(payload)
                             library.addToPlaylist(0, songs)
                             scope.launch {
-                                val result = toasts.show("${payload.label} added to “${library.playlists[0].name}”", actionLabel = "Undo",
-                                    shortcut = "Ctrl+Z")
+                                val result = toasts.show(context.getString(R.string.added_to_playlist, payload.label, library.playlists[0].name),
+                                    actionLabel = context.getString(R.string.action_undo), shortcut = "Ctrl+Z")
                                 if (result == ToastResult.ActionPerformed) library.addToPlaylist(0, -songs)
                             }
                             true
@@ -159,7 +159,8 @@ class MainActivity : ComponentActivity() {
                             val names = payload.keys.filter { it !in library.binned }
                             library.binned.addAll(names)
                             scope.launch {
-                                val result = toasts.show("${payload.label} moved to the bin", actionLabel = "Undo", shortcut = "Ctrl+Z")
+                                val result = toasts.show(context.getString(R.string.moved_to_bin, payload.label),
+                                    actionLabel = context.getString(R.string.action_undo), shortcut = "Ctrl+Z")
                                 if (result == ToastResult.ActionPerformed) library.binned.removeAll(names)
                             }
                             true
@@ -242,7 +243,7 @@ class MainActivity : ComponentActivity() {
                         "albums" -> AlbumsScreen(openAlbum, onOpen = { openAlbum = it }, onPlay = { track = it })
                         "tracks" -> TracksScreen(playing = track, onPlay = { track = it })
                         "playlists" -> PlaylistsScreen(library, onPlay = { track = it })
-                        "files" -> FilesScreen(prefs, library)
+                        "files" -> FilesScreen(prefs, library, toasts)
                         "bin" -> BinScreen(library)
                         "settings" -> {
                             // the shortcut table only where there is a keyboard (or a mouse) to use it
@@ -264,12 +265,12 @@ class MainActivity : ComponentActivity() {
                 }
                 if (about) {
                     // "Esc" with a hardware keyboard (DeX), a × button on touch
-                    DeskDialog(onDismiss = { about = false }, title = "Desktop Kit 2.0", actions = {
-                        DeskButton("Close", { about = false }, primary = true)
+                    // the kit's version, from the build (it said "2.0" long after 2.0)
+                    DeskDialog(onDismiss = { about = false }, title = stringResource(R.string.about_title, BuildConfig.VERSION_NAME), actions = {
+                        DeskButton(stringResource(R.string.action_close), { about = false }, primary = true)
                     }) {
                         Text(
-                            "Glass bars, springs on the phone, the workstation on tablet and DeX, the menu bar in the " +
-                                "window's title bar, more than one window.",
+                            stringResource(R.string.about_text),
                             style = DeskTheme.type.body,
                             color = DeskTheme.colors.textSecondary,
                         )

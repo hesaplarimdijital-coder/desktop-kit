@@ -17,6 +17,7 @@
     <string name="dk_key_space">Space</string>
     <string name="dk_menu_view">View</string>
     <string name="dk_menu_help">Help</string>
+    <string name="dk_menus">Menus</string>
     <string name="dk_toggle_sidebar">Show or hide the sidebar</string>
     <string name="dk_shortcut_list">Keyboard shortcuts</string>
 
@@ -41,7 +42,7 @@
     <!-- 1.0: player, sheets, tables, workstation, dialogs -->
     <string name="dk_player">Player</string>
     <string name="dk_player_expand">Open the player</string>
-    <string name="dk_player_collapse">Close the player</string>
+    <string name="dk_player_collapse">Collapse the player</string>
     <string name="dk_columns">Columns</string>
     <string name="dk_columns_move_left">Move left</string>
     <string name="dk_columns_move_right">Move right</string>
@@ -50,6 +51,9 @@
     <string name="dk_inspector_show">Show the inspector</string>
     <string name="dk_inspector_hide">Hide the inspector</string>
     <string name="dk_resize_inspector">Resize the inspector</string>
+    <string name="dk_resize">Resize the panes</string>
+    <string name="dk_grid_larger">Larger covers</string>
+    <string name="dk_grid_smaller">Smaller covers</string>
     <string name="dk_key_esc">Esc</string>
 
     <!-- 2.0: forms, feedback, structure -->
@@ -63,9 +67,11 @@
     <string name="dk_number_increase">Increase</string>
     <string name="dk_notification">Notification</string>
     <string name="dk_selection_clear">Clear selection</string>
+    <string name="dk_select_all">Select all</string>
     <string name="dk_tab_close">Close tab</string>
     <string name="dk_tabs">Tabs</string>
     <string name="dk_loading">Loading</string>
+    <string name="dk_refreshing">Refreshing</string>
     <string name="dk_accent_system">Wallpaper</string>
     <string name="dk_palette">Command palette</string>
     <string name="dk_palette_best">Best match</string>
@@ -75,4 +81,15 @@
     <string name="dk_palette_show_all">Show all %1$d</string>
     <string name="dk_new_window">New window</string>
     <string name="dk_play">Play</string>
+    <plurals name="dk_badge_new">
+        <item quantity="one">%d new</item>
+        <item quantity="other">%d new</item>
+    </plurals>
+    <string name="dk_badge_dot">New</string>
+    <string name="dk_sorted_ascending">Sorted ascending</string>
+    <string name="dk_sorted_descending">Sorted descending</string>
+    <string name="dk_sort_by">Sort by %1$s</string>
+    <string name="dk_close_sheet">Close sheet</string>
+    <string name="dk_token_invalid">Not valid</string>
+    <string name="dk_token_remove">Remove</string>
 </resources>

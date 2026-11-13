@@ -1,5 +1,18 @@
 package desktopkit.components
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
+import desktopkit.input.TabNavigation
 import desktopkit.theme.rememberDeskHaptics
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -161,6 +174,14 @@ fun KeyValueRow(
  * without it, opens [menu]; a right click and the Menu key open [menu] too. In [selectionMode] a
  * check box leads the row and shows [selected]. [drag] lets the row be dragged with a mouse to a
  * [dropZone].
+ *
+ * [subtitleMaxLines] lets the subtitle wrap; [preview] adds a third line under it (a message's first
+ * words under its subject), up to [previewMaxLines] lines. [moreButton] puts a "⋯" button at the
+ * row's end that opens [menu]: on touch the long press that opens it is not discovered by everyone,
+ * and the button says the row has actions.
+ *
+ * [swipeStart] and [swipeEnd] are what a finger does by sliding the row toward the end and toward the
+ * start ([SwipeAction]: archive, snooze); not in [selectionMode], not with a mouse.
  */
 @Composable
 fun DeskListRow(
@@ -189,6 +210,12 @@ fun DeskListRow(
     menu: (() -> List<MenuEntry>)? = null,
     drag: (() -> DeskDragPayload?)? = null,
     openMenuOnTap: Boolean = false,
+    subtitleMaxLines: Int = 1,
+    preview: String? = null,
+    previewMaxLines: Int = 2,
+    moreButton: Boolean = false,
+    swipeStart: SwipeAction? = null,
+    swipeEnd: SwipeAction? = null,
 ) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
@@ -202,73 +229,89 @@ fun DeskListRow(
     val background by animatedStateBackground(state, selected)
     val moreLabel = stringResource(R.string.dk_more_options)
     val minHeight = when {
-        subtitle != null || progress != null -> if (touch) 56.dp else 44.dp
+        subtitle != null || progress != null || preview != null -> if (touch) 56.dp else 44.dp
         else -> dimens.rowHeight.coerceAtLeast(dimens.minTarget)
     }
     Box(modifier.fillMaxWidth().onSizeChanged { rowHeight = it.height }.dragSource(enabled = drag != null) { drag?.invoke() }) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = minHeight)
-                .focusRing(state, RoundedCornerShape(dimens.radiusSmall))
-                .background(background)
-                .pointerHoverIcon(PointerIcon.Hand)
-                .hoverable(interaction, enabled)
-                .secondaryClick(enabled && menu != null, openMenuAt)
-                .combinedClickable(
-                    interactionSource = interaction,
-                    indication = null,
-                    enabled = enabled,
-                    onLongClick = when {
-                        onLongClick != null -> onLongClick
-                        menu != null -> { { menuAt = IntOffset(0, rowHeight) } }
-                        else -> null
-                    },
-                    onClick = if (openMenuOnTap && !selectionMode && menu != null) { { menuAt = IntOffset(0, rowHeight) } } else onClick,
-                )
-                .onKeyEvent { event ->
-                    val opens = event.type == KeyEventType.KeyDown && latestMenu != null &&
-                        (event.key == Key.Menu || (event.key == Key.F10 && event.isShiftPressed))
-                    if (opens) menuAt = IntOffset(0, rowHeight)
-                    opens
+        SwipeBox(swipeStart, swipeEnd, enabled = touch && enabled && !selectionMode) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = minHeight)
+                    .focusRing(state, RoundedCornerShape(dimens.radiusSmall))
+                    .background(background)
+                    .pointerHoverIcon(PointerIcon.Hand)
+                    .hoverable(interaction, enabled)
+                    .secondaryClick(enabled && menu != null, openMenuAt)
+                    .combinedClickable(
+                        interactionSource = interaction,
+                        indication = null,
+                        enabled = enabled,
+                        onLongClick = when {
+                            onLongClick != null -> onLongClick
+                            menu != null -> { { menuAt = IntOffset(0, rowHeight) } }
+                            else -> null
+                        },
+                        onClick = if (openMenuOnTap && !selectionMode && menu != null) { { menuAt = IntOffset(0, rowHeight) } } else onClick,
+                    )
+                    .onKeyEvent { event ->
+                        val opens = event.type == KeyEventType.KeyDown && latestMenu != null &&
+                            (event.key == Key.Menu || (event.key == Key.F10 && event.isShiftPressed))
+                        if (opens) menuAt = IntOffset(0, rowHeight)
+                        opens
+                    }
+                    .semantics {
+                        this.selected = selected
+                        // the menu and the swipes, by name: TalkBack's actions
+                        val actions = listOfNotNull(
+                            if (menu != null) CustomAccessibilityAction(moreLabel) { menuAt = IntOffset(0, rowHeight); true } else null,
+                            swipeStart?.let { swipe -> CustomAccessibilityAction(swipe.label) { swipe.onSwipe(); true } },
+                            swipeEnd?.let { swipe -> CustomAccessibilityAction(swipe.label) { swipe.onSwipe(); true } },
+                        )
+                        if (actions.isNotEmpty()) customActions = actions
+                    }
+                    .padding(start = dimens.pagePadding + indent, end = dimens.pagePadding, top = dimens.gapS, bottom = dimens.gapS),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(dimens.gapM),
+            ) {
+                if (selectionMode) DeskCheckbox(selected, onCheckedChange = null)
+                if (leadingContent != null) {
+                    leadingContent()
+                } else if (leading != null) {
+                    Icon(leading, contentDescription = null, tint = leadingTint, modifier = Modifier.size(dimens.icon))
                 }
-                .semantics {
-                    this.selected = selected
-                    if (menu != null) customActions = listOf(CustomAccessibilityAction(moreLabel) { menuAt = IntOffset(0, rowHeight); true })
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        title,
+                        style = if (strong) DeskTheme.type.bodyStrong else DeskTheme.type.body,
+                        color = if (!enabled) colors.textTertiary else if (selected) colors.onSelection else colors.text,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (!subtitle.isNullOrEmpty()) {
+                        Text(subtitle, style = DeskTheme.type.caption, color = subtitleColor, maxLines = subtitleMaxLines.coerceAtLeast(1),
+                            overflow = TextOverflow.Ellipsis)
+                    }
+                    if (!preview.isNullOrEmpty()) {
+                        Text(preview, style = DeskTheme.type.caption, color = colors.textTertiary, maxLines = previewMaxLines.coerceAtLeast(1),
+                            overflow = TextOverflow.Ellipsis)
+                    }
+                    if (progress != null) {
+                        Spacer(Modifier.height(2.dp))
+                        DeskProgressBar(progress.coerceIn(0f, 1f), Modifier.fillMaxWidth(), color = progressColor, height = 3.dp)
+                    }
                 }
-                .padding(start = dimens.pagePadding + indent, end = dimens.pagePadding, top = dimens.gapS, bottom = dimens.gapS),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(dimens.gapM),
-        ) {
-            if (selectionMode) DeskCheckbox(selected, onCheckedChange = null)
-            if (leadingContent != null) {
-                leadingContent()
-            } else if (leading != null) {
-                Icon(leading, contentDescription = null, tint = leadingTint, modifier = Modifier.size(dimens.icon))
+                if (trailing != null || trailingSub != null) {
+                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.widthIn(max = 120.dp)) {
+                        if (trailing != null) Text(trailing, style = DeskTheme.type.mono, color = trailingColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        if (trailingSub != null) Text(trailingSub, style = DeskTheme.type.caption, color = trailingSubColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                trailingContent?.invoke(this)
+                if (moreButton && menu != null && !selectionMode) {
+                    DeskIconButton(DeskIcons.MoreHorizontal, moreLabel, onClick = { menuAt = IntOffset(0, rowHeight) }, enabled = enabled)
+                }
             }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    title,
-                    style = if (strong) DeskTheme.type.bodyStrong else DeskTheme.type.body,
-                    color = if (!enabled) colors.textTertiary else if (selected) colors.onSelection else colors.text,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (!subtitle.isNullOrEmpty()) {
-                    Text(subtitle, style = DeskTheme.type.caption, color = subtitleColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                if (progress != null) {
-                    Spacer(Modifier.height(2.dp))
-                    DeskProgressBar(progress.coerceIn(0f, 1f), Modifier.fillMaxWidth(), color = progressColor, height = 3.dp)
-                }
-            }
-            if (trailing != null || trailingSub != null) {
-                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.widthIn(max = 120.dp)) {
-                    if (trailing != null) Text(trailing, style = DeskTheme.type.mono, color = trailingColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    if (trailingSub != null) Text(trailingSub, style = DeskTheme.type.caption, color = trailingSubColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            }
-            trailingContent?.invoke(this)
         }
         if (divider) HorizontalRule(Modifier.align(Alignment.BottomStart).padding(start = dimens.pagePadding + indent))
         if (menu != null) {
@@ -389,6 +432,10 @@ fun IconMenuButton(
 /**
  * A row of [DeskTab]s over a rule, scrolling sideways when they do not fit (search results,
  * conversations, the sections of a screen).
+ *
+ * The strip is one stop of the Tab key, at the selected tab (and its close button); the arrow keys
+ * move among the tabs, Home and End to the first and the last one, Enter or Space opens the one
+ * focused.
  */
 @Composable
 fun TabStrip(
@@ -398,19 +445,75 @@ fun TabStrip(
 ) {
     val rule = DeskTheme.colors.border
     val label = stringResource(R.string.dk_tabs)
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .drawBehind { drawRect(rule, topLeft = Offset(0f, size.height - 1.dp.toPx()), size = Size(size.width, 1.dp.toPx())) }
-            .horizontalScroll(rememberScrollState())
-            .padding(contentPadding)
-            .selectableGroup()
-            .semantics { paneTitle = label },
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-        content = content,
-    )
+    val strip = remember { TabStripState() }
+    strip.rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    CompositionLocalProvider(LocalTabStrip provides strip) {
+        Row(
+            modifier = modifier
+                .fillMaxWidth()
+                .drawBehind { drawRect(rule, topLeft = Offset(0f, size.height - 1.dp.toPx()), size = Size(size.width, 1.dp.toPx())) }
+                .onKeyEvent { event -> event.type == KeyEventType.KeyDown && strip.move(event.key) }
+                .horizontalScroll(rememberScrollState())
+                .padding(contentPadding)
+                .selectableGroup()
+                .semantics { paneTitle = label },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            content = content,
+        )
+    }
 }
+
+/** The tabs of a [TabStrip], to move the keyboard focus among them. */
+@Stable
+internal class TabStripState {
+    class Tab(val focus: FocusRequester) {
+        var selected = false
+        var focused = false
+
+        /** Where the tab lies along the strip, in the window; the order the arrows follow. */
+        var x = 0f
+    }
+
+    val tabs = mutableListOf<Tab>()
+
+    /** Whether the strip runs right to left (Arabic, Hebrew): its first tab is the rightmost. */
+    var rtl = false
+
+    /**
+     * Whether Tab stops at [tab]: the focused tab while the focus is in the strip (so Tab leaves it), else the
+     * selected one, else the first.
+     */
+    fun stopsAt(tab: Tab): Boolean {
+        val focused = tabs.firstOrNull { it.focused }
+        return when {
+            focused != null -> tab === focused
+            tabs.any { it.selected } -> tab.selected
+            else -> tab === (if (rtl) tabs.maxByOrNull { it.x } else tabs.minByOrNull { it.x })
+        }
+    }
+
+    /**
+     * Moves the focus to the tab beside the focused one ([key] Left, Right: the one on that side; Home, End: the first
+     * and the last, which right to left are the rightmost and the leftmost); false for another key.
+     */
+    fun move(key: Key): Boolean {
+        val ordered = tabs.sortedBy { it.x }
+        val at = ordered.indexOfFirst { it.focused }
+        if (at < 0) return false
+        val target = when (key) {
+            Key.DirectionLeft -> ordered.getOrNull(at - 1)
+            Key.DirectionRight -> ordered.getOrNull(at + 1)
+            Key.MoveHome -> if (rtl) ordered.lastOrNull() else ordered.firstOrNull()
+            Key.MoveEnd -> if (rtl) ordered.firstOrNull() else ordered.lastOrNull()
+            else -> return false
+        }
+        target?.let { runCatching { it.focus.requestFocus() } }
+        return true
+    }
+}
+
+internal val LocalTabStrip = staticCompositionLocalOf<TabStripState?> { null }
 
 /**
  * One tab: an optional [icon], the [label], a [badge] count and a [busy] dot; the selected tab gets
@@ -448,8 +551,21 @@ fun DeskTab(
     val haptics = rememberDeskHaptics()
     val latestClose by rememberUpdatedState(onClose)
     val closeByMiddleClick: () -> Unit = remember { { latestClose?.invoke() } }
+    // one Tab stop for the strip: the selected tab; the arrows reach the others (TabStrip)
+    val strip = LocalTabStrip.current
+    val focus = remember { FocusRequester() }
+    val entry = remember(strip) { strip?.let { TabStripState.Tab(focus) } }
+    SideEffect { entry?.selected = selected }
+    DisposableEffect(strip, entry) {
+        if (strip != null && entry != null) strip.tabs.add(entry)
+        onDispose { if (strip != null && entry != null) strip.tabs.remove(entry) }
+    }
+    val tabStop: () -> Boolean = { strip == null || entry == null || !TabNavigation.active || strip.stopsAt(entry) }
     Row(
         modifier = modifier
+            .onPlaced { entry?.x = it.positionInWindow().x }
+            .focusRequester(focus)
+            .focusProperties { canFocus = tabStop() }
             .heightIn(min = if (touch) dimens.minTarget else 30.dp)
             .focusRing(state, shape)
             .background(background, shape)
@@ -469,7 +585,10 @@ fun DeskTab(
             }
             .middleClick(onClose != null, closeByMiddleClick)
             .dragSource(enabled = drag != null) { drag?.invoke() }
-            .onFocusChanged { focusWithin = it.hasFocus }
+            .onFocusChanged {
+                focusWithin = it.hasFocus
+                entry?.focused = it.hasFocus
+            }
             .deskClickable(interaction, {
                 if (!selected) haptics.tick()
                 onClick()
@@ -489,9 +608,13 @@ fun DeskTab(
         if (busy) Box(Modifier.size(6.dp).background(colors.accentText, CircleShape))
         CountBadge(badge)
         if (onClose != null) {
-            Box(Modifier.size(if (touch) 32.dp else 24.dp), contentAlignment = Alignment.Center) {
+            // a finger's target is 48 dp (it was 32)
+            Box(Modifier.size(if (touch) 48.dp else 24.dp), contentAlignment = Alignment.Center) {
                 if (showClose) {
-                    DeskIconButton(DeskIcons.Close, closeLabel, onClose, size = if (touch) 32.dp else 24.dp, iconSize = if (touch) 16.dp else 12.dp)
+                    // a tab's close button is a Tab stop with its tab only
+                    Box(Modifier.focusProperties { canFocus = tabStop() }) {
+                        DeskIconButton(DeskIcons.Close, closeLabel, onClose, size = if (touch) 48.dp else 24.dp, iconSize = if (touch) 16.dp else 12.dp)
+                    }
                 }
             }
         }

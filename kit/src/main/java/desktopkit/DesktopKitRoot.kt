@@ -32,16 +32,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.core.view.WindowCompat
 import desktopkit.input.rememberInputModeState
+import desktopkit.input.TabNavigation
 import desktopkit.input.trackInputMode
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import desktopkit.settings.DeskPreferences
 import desktopkit.shell.CaptionArea
 import desktopkit.shell.CaptionElements
+import desktopkit.shell.HeightClass
+import desktopkit.shell.LocalHeightClass
 import desktopkit.shell.LocalWidthClass
 import desktopkit.shell.WidthClass
 import desktopkit.theme.Accent
@@ -146,13 +154,26 @@ fun DesktopKitRoot(
                 .fillMaxSize()
                 .background(DeskTheme.colors.background)
                 .trackInputMode(inputMode)
+                // which keys move the focus: a table is one Tab stop (TabNavigation)
+                .onPreviewKeyEvent { TabNavigation.see(it); false }
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            if (awaitPointerEvent(PointerEventPass.Initial).type == PointerEventType.Press) TabNavigation.reset()
+                        }
+                    }
+                }
                 .windowInsetsPadding(padding),
         ) {
             val widthClass = WidthClass.fromWidth(maxWidth.value)
+            // the window's height, not what the on-screen keyboard leaves of it: a field taking the focus must not turn a
+            // phone into a "short window" (a lower top bar, no larger text) while the keyboard is up
+            val heightClass = HeightClass.fromHeight(LocalConfiguration.current.screenHeightDp.toFloat())
             val reduced = rememberReducedMotion()
             CompositionLocalProvider(
                 LocalWidthClass provides widthClass,
-                LocalMotionTier provides DeskMotion.tier(widthClass, reduced),
+                LocalHeightClass provides heightClass,
+                LocalMotionTier provides DeskMotion.tier(widthClass, reduced, heightClass),
                 LocalRootInsets provides rootInsets,
             ) { content(widthClass) }
         }

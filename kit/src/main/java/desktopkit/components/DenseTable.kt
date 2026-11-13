@@ -1,5 +1,8 @@
 package desktopkit.components
 
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.State
@@ -28,6 +31,26 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.state.ToggleableState
+import androidx.compose.ui.unit.LayoutDirection
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import desktopkit.input.TabNavigation
+import androidx.compose.foundation.lazy.LazyListLayoutInfo
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
@@ -61,16 +84,21 @@ import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerType
+import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import desktopkit.R
 import desktopkit.input.ContextMenuArea
 import desktopkit.settings.DeskPreferences
@@ -110,6 +138,23 @@ class TableColumn<T>(
     val hideBelow: WidthClass? = null,
     /** Stable name of the column for [TableColumnsState] (order and visibility are stored by it); the title by default. */
     val id: String = title,
+    /**
+     * Where a value too long for the cell is cut: at its end (the default) or, with
+     * [TextOverflow.MiddleEllipsis], in its middle, so a file name keeps its extension and a path its
+     * last folder ("Kayıt_2026-11-12…tam_kayit.flac").
+     */
+    val ellipsis: TextOverflow = TextOverflow.Ellipsis,
+    /**
+     * Draws the cell instead of [value]'s text: an icon (a star, a paperclip), a badge, a progress bar.
+     * [value] still sorts the column and is what TalkBack reads unless the cell says otherwise.
+     */
+    val cell: (@Composable (T) -> Unit)? = null,
+    /**
+     * Makes the cell a button of its own that does not open the row: a star toggled in place.
+     * [cellClickLabel] names what it does for TalkBack ("Star", "Remove star").
+     */
+    val onCellClick: ((T) -> Unit)? = null,
+    val cellClickLabel: ((T) -> String)? = null,
     val value: (T) -> String,
 )
 
@@ -155,6 +200,11 @@ data class TableSort(val column: Int, val ascending: Boolean)
  * [rowDrag] lets rows be dragged with a mouse to a [dropZone] (the sidebar, a list, another window
  * of the app): it builds what travels for the row under the pointer, usually the whole selection
  * when that row is selected. [loading] shows breathing placeholder rows while [rows] is empty.
+ *
+ * [rowEmphasis] sets rows apart in bold and in the text colour: an unread message. [emptyContent] is
+ * shown under the header when there are no rows and nothing is loading, usually a
+ * [desktopkit.screens.MessageScreen] saying why and what to do (no device connected, nothing found,
+ * the folder could not be read); without it an empty table is only its header.
  */
 @Composable
 fun <T> DenseTable(
@@ -178,6 +228,8 @@ fun <T> DenseTable(
     loading: Boolean = false,
     rowDrag: ((T, Int) -> DeskDragPayload?)? = null,
     clearSelectionOnBack: Boolean = true,
+    rowEmphasis: ((T) -> Boolean)? = null,
+    emptyContent: (@Composable () -> Unit)? = null,
 ) {
     val dimens = DeskTheme.dimens
     val colors = DeskTheme.colors
@@ -189,7 +241,11 @@ fun <T> DenseTable(
     val glassMode = DeskGlass.mode
     val rowsGlass = remember { HazeState() }
     // the rows start under the header; its height is known after the first layout
-    val headerPx = remember { mutableIntStateOf(with(density) { (dimens.minTarget.coerceAtLeast(28.dp) + 1.dp).roundToPx() }) }
+    val headerPx = remember { mutableIntStateOf(with(density) { (dimens.rowHeight.coerceAtLeast(dimens.minTarget) + 1.dp).roundToPx() }) }
+    // the select mode (toggleOnClick) shows a check box on every row and one for them all in the header
+    val checks = onSelectionChange != null && toggleOnClick
+    val checkWidth = if (DeskTheme.inputMode == InputMode.Touch) 48.dp else 32.dp
+    val selectAllLabel = stringResource(R.string.dk_select_all)
     val padding = remember(contentPadding, density) { HeaderPadding(contentPadding, headerPx, density) }
     val scrolled by remember(state) { derivedStateOf { state.firstVisibleItemIndex > 0 || state.firstVisibleItemScrollOffset > 0 } }
     val chooserLabels = ColumnChooserLabels(
@@ -202,20 +258,99 @@ fun <T> DenseTable(
     val selection = selectedKeys ?: emptySet()
     val touch = DeskTheme.inputMode == InputMode.Touch
     val tracker = remember { SelectionTracker() }
+    val scope = rememberCoroutineScope()
+    // read through these in the pointer and key handlers, which outlive a composition
+    val keysRef = rememberUpdatedState(remember(rows) { rows.map(key) })
+    val keySetRef = rememberUpdatedState(remember(keysRef.value) { keysRef.value.toHashSet() })
+    val selectedKeyRef = rememberUpdatedState(selectedKey)
+    val onSelectionChangeRef = rememberUpdatedState(onSelectionChange)
+    val keysInOrder = { keysRef.value }
+    // each composed row's focus, so the arrow keys can move it to a row that is scrolled into view
+    val rowFocus = remember { HashMap<Any, FocusRequester>() }
+    val hop = remember { TabHop() }
     val focusManager = LocalFocusManager.current
-    val keysInOrder = { rows.map(key) }
+    val latestSelection by rememberUpdatedState(selection)
+    val latestMulti by rememberUpdatedState(multi)
+    val latestDrag by rememberUpdatedState(rowDrag != null)
+    val marquee = remember { Marquee() }
+    val marqueeColor = colors.accent
     // while the rows load: breathing placeholder rows under the header
     val skeleton = loading && rows.isEmpty()
     val pulse = if (skeleton) rememberSkeletonPulse() else null
     val loadingLabel = stringResource(R.string.dk_loading)
     fun update(result: TableSelection.Result) {
         tracker.anchor = result.anchor
-        if (result.selection != selection) onSelectionChange?.invoke(result.selection)
+        if (result.selection != latestSelection) onSelectionChangeRef.value?.invoke(result.selection)
     }
+
+    /**
+     * The one row Tab reaches: the focused one, else the anchor of the selection or the selected
+     * one, when it is in view; else the first row in view. Read when the focus moves, not composed.
+     */
+    fun rovingKey(): Any? {
+        val keySet = keySetRef.value
+        val active = tracker.focused ?: tracker.anchor ?: selectedKeyRef.value ?: latestSelection.firstOrNull()
+        val visible = state.layoutInfo.visibleItemsInfo
+        return if (active != null && active in keySet && visible.any { it.key == active }) active
+        else visible.firstOrNull { it.key in keySet }?.key
+    }
+
+    /** Moves the keyboard focus to the row at [index], scrolling it into view. */
+    fun focusRow(index: Int) {
+        val keys = keysRef.value
+        val keySet = keySetRef.value
+        val target = keys.getOrNull(index.coerceIn(0, (keys.size - 1).coerceAtLeast(0))) ?: return
+        val at = keys.indexOf(target)
+        tracker.focused = target
+        scope.launch {
+            val info = state.layoutInfo
+            val shown = info.visibleItemsInfo.firstOrNull { it.key == target }
+            val limit = info.viewportSize.height - info.beforeContentPadding - info.afterContentPadding
+            when {
+                shown == null -> {
+                    val below = at > (info.visibleItemsInfo.firstOrNull { it.key in keySet }?.index ?: 0)
+                    state.scrollToItem(at)
+                    // going down, the row comes in at the bottom, as a list moved by the keys does (at the end of the
+                    // list it is there already: the list cannot scroll further)
+                    val row = state.layoutInfo.visibleItemsInfo.firstOrNull { it.key == target }
+                    if (below && row != null) {
+                        val past = row.offset - (limit - row.size)
+                        if (past < 0) state.scrollBy(past.toFloat())
+                    }
+                }
+                shown.offset < 0 -> state.scrollBy(shown.offset.toFloat())
+                shown.offset + shown.size > limit -> state.scrollBy((shown.offset + shown.size - limit).toFloat())
+            }
+            withFrameNanos { }
+            runCatching { rowFocus[target]?.requestFocus() }
+        }
+    }
+
+    /** The rows that fit in view, for Page Up and Page Down. */
+    fun pageRows(): Int = state.layoutInfo.visibleItemsInfo.count { it.key in keySetRef.value }.coerceAtLeast(2) - 1
+
+    /** The row index under [y] (in the table), -1 above the first row in view's predecessor, past the end below the last. */
+    fun indexAt(y: Float): Int {
+        val keys = keysRef.value
+        val keySet = keySetRef.value
+        val info = state.layoutInfo
+        val at = y - info.beforeContentPadding
+        val rowsInView = info.visibleItemsInfo.filter { it.key in keySet }
+        val hit = rowsInView.firstOrNull { at >= it.offset && at < it.offset + it.size }
+        return when {
+            hit != null -> keys.indexOf(hit.key)
+            rowsInView.isEmpty() -> keys.size
+            at < rowsInView.first().offset -> keys.indexOf(rowsInView.first().key) - 1
+            else -> keys.indexOf(rowsInView.last().key) + 1
+        }
+    }
+
     if (multi && clearSelectionOnBack) ClearSelectionOnBack(selection, touch, toggleOnClick) { update(TableSelection.clear()) }
     Box(
         modifier
             .fillMaxSize()
+            // before the frame: a press on the scrollbar is the scrollbar's
+            .verticalScrollbar(state)
             .then(
                 if (!multi) Modifier else Modifier
                     .pointerInput(Unit) {
@@ -232,43 +367,201 @@ fun <T> DenseTable(
                             }
                         }
                     }
-                    .onPreviewKeyEvent { event ->
-                        // Enter and Space click the focused row: remember the keys held with them too
-                        tracker.toggle = event.isCtrlPressed || event.isMetaPressed
-                        tracker.range = event.isShiftPressed
-                        tracker.finger = false
-                        false
+                    // the selection frame (DeskMail's request 22): a mouse dragged from a row that is not selected, or
+                    // from below the rows, draws a frame and the rows it touches are selected
+                    .pointerInput(Unit) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                            if (down.type != PointerType.Mouse || !currentEvent.buttons.isPrimaryPressed || down.isConsumed) return@awaitEachGesture
+                            if (!latestMulti || down.position.y < headerPx.intValue) return@awaitEachGesture
+                            val startIndex = indexAt(down.position.y)
+                            val startKey = keysRef.value.getOrNull(startIndex)
+                            // a selected row drags the selection instead (rowDrag)
+                            if (latestDrag && startKey != null && startKey in latestSelection) return@awaitEachGesture
+                            val mods = currentEvent.keyboardModifiers
+                            val toggle = mods.pointerCtrl || mods.pointerMeta
+                            val add = mods.pointerShift
+                            val slop = viewConfiguration.touchSlop
+                            // a click stays a click; the frame starts once the mouse has moved
+                            var moved: Offset
+                            while (true) {
+                                val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: return@awaitEachGesture
+                                if (!change.pressed) return@awaitEachGesture
+                                if ((change.position - down.position).getDistance() > slop) {
+                                    change.consume()
+                                    moved = change.position
+                                    break
+                                }
+                            }
+                            val before = latestSelection
+                            val rowInfo = state.layoutInfo.visibleItemsInfo.firstOrNull { it.key == startKey }
+                            marquee.start(startIndex, down.position, (down.position.y - state.layoutInfo.beforeContentPadding) - (rowInfo?.offset ?: 0))
+                            // Esc reaches the table: the focus goes to the row the frame started on
+                            (startKey ?: rovingKey())?.let { first ->
+                                tracker.focused = first
+                                runCatching { rowFocus[first]?.requestFocus() }
+                            }
+                            // the move that started the frame already selects what it reaches
+                            marquee.pointer = moved
+                            marquee.select(indexAt(moved.y), keysRef.value, before, toggle, add, ::update)
+                            val edge = 32.dp.toPx()
+                            // near the rows' top or bottom edge the list scrolls along, and the frame with it; only
+                            // there: frames are asked for while the pointer is at an edge, not all the time it is down
+                            fun speedAt(y: Float): Float {
+                                val top = headerPx.intValue.toFloat()
+                                val bottom = size.height.toFloat()
+                                return when {
+                                    y < top + edge -> -(top + edge - y).coerceAtMost(edge) / 2f
+                                    y > bottom - edge -> (y - (bottom - edge)).coerceAtMost(edge) / 2f
+                                    else -> 0f
+                                }
+                            }
+                            var scrolling: Job? = null
+                            try {
+                                while (true) {
+                                    val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: break
+                                    change.consume()
+                                    if (!change.pressed) break
+                                    marquee.pointer = change.position
+                                    if (!marquee.cancelled) marquee.select(indexAt(change.position.y), keysRef.value, before, toggle, add, ::update)
+                                    if (speedAt(change.position.y) != 0f && scrolling?.isActive != true) {
+                                        scrolling = scope.launch {
+                                            while (true) {
+                                                withFrameNanos { }
+                                                val y = marquee.pointer.y
+                                                val speed = speedAt(y)
+                                                if (speed == 0f || marquee.cancelled) break
+                                                state.dispatchRawDelta(speed)
+                                                marquee.select(indexAt(y), keysRef.value, before, toggle, add, ::update)
+                                            }
+                                        }
+                                    }
+                                }
+                            } finally {
+                                scrolling?.cancel()
+                                marquee.end()
+                            }
+                        }
                     }
-                    .onKeyEvent { event ->
-                        if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
-                        val command = event.isCtrlPressed || event.isMetaPressed
-                        when {
-                            event.key == Key.A && command && !event.isShiftPressed && !event.isAltPressed -> {
-                                update(TableSelection.all(keysInOrder(), tracker.anchor))
-                                true
-                            }
-                            event.key == Key.Escape && !command && selection.isNotEmpty() -> {
-                                update(TableSelection.clear())
-                                true
-                            }
-                            (event.key == Key.DirectionUp || event.key == Key.DirectionDown) && event.isShiftPressed && !command -> {
-                                val focused = tracker.focused ?: return@onKeyEvent false
-                                val down = event.key == Key.DirectionDown
-                                val result = TableSelection.extend(keysInOrder(), tracker.anchor, focused, if (down) 1 else -1)
-                                    ?: return@onKeyEvent true
-                                update(result)
-                                focusManager.moveFocus(if (down) FocusDirection.Down else FocusDirection.Up)
-                                true
-                            }
-                            else -> false
+                    .drawWithContent {
+                        drawContent()
+                        if (marquee.active && !marquee.cancelled) {
+                            val rect = marquee.rect(state.layoutInfo, keysRef.value, headerPx.intValue.toFloat(), size.height)
+                            drawRect(marqueeColor.copy(alpha = 0.12f), rect.topLeft, rect.size)
+                            drawRect(marqueeColor, rect.topLeft, rect.size, style = Stroke(1.dp.toPx()))
                         }
                     },
-            ),
+            )
+            .onPreviewKeyEvent { event ->
+                // Enter and Space click the focused row: remember the keys held with them too
+                tracker.toggle = event.isCtrlPressed || event.isMetaPressed
+                tracker.range = event.isShiftPressed
+                tracker.finger = false
+                // Tab leaves the rows at once, wherever in them the focus is (a row, a cell's button): the rows are one stop
+                if (hop.handle(event, focusManager) { rovingKey()?.let { key -> runCatching { rowFocus[key]?.requestFocus() } } }) {
+                    return@onPreviewKeyEvent true
+                }
+                // the rows are one Tab stop: the arrows, Home, End and the page keys move the focus among them. Taken
+                // before the list sees them: its own scrolling takes the page keys and would leave the focus behind
+                val focusedIndex = tracker.focused?.let { keysRef.value.indexOf(it) } ?: -1
+                if (event.type != KeyEventType.KeyDown || focusedIndex < 0 || event.isAltPressed || event.isShiftPressed ||
+                    event.isCtrlPressed || event.isMetaPressed
+                ) return@onPreviewKeyEvent false
+                when (event.key) {
+                    Key.DirectionDown -> { focusRow(focusedIndex + 1); true }
+                    Key.DirectionUp -> { focusRow(focusedIndex - 1); true }
+                    Key.MoveHome -> { focusRow(0); true }
+                    Key.MoveEnd -> { focusRow(keysRef.value.size - 1); true }
+                    Key.PageDown -> { focusRow(focusedIndex + pageRows()); true }
+                    Key.PageUp -> { focusRow(focusedIndex - pageRows()); true }
+                    else -> false
+                }
+            }
+            .onKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+                val command = event.isCtrlPressed || event.isMetaPressed
+                val focusedIndex = tracker.focused?.let { keysRef.value.indexOf(it) } ?: -1
+                when {
+                    multi && event.key == Key.A && command && !event.isShiftPressed && !event.isAltPressed -> {
+                        update(TableSelection.all(keysInOrder(), tracker.anchor))
+                        true
+                    }
+                    event.key == Key.Escape && marquee.active -> {
+                        // the frame is dropped and the selection is as it was before it
+                        marquee.cancel()?.let { update(TableSelection.Result(it, tracker.anchor)) }
+                        true
+                    }
+                    multi && event.key == Key.Escape && !command && selection.isNotEmpty() -> {
+                        update(TableSelection.clear())
+                        true
+                    }
+                    multi && (event.key == Key.DirectionUp || event.key == Key.DirectionDown) && event.isShiftPressed && !command -> {
+                        val focused = tracker.focused ?: return@onKeyEvent false
+                        val down = event.key == Key.DirectionDown
+                        val result = TableSelection.extend(keysInOrder(), tracker.anchor, focused, if (down) 1 else -1)
+                            ?: return@onKeyEvent true
+                        update(result)
+                        focusRow(focusedIndex + if (down) 1 else -1)
+                        true
+                    }
+                    else -> false
+                }
+            },
     ) {
+        // sticky header over the rows: glass once rows pass beneath it. Composed before the rows, so its sort buttons
+        // come before them in the Tab order as they do on screen; drawn over them
+        Column(
+            Modifier
+                .zIndex(1f)
+                .fillMaxWidth()
+                .onSizeChanged { headerPx.intValue = it.height }
+                .glass(DeskGlass.chrome(colors, GlassThickness.Thin), source = rowsGlass, mode = glassMode, enabled = glassHeader && scrolled),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    // as tall as a row: the header reads as the first line of the table
+                    .heightIn(min = dimens.rowHeight.coerceAtLeast(dimens.minTarget))
+                    .padding(horizontal = dimens.pagePadding - 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (checks) {
+                    val all = rows.isNotEmpty() && rows.all { key(it) in selection }
+                    val checkState = when {
+                        all -> ToggleableState.On
+                        selection.isEmpty() -> ToggleableState.Off
+                        else -> ToggleableState.Indeterminate
+                    }
+                    Box(Modifier.width(checkWidth), contentAlignment = Alignment.Center) {
+                        DeskCheckbox(
+                            state = checkState,
+                            onClick = { update(if (all) TableSelection.clear() else TableSelection.all(rows.map(key), tracker.anchor)) },
+                            modifier = Modifier.semantics { contentDescription = selectAllLabel },
+                        )
+                    }
+                }
+                shownColumns.forEach { (index, column) ->
+                    if (columnsState != null) {
+                        ContextMenuArea(
+                            entries = { columnChooserEntries(columns, columnsState, column.id, chooserLabels) },
+                            modifier = Modifier.cell(this, column.width),
+                            accessibilityLabel = chooserLabels.title,
+                        ) {
+                            Row { HeaderCell(column, index, sort, onSortChange, Modifier.weight(1f)) }
+                        }
+                    } else {
+                        HeaderCell(column, index, sort, onSortChange, Modifier.cell(this, column.width))
+                    }
+                }
+            }
+            HorizontalRule()
+        }
+        HopSpot(hop, hop.before)
         LazyColumn(
             state = state,
             modifier = Modifier
                 .fillMaxSize()
+                .onFocusChanged { hop.inside = it.hasFocus }
                 .glassSource(rowsGlass, glassMode)
                 .then(if (!skeleton) Modifier else Modifier.semantics { contentDescription = loadingLabel }),
             contentPadding = padding,
@@ -276,8 +569,18 @@ fun <T> DenseTable(
             if (pulse != null) {
                 items(8) { i -> SkeletonTableRow(shownColumns, i, pulse) }
             }
+            if (rows.isEmpty() && !skeleton && emptyContent != null) {
+                item(key = "desktopkit.empty") {
+                    Box(Modifier.fillParentMaxWidth().fillParentMaxHeight(0.8f), contentAlignment = Alignment.Center) { emptyContent() }
+                }
+            }
             itemsIndexed(rows, key = { _, item -> key(item) }) { index, item ->
                 val itemKey = key(item)
+                val requester = remember { FocusRequester() }
+                DisposableEffect(itemKey, requester) {
+                    rowFocus[itemKey] = requester
+                    onDispose { if (rowFocus[itemKey] === requester) rowFocus.remove(itemKey) }
+                }
                 val onClick = {
                     // the press's pointer when there was one; TalkBack's double tap follows the layout
                     val finger = tracker.finger ?: touch
@@ -300,10 +603,25 @@ fun <T> DenseTable(
                         columns = shownColumns,
                         item = item,
                         selected = itemKey in selection || (selectedKey != null && itemKey == selectedKey),
+                        emphasized = rowEmphasis?.invoke(item) == true,
+                        checkWidth = if (checks) checkWidth else null,
                         onClick = onClick,
-                        modifier = (if (!multi) Modifier else Modifier.onFocusChanged { focus ->
-                            if (focus.isFocused) tracker.focused = itemKey else if (tracker.focused == itemKey) tracker.focused = null
-                        }).dragSource(enabled = rowDrag != null) { rowDrag?.invoke(item, index) },
+                        modifier = Modifier
+                            .focusRequester(requester)
+                            // one Tab stop: Tab reaches only the current row (the arrows reach every one)
+                            .focusProperties { canFocus = !TabNavigation.active || itemKey == rovingKey() }
+                            .onFocusChanged { focus ->
+                                if (focus.isFocused) tracker.focused = itemKey else if (tracker.focused == itemKey) tracker.focused = null
+                            }
+                            // with a mouse a selected row drags at once (the rest a finger needs is not asked of it); a
+                            // press on a row that is not selected draws the selection frame instead
+                            .dragSource(
+                                enabled = rowDrag != null,
+                                acrossWindows = true,
+                                touch = false,
+                                pointerHold = false,
+                                canStart = { !multi || itemKey in latestSelection },
+                            ) { rowDrag?.invoke(item, index) },
                     )
                 }
                 if (rowMenu != null) {
@@ -318,36 +636,73 @@ fun <T> DenseTable(
                 }
             }
         }
-        // sticky header over the rows: glass once rows pass beneath it
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .onSizeChanged { headerPx.intValue = it.height }
-                .glass(DeskGlass.chrome(colors, GlassThickness.Thin), source = rowsGlass, mode = glassMode, enabled = glassHeader && scrolled),
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = dimens.minTarget.coerceAtLeast(28.dp))
-                    .padding(horizontal = dimens.pagePadding - 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                shownColumns.forEach { (index, column) ->
-                    if (columnsState != null) {
-                        ContextMenuArea(
-                            entries = { columnChooserEntries(columns, columnsState, column.id, chooserLabels) },
-                            modifier = Modifier.cell(this, column.width),
-                            accessibilityLabel = chooserLabels.title,
-                        ) {
-                            Row { HeaderCell(column, index, sort, onSortChange, Modifier.weight(1f)) }
-                        }
-                    } else {
-                        HeaderCell(column, index, sort, onSortChange, Modifier.cell(this, column.width))
-                    }
-                }
-            }
-            HorizontalRule()
+        HopSpot(hop, hop.after)
+    }
+}
+
+/**
+ * A selection frame being drawn with the mouse: where it started (the row and the point within it, so
+ * the frame stays with the rows as they scroll) and where the pointer is.
+ */
+private class Marquee {
+    var active by mutableStateOf(false)
+        private set
+    var cancelled by mutableStateOf(false)
+        private set
+    var pointer by mutableStateOf(Offset.Zero)
+    private var startIndex = 0
+    private var startX = 0f
+    private var startInRow = 0f
+    private var before: Set<Any> = emptySet()
+
+    fun start(index: Int, at: Offset, inRow: Float) {
+        startIndex = index
+        startX = at.x
+        startInRow = inRow
+        pointer = at
+        cancelled = false
+        active = true
+    }
+
+    /** Selects the rows between the start and [index]: alone, toggled into [base] ([toggle]) or added to it ([add]). */
+    fun select(index: Int, keys: List<Any>, base: Set<Any>, toggle: Boolean, add: Boolean, update: (TableSelection.Result) -> Unit) {
+        before = base
+        val first = minOf(startIndex, index).coerceAtLeast(0)
+        val last = maxOf(startIndex, index).coerceAtMost(keys.size - 1)
+        val covered = if (first > last) emptySet() else keys.subList(first, last + 1).toCollection(LinkedHashSet())
+        val result = when {
+            toggle -> (base - covered) + (covered - base)
+            add -> base + covered
+            else -> covered
         }
+        update(TableSelection.Result(result, keys.getOrNull(startIndex.coerceIn(0, (keys.size - 1).coerceAtLeast(0)))))
+    }
+
+    /** Esc: the frame is dropped; the selection it started from, to put back. */
+    fun cancel(): Set<Any>? {
+        if (!active || cancelled) return null
+        cancelled = true
+        return before
+    }
+
+    fun end() {
+        active = false
+        cancelled = false
+    }
+
+    /** The frame in the table's coordinates: its start follows its row, clamped to the rows' area. */
+    fun rect(info: LazyListLayoutInfo, keys: List<Any>, top: Float, bottom: Float): Rect {
+        val key = keys.getOrNull(startIndex)
+        val row = info.visibleItemsInfo.firstOrNull { it.key == key }
+        val keySet = keys.toHashSet()
+        val rowsInView = info.visibleItemsInfo.filter { it.key in keySet }
+        val startY = when {
+            row != null -> info.beforeContentPadding + row.offset + startInRow
+            rowsInView.isNotEmpty() && startIndex < keys.indexOf(rowsInView.first().key) -> top
+            else -> bottom
+        }.coerceIn(top, bottom)
+        val y = pointer.y.coerceIn(top, bottom)
+        return Rect(minOf(startX, pointer.x), minOf(startY, y), maxOf(startX, pointer.x), maxOf(startY, y))
     }
 }
 
@@ -460,15 +815,22 @@ private fun <T> HeaderCell(column: TableColumn<T>, index: Int, sort: TableSort?,
     val active = sort?.column == index
     val clickable = onSortChange != null && column.sortable
     val shape = RoundedCornerShape(4.dp)
+    // TalkBack hears which way the column sorts, and what a tap does
+    val sortedState = if (active) stringResource(if (sort.ascending) R.string.dk_sorted_ascending else R.string.dk_sorted_descending) else null
+    val sortLabel = stringResource(R.string.dk_sort_by, column.title)
     Row(
         modifier = modifier
             .heightIn(min = DeskTheme.dimens.minTarget)
             .focusRing(state, shape)
             .background(if (clickable) stateBackground(state) else Color.Transparent, shape)
+            .semantics {
+                heading()
+                if (sortedState != null) stateDescription = sortedState
+            }
             .then(
                 if (clickable) Modifier.deskClickable(interaction, {
                     onSortChange(TableSort(index, if (active) !sort.ascending else true))
-                }, role = Role.Button) else Modifier,
+                }, role = Role.Button, onClickLabel = sortLabel) else Modifier,
             )
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -484,13 +846,22 @@ private fun <T> HeaderCell(column: TableColumn<T>, index: Int, sort: TableSort?,
 }
 
 @Composable
-private fun <T> TableRow(columns: List<IndexedValue<TableColumn<T>>>, item: T, selected: Boolean, onClick: () -> Unit, modifier: Modifier) {
+private fun <T> TableRow(
+    columns: List<IndexedValue<TableColumn<T>>>,
+    item: T,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier,
+    emphasized: Boolean = false,
+    checkWidth: Dp? = null,
+) {
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
     val interaction = remember { MutableInteractionSource() }
     val state = interaction.collectState()
     val shape = RoundedCornerShape(dimens.radiusControl)
     val background by animatedStateBackground(state, selected)
+    val marker = colors.accent
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -498,28 +869,68 @@ private fun <T> TableRow(columns: List<IndexedValue<TableColumn<T>>>, item: T, s
             .heightIn(min = dimens.rowHeight.coerceAtLeast(dimens.minTarget))
             .focusRing(state, shape)
             .background(background, shape)
+            // a selected row is marked by a bar at its start as well as by its colour
+            .drawBehind {
+                if (selected) {
+                    val bar = 4.dp.toPx()
+                    val inset = (size.height / 4).coerceAtMost(8.dp.toPx())
+                    val x = if (layoutDirection == LayoutDirection.Rtl) size.width - bar else 0f
+                    drawRoundRect(marker, Offset(x, inset), Size(bar, size.height - 2 * inset), CornerRadius(bar / 2))
+                }
+            }
             .semantics { this.selected = selected }
             .deskClickable(interaction, onClick)
             .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (checkWidth != null) {
+            Box(Modifier.width(checkWidth), contentAlignment = Alignment.Center) { DeskCheckbox(selected, onCheckedChange = null) }
+        }
         columns.forEach { (index, column) ->
-            Box(Modifier.cell(this, column.width).padding(horizontal = 8.dp), contentAlignment = if (column.alignEnd) Alignment.CenterEnd else Alignment.CenterStart) {
-                Text(
-                    text = column.value(item),
-                    style = column.textStyle ?: if (column.mono) DeskTheme.type.mono else if (index == 0) DeskTheme.type.bodyStrong else DeskTheme.type.body,
-                    color = when {
-                        selected -> colors.onSelection
-                        index == 0 -> colors.text
-                        else -> colors.textSecondary
-                    },
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = if (column.alignEnd) TextAlign.End else TextAlign.Start,
-                )
+            val cellClick = column.onCellClick
+            Box(
+                Modifier
+                    .cell(this, column.width)
+                    .then(if (cellClick == null) Modifier else Modifier.cellButton(column.cellClickLabel?.invoke(item)) { cellClick(item) })
+                    .padding(horizontal = 8.dp),
+                contentAlignment = if (column.alignEnd) Alignment.CenterEnd else Alignment.CenterStart,
+            ) {
+                val custom = column.cell
+                if (custom != null) {
+                    custom(item)
+                } else {
+                    val base = column.textStyle ?: if (column.mono) DeskTheme.type.mono else if (index == 0) DeskTheme.type.bodyStrong else DeskTheme.type.body
+                    Text(
+                        text = column.value(item),
+                        // an emphasized row (unread) is bold and in the text colour throughout
+                        style = if (emphasized) base.copy(fontWeight = FontWeight.SemiBold) else base,
+                        color = when {
+                            selected -> colors.onSelection
+                            index == 0 || emphasized -> colors.text
+                            else -> colors.textSecondary
+                        },
+                        maxLines = 1,
+                        overflow = column.ellipsis,
+                        textAlign = if (column.alignEnd) TextAlign.End else TextAlign.Start,
+                    )
+                }
             }
         }
     }
+}
+
+/** A cell that is a button of its own (a star), with hover and press states and a hand pointer. */
+@Composable
+private fun Modifier.cellButton(label: String?, onClick: () -> Unit): Modifier {
+    val interaction = remember { MutableInteractionSource() }
+    val state = interaction.collectState()
+    val shape = RoundedCornerShape(DeskTheme.dimens.radiusSmall)
+    return this
+        .focusRing(state, shape)
+        .background(stateBackground(state), shape)
+        // reached with the arrows from its row, not a stop of the Tab key: the rows are one stop
+        .focusProperties { canFocus = !TabNavigation.active }
+        .deskClickable(interaction, onClick, onClickLabel = label)
 }
 
 /** A table row while the rows load: one breathing bar per cell, of varying length. */

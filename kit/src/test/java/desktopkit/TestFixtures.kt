@@ -156,6 +156,7 @@ fun TestShell(
     moreActions: List<ActionGroup> = emptyList(),
     toasts: desktopkit.components.ToastState? = null,
     overlays: @Composable () -> Unit = {},
+    iconBadges: desktopkit.shell.NavIconBadges = emptyMap(),
     content: @Composable (String, ShellNavigator) -> Unit = { route, _ -> SampleScreen(route) },
 ) {
     val navController = rememberNavController()
@@ -169,6 +170,7 @@ fun TestShell(
             navController = navController,
             sidebarCollapsed = sidebarCollapsed,
             badges = mapOf("documents" to "128", "music" to "4 812", "downloads" to "3 yeni"),
+            iconBadges = iconBadges,
             menus = listOf("Dosya", "Düzen", "Görünüm", "Araçlar", "Yardım").map { title ->
                 MenuSpec(title) { listOf(MenuEntry.Item("$title…", {})) }
             },

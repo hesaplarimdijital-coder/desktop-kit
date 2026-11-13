@@ -34,6 +34,11 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # the design standard's mechanical checks: no new raw colours, platform toasts, dead buttons, endless
+      # motion, off-scale sizes or shouting strings (tools/design_check.py; known ones are in its baseline)
+      - name: Design standard
+        run: python3 tools/design_check.py
+
       - name: Build and test
         run: |
           ./gradlew :kit:testDebugUnitTest :kit:publishToMavenLocal :sample:assembleDebug \
