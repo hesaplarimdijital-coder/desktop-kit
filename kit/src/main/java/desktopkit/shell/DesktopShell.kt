@@ -65,11 +65,10 @@ import androidx.navigation.createGraph
 import androidx.navigation.get
 import desktopkit.LocalRootInsets
 import desktopkit.components.ActionGroup
-import desktopkit.components.ActionGroupList
+import desktopkit.components.ActionSheet
 import desktopkit.components.DeskButton
 import desktopkit.components.ToastState
 import desktopkit.components.ToastHost
-import desktopkit.components.GlassBottomSheet
 import desktopkit.components.MenuBarMenus
 import desktopkit.components.MenuEntry
 import desktopkit.components.MenuSpec
@@ -659,9 +658,12 @@ private fun ShellContent(
         )
 
         if (spec.moreStyle == MoreStyle.Sheet) {
-            GlassBottomSheet(visible = moreOpen, onDismiss = { moreOpen = false }, title = more.label) {
-                ActionGroupList(moreSheetGroups(spec, navKind, navigator) + moreActions, onDismiss = { moreOpen = false })
-            }
+            ActionSheet(
+                visible = moreOpen,
+                onDismiss = { moreOpen = false },
+                groups = moreSheetGroups(spec, navKind, navigator) + moreActions,
+                title = more.label,
+            )
         }
         CompositionLocalProvider(LocalNavKind provides navKind) { overlays() }
     }

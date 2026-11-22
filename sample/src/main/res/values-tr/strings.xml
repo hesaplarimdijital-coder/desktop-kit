@@ -2,6 +2,7 @@
 <resources>
     <string name="app_name">Desktop Kit örneği</string>
     <string name="menu_file">Dosya</string>
+    <string name="menu_open_recent">Son açılanlar</string>
     <string name="action_new_folder">Yeni klasör</string>
     <string name="action_open">Aç</string>
     <string name="action_refresh">Yenile</string>

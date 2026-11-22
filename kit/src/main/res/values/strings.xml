@@ -92,4 +92,8 @@
     <string name="dk_close_sheet">Close sheet</string>
     <string name="dk_token_invalid">Not valid</string>
     <string name="dk_token_remove">Remove</string>
+
+    <!-- Submenus -->
+    <string name="dk_submenu">Submenu</string>
+    <string name="dk_submenu_open">Open submenu</string>
 </resources>

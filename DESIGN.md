@@ -124,6 +124,22 @@ dönen şey (belirsiz ilerleme çubuğu, yenileme diski) o iş bitince durur.
 Yan çevrilmiş telefon (yükseklik sınıfı Compact, 480 dp altı) rayı alır ama telefonun yazısını ve
 yaylarını korur.
 
+## Menüler ve alt menüler
+
+Menü köşesinden büyüyerek belirir (150 ms, %92'den) ve olduğu yerde solar (100 ms); alt menü de öyle, açan
+satırın yanındaki köşesinden.
+
+| Değer | Ne |
+|---|---|
+| 200 ms (`SUBMENU_HOVER_MS`) | imlecin bir satırda durması: alt menüsü açılır, başka satırın açık alt menüsü kapanır |
+| 16 dp | alt menüye giden imlecin "güvenli üçgeni"nin alt menünün üstünden ve altından payı |
+| 4 dp | menü ile alt menüsü arasındaki boşluk (iki cam yüzey üst üste binmez) |
+| 4 dp | alt menü açan satırdan bu kadar yukarıda başlar: ilk satırı açan satırla hizalanır |
+| 90 + 210 ms, 24 dp | telefonun "⋯" sayfasında alt menü sayfaları arası fade-through ve yana kayma; sayfanın yüksekliği telefonda `gesture()` yayıyla, genişte 300 ms'de değişir |
+
+Tıklama, dokunma ve klavye (→, Enter) beklemeden açar. Alt menü bitiş yanında açılır; pencerede yer yoksa başlangıç
+yanında, ikisinde de yoksa (telefon) daha çok yer olan yanda menüsünün üstüne.
+
 ## Yazılı istisnalar
 
 Bileşenlerde ölçüler 4 dp'lik ızgaradadır (1 ve 2 dp'lik çizgiler hariç). Kitte bugün ızgaranın
@@ -162,4 +178,5 @@ köşesi, sistemin değeri) sabit kalır.
 | Boş, hata, yapım aşaması | `MessageScreen` |
 | Komutlar ve kısayollar | `ShortcutRegistry` + `CommandPalette` |
 | Alt sayfa | `GlassBottomSheet` |
+| İç içe menü | `MenuEntry.Submenu` (menüde yanında açılır, telefonun "⋯" sayfasında sayfa olarak) |
 | İletişim kutusu | `DeskDialog` |
