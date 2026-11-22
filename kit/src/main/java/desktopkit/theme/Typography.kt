@@ -54,8 +54,16 @@ data class DeskType(
     val labelSmall: TextStyle,
     val caption: TextStyle,
     val mono: TextStyle,
+    /**
+     * The code editor's text ([desktopkit.editor.CodeEditor]): the monospace face at the body size, on
+     * lines one and a half times as high, since code and scripts are read line by line.
+     */
+    val code: TextStyle = mono.copy(fontSize = body.fontSize, lineHeight = (body.fontSize.value * CODE_LINE_RATIO).sp),
 ) {
     companion object {
+        /** A code line's height as a multiple of its text size. */
+        internal const val CODE_LINE_RATIO = 1.5f
+
         /**
          * The dense set for mouse and touchpad. [step] adds that many sp to every style (line
          * heights grow in proportion), e.g. `pointer(fonts, step = 1f)` for a slightly larger desktop.
@@ -130,5 +138,6 @@ fun DeskType.grow(step: Float): DeskType {
         labelSmall = labelSmall.grown(),
         caption = caption.grown(),
         mono = mono.grown(),
+        code = code.grown(),
     )
 }

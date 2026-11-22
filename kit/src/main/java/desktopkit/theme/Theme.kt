@@ -29,6 +29,9 @@ import androidx.compose.ui.graphics.lerp
  * turns skipping off for the whole subtree); a dynamic one recomposes only what reads the colours.
  */
 val LocalDeskColors = compositionLocalOf { DeskPalette.dark(Accent.Blue) }
+
+/** The code editor's colours; dynamic like [LocalDeskColors], which they are made from. */
+val LocalDeskSyntax = compositionLocalOf { DeskSyntax.from(DeskPalette.dark(Accent.Blue)) }
 val LocalDeskType = staticCompositionLocalOf { DeskType.Pointer }
 val LocalDeskDimens = staticCompositionLocalOf { DeskDimens.Pointer }
 val LocalInputMode = staticCompositionLocalOf { InputMode.Pointer }
@@ -43,6 +46,10 @@ object DeskTheme {
         @Composable @ReadOnlyComposable get() = LocalDeskDimens.current
     val inputMode: InputMode
         @Composable @ReadOnlyComposable get() = LocalInputMode.current
+
+    /** The code editor's colours: `DeskTheme.syntax[SyntaxRole.Keyword].color`. */
+    val syntax: DeskSyntax
+        @Composable @ReadOnlyComposable get() = LocalDeskSyntax.current
 }
 
 /**
@@ -55,7 +62,9 @@ object DeskTheme {
  * - [fonts]: `DeskFonts.System` or your own families;
  * - [colors] / [dimens]: transform the computed tokens, e.g. `{ it.copy(radiusCard = 4.dp) }`;
  * - [type]: builds the text styles for an input mode and the fonts, e.g. one sp larger with a
- *   pointer only: `{ mode, fonts -> DeskType.forMode(mode, fonts, pointerStep = 1f) }`.
+ *   pointer only: `{ mode, fonts -> DeskType.forMode(mode, fonts, pointerStep = 1f) }`;
+ * - [syntax]: transforms the code editor's colours ([DeskSyntax]), e.g.
+ *   `{ it.with(SyntaxRole.Tag, SyntaxStyle(it.plain, italic = true)) }`.
  *
  * A new accent (one taken from the playing track's artwork, say) or theme cross-fades over
  * [colorChangeMillis] (150 ms); glass tints follow, since they are made from these colours. Only
@@ -72,6 +81,7 @@ fun DesktopKitTheme(
     dimens: (DeskDimens) -> DeskDimens = { it },
     type: (InputMode, DeskFonts) -> DeskType = { mode, fonts -> DeskType.forMode(mode, fonts) },
     colorChangeMillis: Int = DeskMotion.COLOR_CHANGE_MS,
+    syntax: (DeskSyntax) -> DeskSyntax = { it },
     content: @Composable () -> Unit,
 ) {
     val systemDark = isSystemInDarkTheme()
@@ -88,8 +98,10 @@ fun DesktopKitTheme(
         TextSelectionColors(handleColor = target.accent, backgroundColor = target.accent.copy(alpha = 0.35f))
     }
     val typography = remember(styles) { styles.toMaterialTypography() }
+    val syntaxColors = remember(palette, syntax) { syntax(DeskSyntax.from(palette)) }
     CompositionLocalProvider(
         LocalDeskColors provides palette,
+        LocalDeskSyntax provides syntaxColors,
         LocalDeskType provides styles,
         LocalDeskDimens provides sizes,
         LocalInputMode provides inputMode,

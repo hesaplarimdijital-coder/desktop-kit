@@ -59,6 +59,7 @@ import desktopkit.theme.DeskMotion
 import desktopkit.theme.LocalMotionTier
 import desktopkit.theme.rememberReducedMotion
 import desktopkit.theme.DeskFonts
+import desktopkit.theme.DeskSyntax
 import desktopkit.theme.DeskTheme
 import desktopkit.theme.DeskType
 import desktopkit.theme.InputMode
@@ -85,7 +86,7 @@ import desktopkit.theme.DesktopKitTheme
  * on the light theme) and the system draws no scrim behind three-button navigation, since the kit's
  * chrome already lies there.
  *
- * [fonts], [colors], [dimens] and [type] are passed to [DesktopKitTheme]. [accent] overrides the stored
+ * [fonts], [colors], [dimens], [type] and [syntax] are passed to [DesktopKitTheme]. [accent] overrides the stored
  * accent without saving it, e.g. a colour taken from the playing track's artwork
  * (`Accent.custom("Artwork", color)`); changes cross-fade in 150 ms. Typical use in `setContent { }`:
  *
@@ -107,6 +108,7 @@ fun DesktopKitRoot(
     type: (InputMode, DeskFonts) -> DeskType = { mode, fonts -> DeskType.forMode(mode, fonts) },
     accent: Accent = prefs.accent,
     systemBarsAppearance: Boolean = true,
+    syntax: (DeskSyntax) -> DeskSyntax = { it },
     content: @Composable (WidthClass) -> Unit,
 ) {
     val inputMode = rememberInputModeState()
@@ -118,6 +120,7 @@ fun DesktopKitRoot(
         colors = colors,
         dimens = dimens,
         type = type,
+        syntax = syntax,
     ) {
         if (systemBarsAppearance) SystemBarsAppearance(dark = DeskTheme.colors.isDark)
         val safeDrawing = WindowInsets.safeDrawing
