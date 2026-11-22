@@ -223,7 +223,7 @@ internal fun Modifier.gridZoom(zoom: GridZoom): Modifier {
  * The keypad's keys go by the key; the others by the character they type, as a browser's zoom does: on a Turkish Q
  * keyboard − is the key a US one has = on, and + is Shift+4.
  */
-private fun zoomKey(event: KeyEvent): Int? {
+internal fun zoomKey(event: KeyEvent): Int? {
     when (event.key) {
         Key.NumPadAdd -> return 1
         Key.NumPadSubtract -> return -1

@@ -553,6 +553,20 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
         if (hint?.toString() != text) hint = text
     }
 
+    private var zoomLabels: Pair<String, String>? = null
+    private var zoomActionIds = IntArray(0)
+
+    /** TalkBack's "Larger text" and "Smaller text" on the editor while it has a zoom ([labels]); null takes them away. */
+    fun applyZoomActions(labels: Pair<String, String>?) {
+        if (labels == zoomLabels) return
+        zoomLabels = labels
+        for (id in zoomActionIds) ViewCompat.removeAccessibilityAction(this, id)
+        zoomActionIds = if (labels == null) IntArray(0) else intArrayOf(
+            ViewCompat.addAccessibilityAction(this, labels.first) { _, _ -> zoom(1); true },
+            ViewCompat.addAccessibilityAction(this, labels.second) { _, _ -> zoom(-1); true },
+        )
+    }
+
     fun applyMarkers(list: List<LineMarker>) {
         if (list == markerList) return
         markerList = list

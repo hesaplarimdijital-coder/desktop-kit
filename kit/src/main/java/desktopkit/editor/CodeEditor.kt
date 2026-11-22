@@ -207,6 +207,7 @@ fun CodeEditor(
     val currentZoom by rememberUpdatedState(zoom)
     val currentKeyHook by rememberUpdatedState(onPreviewKeyEvent)
     val editorLabel = label ?: stringResource(R.string.dk_editor)
+    val zoomLabels = if (zoom == null) null else stringResource(R.string.dk_editor_larger) to stringResource(R.string.dk_editor_smaller)
 
     // known to the shell like the kit's text fields: a tap in the editor or a scroll that starts in it keeps the keyboard
     val shell = LocalShellOverlayHost.current
@@ -281,6 +282,7 @@ fun CodeEditor(
                 view.accessibilityLabel = editorLabel
                 view.links = links
                 view.applyPlaceholder(placeholder)
+                view.applyZoomActions(zoomLabels)
                 view.applyContentPadding(topPadding, bottomPadding)
                 if (state.tokens.tokenizer !== tokenizer) {
                     state.tokens.tokenizer = tokenizer

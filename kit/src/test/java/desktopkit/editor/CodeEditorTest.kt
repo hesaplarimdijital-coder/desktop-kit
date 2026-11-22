@@ -671,6 +671,16 @@ class CodeEditorTest {
         assertEquals(1.1f, zoom!!.scale, 0.001f)
         compose.runOnIdle { assertEquals(size * 1.1f, view.textSize, 0.01f) }
         assertEquals("the line at the top stays there", top, document.firstVisibleLine)
+        // TalkBack has the same steps
+        compose.runOnIdle {
+            val actions = view.createAccessibilityNodeInfo().actionList
+            val larger = actions.single { it.label == "Yazıyı büyüt" }
+            assertTrue(actions.any { it.label == "Yazıyı küçült" })
+            view.performAccessibilityAction(larger.id, null)
+        }
+        assertEquals(1.2f, zoom!!.scale, 0.001f)
+        onUi { it.press(KeyEvent.KEYCODE_MINUS, KeyEvent.META_CTRL_ON) }
+        assertEquals(1.1f, zoom!!.scale, 0.001f)
         onUi { it.press(KeyEvent.KEYCODE_0, KeyEvent.META_CTRL_ON) }
         assertEquals(1f, zoom!!.scale, 0.001f)
         compose.runOnIdle { assertEquals(size, view.textSize, 0.01f) }
