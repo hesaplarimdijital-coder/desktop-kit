@@ -151,6 +151,26 @@ class CodeEditorStateTest {
     }
 
     @Test
+    fun scrollToLineOnADocumentNoEditorShowsIsItsFirstVisibleLine() {
+        val state = CodeEditorState((1..100).joinToString("\n") { "satır $it" })
+        assertEquals(0, state.firstVisibleLine)
+        // the place saved before a restart, given back before any editor shows the document
+        state.scrollToLine(40)
+        assertEquals(40, state.firstVisibleLine)
+        // lines added above keep the same text at the top
+        state.replace(0, 0, "yeni\nyeni\n")
+        assertEquals(42, state.firstVisibleLine)
+        assertEquals("satır 41", state.lineText(state.firstVisibleLine))
+        // the line at the top taken away: the place of the change comes to the top
+        state.replace(state.lineStart(41), state.lineEnd(43) + 1, "")
+        assertEquals(41, state.firstVisibleLine)
+        state.scrollToLine(10_000)
+        assertEquals(state.lineCount - 1, state.firstVisibleLine)
+        state.setText("bir")
+        assertEquals(0, state.firstVisibleLine)
+    }
+
+    @Test
     fun revealAndFocusWaitForAnEditor() {
         val state = CodeEditorState("bir\niki\nüç")
         state.revealLine(2, select = true, focus = true)

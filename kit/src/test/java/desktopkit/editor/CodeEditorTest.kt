@@ -15,13 +15,19 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -31,6 +37,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import desktopkit.components.MenuEntry
@@ -68,7 +75,9 @@ class CodeEditorTest {
     private var softWrap by mutableStateOf(true)
     private var markers by mutableStateOf(emptyList<LineMarker>())
     private var padding by mutableStateOf(PaddingValues(0.dp))
+    private var editorWidth by mutableStateOf<Dp?>(null)
     private var zoom: CodeEditorZoom? = null
+    private var keyHook: ((androidx.compose.ui.input.key.KeyEvent) -> Boolean)? = null
     private val clickedMarkers = mutableListOf<LineMarker>()
     private val clickedLinks = mutableListOf<Int>()
     private val menuOffsets = mutableListOf<Int>()
@@ -82,7 +91,7 @@ class CodeEditorTest {
                     extra()
                     CodeEditor(
                         state = document,
-                        modifier = Modifier.fillMaxSize().testTag("editor"),
+                        modifier = (editorWidth?.let { Modifier.width(it).fillMaxHeight() } ?: Modifier.fillMaxSize()).testTag("editor"),
                         tokenizer = sampleTokenizer,
                         markers = markers,
                         onMarkerClick = { clickedMarkers += it },
@@ -96,6 +105,7 @@ class CodeEditorTest {
                         softWrap = softWrap,
                         readOnly = readOnly,
                         contentPadding = padding,
+                        onPreviewKeyEvent = keyHook,
                     )
                 }
             }
@@ -146,6 +156,16 @@ class CodeEditorTest {
         val coords = arrayOf(MotionEvent.PointerCoords().apply { x = at.x; y = at.y; pressure = 1f; size = 1f })
         val event = MotionEvent.obtain(now, now, action, 1, properties, coords, meta, buttons, 1f, 1f, 0, 0, InputDevice.SOURCE_MOUSE, 0)
         if (action == MotionEvent.ACTION_HOVER_MOVE || action == MotionEvent.ACTION_SCROLL) dispatchGenericMotionEvent(event) else dispatchTouchEvent(event)
+        event.recycle()
+    }
+
+    /** The mouse wheel turned [notches] away from the user (negative: toward) over the editor. */
+    private fun CodeEditorView.wheel(meta: Int, notches: Float) {
+        val now = android.os.SystemClock.uptimeMillis()
+        val properties = arrayOf(MotionEvent.PointerProperties().apply { id = 0; toolType = MotionEvent.TOOL_TYPE_MOUSE })
+        val coords = arrayOf(MotionEvent.PointerCoords().apply { x = 200f; y = 200f; setAxisValue(MotionEvent.AXIS_VSCROLL, notches) })
+        val event = MotionEvent.obtain(now, now, MotionEvent.ACTION_SCROLL, 1, properties, coords, meta, 0, 1f, 1f, 0, 0, InputDevice.SOURCE_MOUSE, 0)
+        dispatchGenericMotionEvent(event)
         event.recycle()
     }
 
@@ -310,6 +330,34 @@ class CodeEditorTest {
         assertInStep()
     }
 
+    @Test
+    fun theAppsKeyHandlerSeesAKeyBeforeTheEditor() {
+        var refreshes = 0
+        keyHook = { event ->
+            if (event.key == Key.F5) {
+                if (event.type == KeyEventType.KeyDown) refreshes++
+                true
+            } else {
+                false
+            }
+        }
+        show()
+        onUi { view ->
+            view.requestFocus()
+            document.select(0)
+            // through the window, the way a hardware key arrives
+            val now = android.os.SystemClock.uptimeMillis()
+            for (code in intArrayOf(KeyEvent.KEYCODE_F5, KeyEvent.KEYCODE_K)) {
+                compose.activity.dispatchKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, code, 0))
+                compose.activity.dispatchKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, code, 0))
+            }
+        }
+        assertEquals(1, refreshes)
+        // a key the app leaves alone is the editor's
+        assertEquals("k// Çay", document.text.take(7))
+        assertInStep()
+    }
+
     // ---------------------------------------------------------------- documents
 
     @Test
@@ -455,6 +503,62 @@ class CodeEditorTest {
     }
 
     @Test
+    fun theFirstVisibleLineFollowsTheScrollAndScrollToLineSetsIt() {
+        document = CodeEditorState((1..300).joinToString("\n") { "satır $it" })
+        padding = PaddingValues(top = 56.dp, bottom = 80.dp)
+        show()
+        assertEquals(0, document.firstVisibleLine)
+        val view = view()
+        onUi { it.scrollBy(0, 400) }
+        compose.runOnIdle {
+            // the line at the top of the text: below the bar and the edge
+            val top = view.scrollY + 56 + 8
+            val expected = document.lineOf(view.layout.getLineStart(view.layout.getLineForVertical(top)))
+            assertTrue(expected > 0)
+            assertEquals(expected, document.firstVisibleLine)
+        }
+        onUi { document.scrollToLine(120) }
+        compose.runOnIdle {
+            assertEquals(120, document.firstVisibleLine)
+            assertEquals(view.layout.getLineTop(view.layout.getLineForOffset(document.lineStart(120))) - 56 - 8, view.scrollY)
+        }
+    }
+
+    @Test
+    fun aDocumentOpensAtTheLineTheAppScrolledItTo() {
+        val restored = CodeEditorState((1..300).joinToString("\n") { "satır $it" })
+        // the place saved before a restart
+        restored.scrollToLine(200)
+        document = restored
+        show()
+        val view = view()
+        compose.runOnIdle {
+            assertEquals(200, restored.firstVisibleLine)
+            assertEquals(view.layout.getLineTop(view.layout.getLineForOffset(restored.lineStart(200))) - 8, view.scrollY)
+        }
+    }
+
+    @Test
+    fun anotherWidthKeepsTheLineAtTheTop() {
+        document = CodeEditorState((1..200).joinToString("\n") { "satır $it: " + "uzun bir paragraf ".repeat(8) })
+        editorWidth = 800.dp
+        show()
+        onUi { document.scrollToLine(120) }
+        assertEquals(120, document.firstVisibleLine)
+        // the window narrows (DeX, a tablet turned): the lines wrap into more rows
+        editorWidth = 400.dp
+        compose.waitForIdle()
+        val view = view()
+        compose.runOnIdle {
+            assertEquals(120, document.firstVisibleLine)
+            assertEquals(document.lineStart(120), view.layout.getLineStart(view.layout.getLineForVertical(view.scrollY + 8)))
+        }
+        editorWidth = 800.dp
+        compose.waitForIdle()
+        compose.runOnIdle { assertEquals(120, document.firstVisibleLine) }
+    }
+
+    @Test
     fun aRightClickOpensTheKitsMenuWithTheAppsEntries() {
         show()
         val target = document.lineStart(6) + 4
@@ -467,6 +571,66 @@ class CodeEditorTest {
         compose.waitForIdle()
         assertEquals(1, jumped)
         compose.onNodeWithText("Kopyala").assertDoesNotExist()
+    }
+
+    @Test
+    fun theDesktopKeysWorkByWordsLinesAndTheDocument() {
+        document = CodeEditorState("bir iki üç\ndört beş\naltı")
+        show()
+        onUi { view ->
+            view.requestFocus()
+            document.select(document.lineEnd(0))
+            // Ctrl+Backspace takes the word before the cursor, Ctrl+Delete the one after it
+            view.press(KeyEvent.KEYCODE_DEL, KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON)
+        }
+        assertEquals("bir iki ", document.lineText(0))
+        onUi { view ->
+            document.select(0)
+            view.press(KeyEvent.KEYCODE_FORWARD_DEL, KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON)
+        }
+        assertEquals(" iki ", document.lineText(0))
+        onUi { view -> view.press(KeyEvent.KEYCODE_MOVE_END) }
+        assertEquals("End goes to the line's end", document.lineEnd(0), document.cursor)
+        onUi { view -> view.press(KeyEvent.KEYCODE_MOVE_END, KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON) }
+        assertEquals("Ctrl+End to the document's", document.length, document.cursor)
+        onUi { view -> view.press(KeyEvent.KEYCODE_MOVE_HOME) }
+        assertEquals(document.lineStart(2), document.cursor)
+        onUi { view -> view.press(KeyEvent.KEYCODE_MOVE_HOME, KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON) }
+        assertEquals(0, document.cursor)
+        onUi { view ->
+            // Shift held, as a keyboard sends it: the selection grows a word at a time
+            val now = android.os.SystemClock.uptimeMillis()
+            val shift = KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON
+            view.dispatchKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SHIFT_LEFT, 0, shift))
+            view.press(KeyEvent.KEYCODE_DPAD_RIGHT, shift or KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON)
+            view.press(KeyEvent.KEYCODE_DPAD_DOWN, shift)
+            view.dispatchKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SHIFT_LEFT, 0, 0))
+        }
+        assertEquals(0, document.selection.start)
+        assertEquals("down a line from the end of the first word", document.lineStart(1) + 4, document.selection.end)
+        assertInStep()
+    }
+
+    @Test
+    fun aMouseSelectsAWordWithTwoClicksAndALineWithThree() {
+        show()
+        val target = document.lineStart(5) + 8
+        onUi { view ->
+            view.requestFocus()
+            val at = pointOf(view, target)
+            view.click(at)
+            view.click(at)
+        }
+        assertEquals("erkenden", document.selectedText)
+        // later, a click of its own and two more
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(2))
+        onUi { view ->
+            val at = pointOf(view, target)
+            view.click(at)
+            view.click(at)
+            view.click(at)
+        }
+        assertEquals(document.lineText(5), document.selectedText.removeSuffix("\n"))
     }
 
     @Test
@@ -498,20 +662,15 @@ class CodeEditorTest {
         val view = view()
         val size = view.textSize
         onUi {
-            val now = android.os.SystemClock.uptimeMillis()
-            fun wheel(meta: Int, notches: Float) {
-                val properties = arrayOf(MotionEvent.PointerProperties().apply { id = 0; toolType = MotionEvent.TOOL_TYPE_MOUSE })
-                val coords = arrayOf(MotionEvent.PointerCoords().apply { x = 200f; y = 200f; setAxisValue(MotionEvent.AXIS_VSCROLL, notches) })
-                val event = MotionEvent.obtain(now, now, MotionEvent.ACTION_SCROLL, 1, properties, coords, meta, 0, 1f, 1f, 0, 0, InputDevice.SOURCE_MOUSE, 0)
-                it.dispatchGenericMotionEvent(event)
-                event.recycle()
-            }
-            wheel(0, -2f)
+            it.wheel(0, -2f)
             assertTrue("the wheel scrolled the text", it.scrollY > 0)
-            wheel(KeyEvent.META_CTRL_ON, 1f)
         }
+        val top = document.firstVisibleLine
+        assertTrue(top > 0)
+        onUi { it.wheel(KeyEvent.META_CTRL_ON, 1f) }
         assertEquals(1.1f, zoom!!.scale, 0.001f)
         compose.runOnIdle { assertEquals(size * 1.1f, view.textSize, 0.01f) }
+        assertEquals("the line at the top stays there", top, document.firstVisibleLine)
         onUi { it.press(KeyEvent.KEYCODE_0, KeyEvent.META_CTRL_ON) }
         assertEquals(1f, zoom!!.scale, 0.001f)
         compose.runOnIdle { assertEquals(size, view.textSize, 0.01f) }

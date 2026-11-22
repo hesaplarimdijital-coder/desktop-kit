@@ -148,8 +148,11 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
     var softWrap = true
         set(value) {
             if (field == value) return
+            // the lines wrap anew: the row at the top stays at the top
+            saveAnchor()
             field = value
             setHorizontallyScrolling(!value)
+            if (document != null && layout != null) restoreScroll = true
             scrollTo(0, scrollY)
         }
     var readOnly = false
@@ -394,11 +397,8 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
         stopFling()
         removeCallbacks(tokenizeMore)
         if (state.host === this) {
+            saveAnchor()
             state.host = null
-            if (layout != null && !restoreScroll) {
-                state.scrollX = scrollX
-                state.scrollY = scrollY
-            }
         }
         document = null
     }
@@ -438,6 +438,13 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
         load(state)
         restoreScroll = true
         requestLayout()
+    }
+
+    override fun scrollToAnchor() {
+        restoreScroll = true
+        stopFling()
+        val state = document
+        if (state != null && layout != null && width > 0 && !isLayoutRequested) applyRestore(state) else requestLayout()
     }
 
     override fun reveal(start: Int, end: Int) {
@@ -503,7 +510,13 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
 
     fun applyMetrics(next: EditorMetrics) {
         if (next == metrics) return
-        val anchor = topOffset()
+        // a new text size keeps the row that was at the top there
+        val state = document
+        if (metrics != null && state != null && layout != null) {
+            saveAnchor()
+            state.setScrollAnchor(state.scrollAnchor, 0)
+            restoreScroll = true
+        }
         metrics = next
         typeface = next.typeface
         setTextSize(TypedValue.COMPLEX_UNIT_PX, next.textSize)
@@ -515,8 +528,6 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
         widestLine = 0f
         applyCursor()
         applyPadding()
-        // a new text size keeps the line that was at the top there
-        if (anchor >= 0) post { scrollToOffsetAtTop(anchor) }
     }
 
     private fun applyCursor() {
@@ -534,6 +545,7 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
         contentTop = top
         contentBottom = bottom
         if (layout != null) scrollTo(scrollX, if (atTop) minScrollY() else scrollY)
+        saveAnchor()
         publishViewport()
     }
 
@@ -1262,24 +1274,29 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
     override fun onScrollChanged(horiz: Int, vert: Int, oldHoriz: Int, oldVert: Int) {
         super.onScrollChanged(horiz, vert, oldHoriz, oldVert)
         if (!ready) return
+        saveAnchor()
         syncSyntaxIfNear()
         publishViewport()
         onViewportChanged?.invoke()
+    }
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        // a new width wraps the lines anew: the row at the top stays at the top
+        if (ready && layout != null && measuredWidth > 0 && MeasureSpec.getSize(widthMeasureSpec) != measuredWidth && document != null) {
+            saveAnchor()
+            restoreScroll = true
+        }
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
     }
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
         if (!ready || layout == null) return
         val state = document
-        if (restoreScroll && state != null) {
-            restoreScroll = false
-            followCursor = false
-            scrollTo(state.scrollX, if (state.scrollY == CodeEditorState.UNSCROLLED) minScrollY() else state.scrollY)
-        } else {
-            scrollTo(scrollX, scrollY)
-        }
+        if (restoreScroll && state != null) applyRestore(state) else scrollTo(scrollX, scrollY)
         if (pendingReveal != NO_REVEAL) applyPendingReveal()
         if (followCursor) bringPointIntoView(selectionEnd.coerceAtLeast(0))
+        saveAnchor()
         syncSyntaxIfNear()
         publishViewport()
         onViewportChanged?.invoke()
@@ -1370,16 +1387,30 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
         return true
     }
 
-    /** The offset of the first character in view, to hold on to while the text size changes. */
-    private fun topOffset(): Int {
-        val layout = layout ?: return -1
-        return layout.getLineStart(layout.getLineForVertical(scrollY + contentTop + (metrics?.edge ?: 0)))
+    /**
+     * Tells the document which row is at the top of the text and how much of it is scrolled past, so the
+     * document comes back there ([CodeEditorState.firstVisibleLine]). Not while a scroll to it is pending.
+     */
+    private fun saveAnchor() {
+        val state = document ?: return
+        val layout = layout ?: return
+        if (restoreScroll || loading || state.host !== this || state.lines.length != length()) return
+        val top = (scrollY + contentTop + (metrics?.edge ?: 0)).coerceIn(0, layout.height)
+        val row = layout.getLineForVertical(top)
+        state.scrollX = scrollX
+        state.setScrollAnchor(layout.getLineStart(row), top - layout.getLineTop(row))
     }
 
-    private fun scrollToOffsetAtTop(offset: Int) {
+    /** Scrolls to where the document says it was: its anchor row at the top of the text, as far as the end allows. */
+    private fun applyRestore(state: CodeEditorState) {
+        restoreScroll = false
+        followCursor = false
         val layout = layout ?: return
-        val row = layout.getLineForOffset(offset.coerceIn(0, length()))
-        scrollTo(scrollX, layout.getLineTop(row) - contentTop - (metrics?.edge ?: 0))
+        val row = layout.getLineForOffset(state.scrollAnchor.coerceIn(0, length()))
+        // after the lines wrapped anew, the row may be lower than the pixels scrolled past it
+        val delta = state.scrollAnchorDelta.coerceAtMost((layout.getLineBottom(row) - layout.getLineTop(row) - 1).coerceAtLeast(0))
+        scrollTo(state.scrollX, layout.getLineTop(row) + delta - contentTop - (metrics?.edge ?: 0))
+        saveAnchor()
     }
 
     /** The cursor's place in the view, for what floats beside it (the completion list): left, top, bottom. */

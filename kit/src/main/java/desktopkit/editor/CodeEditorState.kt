@@ -52,12 +52,21 @@ class CodeEditorState(initialText: String = "") {
     internal var pendingReveal: TextRange? = null
     internal var pendingFocus = false
 
-    /** Where the editor had scrolled to when it last showed this document; [UNSCROLLED] before the first time. */
+    /**
+     * Where the text is scrolled to, kept while an editor shows the document and for the next one that
+     * does: [scrollAnchor] is the offset of the row at the top of the text (below the content padding),
+     * [scrollAnchorDelta] how many pixels of that row are scrolled past. A row, not pixels, so the same
+     * line comes back on a window of another width; [scrollX] is the sideways scroll of unwrapped text.
+     */
+    internal var scrollAnchor = 0
+        private set
+    internal var scrollAnchorDelta = 0
+        private set
     internal var scrollX = 0
-    internal var scrollY = UNSCROLLED
 
     private var versionState by mutableIntStateOf(0)
     private var selectionState by mutableStateOf(TextRange.Zero)
+    private var firstVisibleLineState by mutableIntStateOf(0)
 
     /** Counts the changes of the text: read it to learn that the text changed, without copying it. */
     val version: Int get() = versionState
@@ -92,6 +101,13 @@ class CodeEditorState(initialText: String = "") {
 
     /** The selected text, empty when nothing is selected. */
     val selectedText: String get() = textIn(selectionState.min, selectionState.max)
+
+    /**
+     * The line at the top of the editor's text (below its content padding), zero-based: where the
+     * document is scrolled to, to keep with the cursor when the app saves its place. Follows the
+     * scrolling while an editor shows the document; the last place otherwise. See [scrollToLine].
+     */
+    val firstVisibleLine: Int get() = firstVisibleLineState
 
     /** Whether there is something to [undo]. */
     var canUndo by mutableStateOf(false)
@@ -202,7 +218,7 @@ class CodeEditorState(initialText: String = "") {
         tokens.reset(lines.count)
         selectionState = TextRange.Zero
         scrollX = 0
-        scrollY = UNSCROLLED
+        setScrollAnchor(0, 0)
         historyChanged()
         textChanged()
         host?.showText()
@@ -293,12 +309,14 @@ class CodeEditorState(initialText: String = "") {
         if (range != selectionState) selectionState = range
     }
 
-    /** The one place the text changes: the buffer, the line index, the tokens, the history. */
+    /** The one place the text changes: the buffer, the line index, the tokens, the history, the scroll anchor. */
     private fun commit(start: Int, removed: String, inserted: String, typed: Boolean, selectionBefore: Long) {
         val end = start + removed.length
         buffer.replace(start, end, inserted)
         val packed = lines.replace(start, end, inserted)
         tokens.linesReplaced(lines.lineOf(start), LineIndex.removedLines(packed), LineIndex.addedLines(packed))
+        // the row at the top stays with its text; one whose text went is where the change is
+        if (scrollAnchor > start) setScrollAnchor(if (scrollAnchor >= end) scrollAnchor + inserted.length - removed.length else start, scrollAnchorDelta)
         if (!replaying) {
             val after = start + inserted.length
             history.record(start, removed, inserted, selectionBefore, pack(TextRange(after)), typed)
@@ -327,6 +345,7 @@ class CodeEditorState(initialText: String = "") {
         buffer.append(text)
         lines.reset(buffer)
         tokens.reset(lines.count)
+        setScrollAnchor(scrollAnchor, scrollAnchorDelta)
         historyChanged()
         textChanged()
     }
@@ -364,6 +383,25 @@ class CodeEditorState(initialText: String = "") {
         val index = line.coerceIn(0, lines.count - 1)
         if (!select) select(lines.start(index))
         reveal(lines.start(index), lines.end(index), select, focus)
+    }
+
+    /**
+     * Scrolls so that [line] is the first line of the text (below the content padding), as far as the
+     * end of the document allows; a document no editor shows opens there. For a place saved from
+     * [firstVisibleLine], after a restart say. The cursor stays where it is.
+     */
+    fun scrollToLine(line: Int) {
+        val start = lines.start(line.coerceIn(0, lines.count - 1))
+        setScrollAnchor(start, 0)
+        host?.scrollToAnchor()
+    }
+
+    /** The editor reports the row at the top of its text: its start [offset], and [delta] pixels of it scrolled past. */
+    internal fun setScrollAnchor(offset: Int, delta: Int) {
+        scrollAnchor = offset.coerceIn(0, buffer.length)
+        scrollAnchorDelta = delta.coerceAtLeast(0)
+        val line = lines.lineOf(scrollAnchor)
+        if (line != firstVisibleLineState) firstVisibleLineState = line
     }
 
     /** Gives the editor the keyboard focus (and opens the on-screen keyboard when there is no other). */
@@ -442,8 +480,6 @@ class CodeEditorState(initialText: String = "") {
     }
 
     internal companion object {
-        const val UNSCROLLED = Int.MIN_VALUE
-
         /** How many columns a tab character counts for when lines are moved out. */
         const val TAB_WIDTH = 4
 
@@ -466,6 +502,9 @@ internal interface EditorHost {
 
     /** Shows the state's text anew: all of it was replaced. */
     fun showText()
+
+    /** Scrolls to the state's scroll anchor (the app chose a line to show at the top). */
+    fun scrollToAnchor()
     fun reveal(start: Int, end: Int)
     fun focus()
 
