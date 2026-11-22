@@ -18,8 +18,10 @@
     kadar yana, menüsünün üstüne açılır.
   - **Fare:** imleç satırda 200 ms durunca açılır, tıklayınca hemen. İmleç başka bir satırda durunca o satır
     devralır (açık alt menü kapanır, satırın kendi alt menüsü varsa açılır). Alt menüye doğru çapraz giderken
-    geçilen satırlar onu kapatmaz: bekleme her yeni satırda ve alt menüye doğru her harekette yeniden başlar
-    (masaüstü menülerinin "güvenli üçgeni"). İmleç menüden çıkınca açık alt menü yerinde kalır.
+    geçilen satırlar onu kapatmaz: bekleme her yeni satırda ve imleci alt menüye yaklaştıran her harekette yeniden
+    başlar, hareket açan satırdan alt menüye uzanan üçgenin içinde kaldıkça (masaüstü menülerinin "güvenli
+    üçgeni"). Geri giden ya da yerinde titreyen imleç beklemeyi uzatmaz. İmleç menüden çıkınca açık alt menü yerinde
+    kalır.
   - **Dokunma:** satıra dokunmak açar, aynı satıra yeniden dokunmak kapatır. Bunu yoğunluk değil basan belirler
     (tablodaki seçim gibi): parmak ve kalem her yoğunlukta böyle; fare tıklaması, Enter ve TalkBack her zaman açar,
     dokunmatik yoğunluk sabitlenmişken de imlecin açtığını tıklama kapatmaz.

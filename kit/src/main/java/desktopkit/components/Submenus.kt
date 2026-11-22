@@ -67,6 +67,7 @@ import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import desktopkit.R
 import desktopkit.theme.DeskTheme
+import kotlin.math.abs
 import kotlinx.coroutines.delay
 
 // Submenus of the kit's menus: a line of a menu that opens another menu beside it, to any depth.
@@ -164,6 +165,15 @@ internal fun headsFor(from: Offset, to: Offset, child: Rect, slack: Float): Bool
     return meets >= child.top - slack && meets <= child.bottom + slack
 }
 
+/**
+ * Whether a move from [from] to [to] brings the pointer nearer to the side of [child] that faces it:
+ * toward the submenu, not away from it, nor only up or down.
+ */
+internal fun nearer(from: Offset, to: Offset, child: Rect): Boolean {
+    val edge = if (child.center.x >= from.x) child.left else child.right
+    return abs(edge - to.x) < abs(edge - from.x)
+}
+
 /** What a move of the pointer does to the wait before the line under it takes over ([SUBMENU_HOVER_MS]). */
 internal enum class HoverWait { Keep, Restart, Cancel }
 
@@ -174,9 +184,10 @@ internal enum class HoverWait { Keep, Restart, Cancel }
  * [SUBMENU_HOVER_MS]: [moved] says when that wait starts again, [settle] which line it was for. So a
  * pointer crossing lines on its way down the menu opens nothing on the way, and one travelling
  * diagonally to the open submenu across its parent's other lines does not close it: each line it
- * crosses starts the wait anew, and while it keeps heading for the submenu ([headsFor], from where
- * it left the submenu's own line) every move does. Once it rests on another line, or turns away
- * and stays there, that line takes over.
+ * crosses starts the wait anew, and so does every move that brings it nearer to the submenu ([nearer])
+ * inside the safe triangle ([headsFor], from where it left the submenu's own line). A pointer that
+ * goes back or trembles in place does not; once it rests on another line, or turns away and stays
+ * there, that line takes over.
  */
 internal class SubmenuHover {
     /** The line the pointer is on that has not taken over yet. */
@@ -192,6 +203,7 @@ internal class SubmenuHover {
      * and [child] where that submenu is, in the coordinates of [at]; [slack] as in [headsFor].
      */
     fun moved(line: Int, at: Offset, open: Int, child: Rect?, slack: Float): HoverWait {
+        val previous = last
         last = at
         if (line == open) {
             tip = at
@@ -200,7 +212,8 @@ internal class SubmenuHover {
             return if (waited) HoverWait.Cancel else HoverWait.Keep
         }
         val from = tip
-        val aiming = open != NONE && child != null && from != null && headsFor(from, at, child, slack)
+        val aiming = open != NONE && child != null && from != null && previous != null &&
+            headsFor(from, at, child, slack) && nearer(previous, at, child)
         return when {
             pending != line -> {
                 pending = line

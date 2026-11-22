@@ -143,6 +143,21 @@ class SubmenuLogicTest {
     }
 
     @Test
+    fun onlyAMoveThatBringsThePointerNearerStartsTheWaitAgain() {
+        val hover = SubmenuHover()
+        hover.moved(0, Offset(150f, 116f), open = 0, child = submenu, slack = slack)
+        assertEquals(HoverWait.Restart, hover.moved(1, Offset(210f, 150f), 0, submenu, slack))
+        // a little way back, still inside the triangle from the line: away from the submenu, not on its way there
+        assertEquals(HoverWait.Keep, hover.moved(1, Offset(205f, 149f), 0, submenu, slack))
+        // a hand that trembles in place
+        assertEquals(HoverWait.Keep, hover.moved(1, Offset(205f, 151f), 0, submenu, slack))
+        // toward it again
+        assertEquals(HoverWait.Restart, hover.moved(1, Offset(215f, 153f), 0, submenu, slack))
+        assertTrue("toward a submenu on the left too", nearer(Offset(250f, 140f), Offset(240f, 141f), Rect(0f, 96f, 96f, 296f)))
+        assertFalse(nearer(Offset(250f, 140f), Offset(255f, 141f), Rect(0f, 96f, 96f, 296f)))
+    }
+
+    @Test
     fun backOnTheSubmenusOwnLineNothingWaits() {
         val hover = SubmenuHover()
         hover.moved(0, Offset(150f, 116f), 0, submenu, slack)
