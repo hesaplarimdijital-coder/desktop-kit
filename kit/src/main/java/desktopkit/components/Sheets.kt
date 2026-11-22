@@ -197,8 +197,7 @@ internal fun ActionSheet(
     title: String? = null,
 ) {
     val pages = remember { SheetPages() }
-    // a sheet opens on its first page
-    LaunchedEffect(visible) { if (visible) pages.reset() }
+    pages.follow(visible)
     val held = remember { GroupsHolder(groups) }
     if (visible) held.value = groups
     val paged = held.value.any { group -> group.actions.any { it is MenuEntry.Submenu } }
@@ -262,6 +261,19 @@ internal class SheetPages {
         cameFrom = path.last()
         path = path.dropLast(1)
         return true
+    }
+
+    /** Whether the sheet was up when [follow] was last told; not state, nothing is drawn from it. */
+    private var up = false
+
+    /**
+     * Follows whether the sheet is [visible]: a sheet that opens starts on its first page, at its top.
+     * Told while the sheet is composed, so the first frame already shows that page; an effect would
+     * come a frame late, and the page the sheet was left on would show and fade away as it rises.
+     */
+    fun follow(visible: Boolean) {
+        if (visible && !up) reset()
+        up = visible
     }
 
     fun reset() {

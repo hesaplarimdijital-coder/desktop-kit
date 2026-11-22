@@ -65,4 +65,21 @@ class SheetPagesTest {
         assertEquals(0, pages.depth)
         assertEquals(null, pages.cameFrom)
     }
+
+    @Test
+    fun aSheetThatOpensStartsOnItsFirstPageAtItsTop() {
+        val pages = SheetPages()
+        pages.follow(visible = true)
+        pages.open(2)
+        val scroll = pages.scrollOf(0)
+        // composed again while it is up (a switch on the page flipped): the page stays
+        pages.follow(visible = true)
+        assertEquals(listOf(2), pages.path)
+        // closed (it slides out on that page), then opened again
+        pages.follow(visible = false)
+        assertEquals(listOf(2), pages.path)
+        pages.follow(visible = true)
+        assertEquals(0, pages.depth)
+        assertFalse("the first page starts at its top again", scroll === pages.scrollOf(0))
+    }
 }

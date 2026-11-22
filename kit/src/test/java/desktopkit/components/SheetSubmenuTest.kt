@@ -305,6 +305,47 @@ class SheetSubmenuTest {
         gone("Düğüm")
     }
 
+    /** Leaves the sheet on a page (an action there closes it), opens it again and looks at its first frames. */
+    private fun reopenedShowsTheFirstPageAtOnce() {
+        tap("Parçalar")
+        tap("Düğüm")
+        assertFalse(open)
+        compose.mainClock.autoAdvance = false
+        open = true
+        compose.waitForIdle()
+        repeat(2) {
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+            // not the page it was left on, fading away as the sheet rises
+            gone("Düğüm")
+        }
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        shown("Aç")
+    }
+
+    /** In a shell the sheet is composed in the shell's overlay, a frame after it is asked for. */
+    @Test
+    fun aSheetOpenedAgainShowsItsFirstPageFromItsFirstFrame() {
+        sheet()
+        reopenedShowsTheFirstPageAtOnce()
+    }
+
+    /** Outside a shell the sheet is a pop-up window of its own, composed in the frame it is asked for. */
+    @Test
+    fun outsideAShellASheetOpenedAgainShowsItsFirstPageFromItsFirstFrame() {
+        compose.setContent {
+            DesktopKitTheme(themeMode = ThemeMode.Dark, inputMode = InputMode.Touch) {
+                CompositionLocalProvider(LocalWidthClass provides WidthClass.Compact) {
+                    MoreSheet(visible = open, onDismiss = { open = false }, groups = groups(), title = "İşlemler")
+                }
+            }
+        }
+        open = true
+        compose.waitForIdle()
+        reopenedShowsTheFirstPageAtOnce()
+    }
+
     @Test
     fun theShellsMoreSheetTurnsPagesToo() {
         compose.setContent {
