@@ -836,7 +836,7 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
         when {
             keyCode == KeyEvent.KEYCODE_ESCAPE && event.hasNoModifiers() -> {
                 // Esc, then Tab: the way out of an editor in which Tab types. The key stops here (an Esc nobody
-                // takes is the system's Back); a second Esc is the platform's, which gives up the focus.
+                // takes is often the system's Back); a second Esc goes on to the app and the system.
                 if (wasArmed) return super.onKeyDown(keyCode, event)
                 escapeArmed = true
                 swallowedKey = keyCode

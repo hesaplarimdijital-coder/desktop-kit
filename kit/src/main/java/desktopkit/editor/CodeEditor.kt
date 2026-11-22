@@ -82,7 +82,8 @@ import kotlin.math.roundToInt
  * with the document. On top of it:
  * - Tab indents by [indent] (the lines of a selection that spans several), Shift+Tab moves them out,
  *   Enter keeps the line's indentation. Since Tab types, the keyboard leaves the editor with Esc and
- *   then Tab (or Shift+Tab), as in desktop editors; Esc twice gives up the focus, the platform's way;
+ *   then Tab (or Shift+Tab) for the next (or the previous) element, as in desktop editors; another key
+ *   after Esc stays in the editor, a second Esc goes on to the app and the system (often as Back);
  * - Ctrl+Z, Ctrl+Y and Ctrl+Shift+Z go through [state]'s history, Ctrl+A, C, X and V do what they do
  *   everywhere, pasted text comes without its styles;
  * - a right click, a two-finger tap on a touchpad, the Menu key or Shift+F10 open the kit's menu with
@@ -356,7 +357,8 @@ fun CodeEditor(
                 view.bind(state)
                 view.applyMarkers(markers)
                 view.applyDecorations(decorations)
-                view.applySearch(if (search != null && search.isOpen) search.matches else CodeSearchState.NO_MATCHES, search?.currentMatch ?: -1)
+                // the current match follows the selection: read only while the search shows
+                if (search != null && search.isOpen) view.applySearch(search.matches, search.currentMatch) else view.applySearch(CodeSearchState.NO_MATCHES, -1)
             },
             onRelease = { view ->
                 view.release()
