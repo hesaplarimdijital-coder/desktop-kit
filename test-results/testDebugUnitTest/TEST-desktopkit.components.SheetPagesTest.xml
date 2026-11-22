@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.components.SheetPagesTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-22T23:44:56.485Z" hostname="runnervm0hi8g" time="0.032">
+  <properties/>
+  <testcase name="aPathLeadsThroughTheSubmenus" classname="desktopkit.components.SheetPagesTest" time="0.01"/>
+  <testcase name="backGoesUpOnePageAndRemembersWhereItCameFrom" classname="desktopkit.components.SheetPagesTest" time="0.021"/>
+  <testcase name="aGroupOfItemsBecomesMenuEntriesAsBefore" classname="desktopkit.components.SheetPagesTest" time="0.0"/>
+  <testcase name="aStepIsFoundAgainByItsLabelWhenTheEntriesMove" classname="desktopkit.components.SheetPagesTest" time="0.0"/>
+  <testcase name="aSheetThatOpensStartsOnItsFirstPageAtItsTop" classname="desktopkit.components.SheetPagesTest" time="0.001"/>
+  <testcase name="thePathSettlesOnWhatIsOnScreen" classname="desktopkit.components.SheetPagesTest" time="0.0"/>
+  <testcase name="aPathThatNoLongerLeadsToASubmenuStopsThere" classname="desktopkit.components.SheetPagesTest" time="0.0"/>
+  <testcase name="aSubmenuRenamedWhereItWasIsFoundAtItsPlace" classname="desktopkit.components.SheetPagesTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
