@@ -34,6 +34,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
@@ -47,6 +48,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -56,8 +59,10 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
@@ -95,6 +100,22 @@ sealed interface MenuEntry {
     ) : MenuEntry
 
     data object Separator : MenuEntry
+
+    /**
+     * A line that opens another menu beside it ("Open Recent ▸"): a chevron at its end, [entries] in a
+     * menu of their own. Submenus nest to any depth. One without entries is shown disabled, and a
+     * disabled one does not open. In a "⋯" sheet on a phone ([MoreSheet]) the line opens a page of
+     * the sheet instead.
+     */
+    data class Submenu(
+        val label: String,
+        val entries: List<MenuEntry>,
+        val icon: ImageVector? = null,
+        val enabled: Boolean = true,
+    ) : MenuEntry {
+        /** Whether there is something to open: enabled and not empty. */
+        internal val opens: Boolean get() = enabled && entries.isNotEmpty()
+    }
 }
 
 /** A titled drop-down of the menu bar. Entries are built when the menu opens. */
@@ -117,6 +138,11 @@ class MenuSpec(val title: String, val entries: () -> List<MenuEntry>)
  * like Material's DropdownMenu and Android's PopupMenu: the click outside only closes the menu and
  * does not reach what is under it. A right click outside closes it and is handed to the window
  * below, so a context menu opens there in the same click (as on desktops).
+ *
+ * A [MenuEntry.Submenu] opens its menu beside its line, in a pop-up of its own that looks and moves
+ * as this one: after the pointer has rested on the line ([SUBMENU_HOVER_MS]) or at once on a click,
+ * a tap, Enter or the arrow key pointing at it. The arrow pointing back, Esc and Back close one
+ * level; choosing an item or pressing outside closes them all. See Submenus.kt.
  */
 @Composable
 fun MenuPopup(
@@ -142,11 +168,22 @@ fun MenuPopup(
     val dismiss = remember { { if (open) currentOnDismiss() } }
     val anchorView = LocalView.current
     if (!target && !transition.currentState && !transition.targetState) return
-    val colors = DeskTheme.colors
-    val dimens = DeskTheme.dimens
-    val shape = RoundedCornerShape(dimens.radiusCard.coerceAtMost(10.dp))
-    val glassy = DeskGlass.source != null && DeskGlass.mode != GlassMode.Solid
+    val direction = LocalLayoutDirection.current
+    val hasSubmenus = shown.value.any { it is MenuEntry.Submenu }
     val provider = remember(shown.offset) { ClampedOffsetPositionProvider(shown.offset) }
+    // which of this menu's submenus is open; a menu without submenus never opens one
+    val level = remember { MenuLevel() }
+    level.follow(shown.value)
+    // closing takes the open submenu along: opened again while it still fades out, the menu starts without one
+    if (!target) SideEffect { level.close() }
+    val choose = remember {
+        { item: MenuEntry.Item ->
+            if (open) {
+                currentOnDismiss()
+                item.onClick()
+            }
+        }
+    }
     Popup(
         popupPositionProvider = provider,
         onDismissRequest = dismiss,
@@ -163,67 +200,128 @@ fun MenuPopup(
                 root.removeOnUnhandledKeyEventListener(escape)
             }
         }
-        val tier = LocalMotionTier.current
-        val reduced = tier == MotionTier.Reduced
-        AnimatedVisibility(
-            visibleState = transition,
-            enter = if (reduced) EnterTransition.None else fadeIn(tween(DeskMotion.SHORT_MS + 50, easing = DeskMotion.StandardDecelerate)),
-            exit = if (reduced) ExitTransition.None else fadeOut(tween(DeskMotion.SHORT_MS, easing = DeskMotion.StandardAccelerate)),
-            label = "menuPopup",
-        ) {
-            // the growth is drawn here rather than with scaleIn: its origin is only known once the pop-up is
-            // placed (flipped above, pushed in from an edge), and a layer reads it at draw time
-            val scale by this.transition.animateFloat(
-                transitionSpec = {
-                    when {
-                        reduced -> snap()
-                        targetState == EnterExitState.Visible -> tween(DeskMotion.SHORT_MS + 50, easing = DeskMotion.EmphasizedDecelerate)
-                        else -> tween(DeskMotion.SHORT_MS, easing = DeskMotion.EmphasizedAccelerate)
-                    }
-                },
-                label = "menuScale",
-            ) { state ->
+        MenuSurface(
+            transition = transition,
+            entries = shown.value,
+            minWidth = minWidth,
+            placed = provider,
+            // wider windows keep the top-left corner, as before
+            growsFromOrigin = LocalMotionTier.current == MotionTier.Gesture,
+            level = level,
+            choose = choose,
+            onKey = { event ->
+                val escape = event.type == KeyEventType.KeyDown && event.key == Key.Escape
+                if (escape) dismiss()
+                escape
+            },
+            // a menu with submenus reads the way they open: the direction of the place it was opened in
+            direction = if (hasSubmenus) direction else null,
+        )
+    }
+    if (hasSubmenus) {
+        Submenus(shown.value, level, parent = provider, active = target, choose = choose, minWidth = minWidth)
+    }
+}
+
+/**
+ * The menu itself, in its pop-up: the glass (or raised) panel with its lines, growing in and fading
+ * out with [transition]. Shared by [MenuPopup] and the submenus, so a submenu is a menu in every
+ * respect. [placed] says where the pop-up was put (the corner it grows from); [level] holds which of
+ * its submenus is open; [choose] runs an item and closes the whole chain; [onKey] gets the keys no
+ * line used. A submenu is announced by [paneTitle] and, opened with a key or a click, gives the
+ * keyboard focus to its first line ([focusFirst]; again when [focusKey] changes).
+ *
+ * [direction] is the layout direction of the place the menu was opened in, which decides the side
+ * submenus open on. A pop-up's content takes its direction from the pop-up's view, which is that of
+ * the app's locale; where the two differ (an app that turns part of its screen the other way), a
+ * menu with submenus follows [direction], so its chevrons, its arrow keys and its submenus agree.
+ * Null leaves the content as the pop-up gives it.
+ */
+@Composable
+internal fun MenuSurface(
+    transition: MutableTransitionState<Boolean>,
+    entries: List<MenuEntry>,
+    minWidth: Dp,
+    placed: PlacedMenu,
+    growsFromOrigin: Boolean,
+    level: MenuLevel,
+    choose: (MenuEntry.Item) -> Unit,
+    onKey: (androidx.compose.ui.input.key.KeyEvent) -> Boolean,
+    paneTitle: String? = null,
+    focusFirst: Boolean = false,
+    focusKey: Int = 0,
+    direction: LayoutDirection? = null,
+) {
+    if (direction != null && direction != LocalLayoutDirection.current) {
+        CompositionLocalProvider(LocalLayoutDirection provides direction) {
+            MenuSurface(transition, entries, minWidth, placed, growsFromOrigin, level, choose, onKey, paneTitle, focusFirst, focusKey)
+        }
+        return
+    }
+    val colors = DeskTheme.colors
+    val dimens = DeskTheme.dimens
+    val shape = RoundedCornerShape(dimens.radiusCard.coerceAtMost(10.dp))
+    val glassy = DeskGlass.source != null && DeskGlass.mode != GlassMode.Solid
+    val tier = LocalMotionTier.current
+    val reduced = tier == MotionTier.Reduced
+    AnimatedVisibility(
+        visibleState = transition,
+        enter = if (reduced) EnterTransition.None else fadeIn(tween(DeskMotion.SHORT_MS + 50, easing = DeskMotion.StandardDecelerate)),
+        exit = if (reduced) ExitTransition.None else fadeOut(tween(DeskMotion.SHORT_MS, easing = DeskMotion.StandardAccelerate)),
+        label = "menuPopup",
+    ) {
+        // the growth is drawn here rather than with scaleIn: its origin is only known once the pop-up is
+        // placed (flipped above, pushed in from an edge), and a layer reads it at draw time
+        val scale by this.transition.animateFloat(
+            transitionSpec = {
                 when {
-                    reduced -> 1f
-                    state == EnterExitState.PreEnter -> 0.92f
-                    state == EnterExitState.PostExit -> 0.96f
-                    else -> 1f
+                    reduced -> snap()
+                    targetState == EnterExitState.Visible -> tween(DeskMotion.SHORT_MS + 50, easing = DeskMotion.EmphasizedDecelerate)
+                    else -> tween(DeskMotion.SHORT_MS, easing = DeskMotion.EmphasizedAccelerate)
                 }
+            },
+            label = "menuScale",
+        ) { state ->
+            when {
+                reduced -> 1f
+                state == EnterExitState.PreEnter -> 0.92f
+                state == EnterExitState.PostExit -> 0.96f
+                else -> 1f
             }
-            val menuScroll = rememberScrollState()
-            Column(
-                modifier = Modifier
-                    .graphicsLayer {
-                        scaleX = scale
-                        scaleY = scale
-                        // wider windows keep the top-left corner, as before
-                        transformOrigin = if (tier == MotionTier.Gesture) provider.origin else TransformOrigin(0f, 0f)
-                    }
-                    .widthIn(min = minWidth, max = 420.dp)
-                    .width(IntrinsicSize.Max)
-                    // a shadow would show through glass; solid menus keep it
-                    .then(if (glassy) Modifier else Modifier.shadow(12.dp, shape))
-                    .glass(DeskGlass.raised(colors, GlassThickness.Regular), shape)
-                    .border(1.dp, colors.borderStrong, shape)
-                    .verticalScrollbar(menuScroll)
-                    .verticalScroll(menuScroll)
-                    .onKeyEvent { event ->
-                        val escape = event.type == KeyEventType.KeyDown && event.key == Key.Escape
-                        if (escape) dismiss()
-                        escape
-                    }
-                    .padding(4.dp),
-            ) {
-                shown.value.forEach { entry ->
-                    when (entry) {
-                        is MenuEntry.Item -> MenuItemRow(entry) {
-                            if (open) {
-                                currentOnDismiss()
-                                entry.onClick()
-                            }
-                        }
-                        MenuEntry.Separator -> HorizontalRule(Modifier.padding(vertical = 4.dp))
-                    }
+        }
+        val menuScroll = rememberScrollState()
+        val hasSubmenus = entries.any { it is MenuEntry.Submenu }
+        val firstLine = remember { FocusRequester() }
+        val firstIndex = if (focusFirst) firstFocusableEntry(entries) else -1
+        if (hasSubmenus) SubmenuHoverWait(level, entries)
+        if (firstIndex >= 0) LaunchedEffect(focusKey) { runCatching { firstLine.requestFocus() } }
+        Column(
+            modifier = Modifier
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    transformOrigin = if (growsFromOrigin) placed.origin else TransformOrigin(0f, 0f)
+                }
+                .widthIn(min = minWidth, max = 420.dp)
+                .width(IntrinsicSize.Max)
+                // a shadow would show through glass; solid menus keep it
+                .then(if (glassy) Modifier else Modifier.shadow(12.dp, shape))
+                .glass(DeskGlass.raised(colors, GlassThickness.Regular), shape)
+                .border(1.dp, colors.borderStrong, shape)
+                .then(if (paneTitle == null) Modifier else Modifier.semantics { this.paneTitle = paneTitle })
+                .verticalScrollbar(menuScroll)
+                .verticalScroll(menuScroll)
+                .onKeyEvent(onKey)
+                .padding(4.dp),
+        ) {
+            entries.forEachIndexed { index, entry ->
+                // only a menu with submenus follows the pointer over its lines and knows where they are
+                val line = (if (hasSubmenus) Modifier.submenuLine(level, index, placed) else Modifier)
+                    .then(if (index == firstIndex) Modifier.focusRequester(firstLine) else Modifier)
+                when (entry) {
+                    is MenuEntry.Item -> MenuItemRow(entry, line) { choose(entry) }
+                    is MenuEntry.Submenu -> SubmenuRow(entry, index, level, line)
+                    MenuEntry.Separator -> HorizontalRule(Modifier.padding(vertical = 4.dp))
                 }
             }
         }
@@ -296,41 +394,71 @@ private class EscapeListener(private val dismiss: () -> Unit) : View.OnUnhandled
 }
 
 @Composable
-internal fun MenuItemRow(item: MenuEntry.Item, onClick: () -> Unit) {
+internal fun MenuItemRow(item: MenuEntry.Item, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val state = interaction.collectState()
     val colors = DeskTheme.colors
-    val dimens = DeskTheme.dimens
-    val shape = RoundedCornerShape(dimens.radiusControl)
     val content = when {
         !item.enabled -> colors.textTertiary
         item.destructive -> colors.danger
         else -> colors.text
     }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = dimens.rowHeight.coerceAtLeast(dimens.minTarget))
-            .focusRing(state, shape)
-            .background(if (item.enabled) animatedStateBackground(state).value else androidx.compose.ui.graphics.Color.Transparent, shape)
+    MenuRow(
+        modifier = modifier,
+        state = state,
+        background = if (item.enabled) animatedStateBackground(state).value else androidx.compose.ui.graphics.Color.Transparent,
+        behaviour = Modifier
             .deskClickable(interaction, onClick, enabled = item.enabled, role = if (item.checked != null) Role.Checkbox else Role.Button)
             // TalkBack says whether a check item is on, not only that it is one
-            .then(if (item.checked == null) Modifier else Modifier.semantics { toggleableState = ToggleableState(item.checked) })
-            .padding(horizontal = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .then(if (item.checked == null) Modifier else Modifier.semantics { toggleableState = ToggleableState(item.checked) }),
+        icon = if (item.checked == true) DeskIcons.Check else item.icon,
+        iconTint = if (item.enabled) colors.textSecondary else content,
+        label = item.label,
+        labelColor = content,
     ) {
-        Box(Modifier.size(dimens.icon), contentAlignment = Alignment.Center) {
-            val icon = if (item.checked == true) DeskIcons.Check else item.icon
-            if (icon != null) Icon(icon, contentDescription = null, tint = if (item.enabled) colors.textSecondary else content,
-                modifier = Modifier.size(dimens.icon))
-        }
-        Spacer(Modifier.width(10.dp))
-        Text(item.label, style = DeskTheme.type.body, color = content, maxLines = 1, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f))
         if (item.shortcut != null && showShortcutHints()) {
             Spacer(Modifier.width(24.dp))
             Text(item.shortcut, style = DeskTheme.type.mono, color = colors.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
+    }
+}
+
+/**
+ * The layout every line of a menu shares: the icon column, the label and what stands at the end
+ * ([trailing]: an item's shortcut, a submenu's chevron). [modifier] comes first (where the line is,
+ * who asks it to take the focus), [behaviour] is its click and its semantics.
+ */
+@Composable
+internal fun MenuRow(
+    modifier: Modifier,
+    state: InteractionState,
+    background: androidx.compose.ui.graphics.Color,
+    behaviour: Modifier,
+    icon: ImageVector?,
+    iconTint: androidx.compose.ui.graphics.Color,
+    label: String,
+    labelColor: androidx.compose.ui.graphics.Color,
+    trailing: @Composable RowScope.() -> Unit,
+) {
+    val dimens = DeskTheme.dimens
+    val shape = RoundedCornerShape(dimens.radiusControl)
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = dimens.rowHeight.coerceAtLeast(dimens.minTarget))
+            .focusRing(state, shape)
+            .background(background, shape)
+            .then(behaviour)
+            .padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(dimens.icon), contentAlignment = Alignment.Center) {
+            if (icon != null) Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(dimens.icon))
+        }
+        Spacer(Modifier.width(10.dp))
+        Text(label, style = DeskTheme.type.body, color = labelColor, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f))
+        trailing()
     }
 }
 
@@ -357,12 +485,15 @@ fun RowScope.MenuBarMenus(menus: List<MenuSpec>) {
     }
 }
 
-internal class ClampedOffsetPositionProvider(private val offset: IntOffset) : PopupPositionProvider {
+internal class ClampedOffsetPositionProvider(private val offset: IntOffset) : PopupPositionProvider, PlacedMenu {
     /**
      * Where the point the menu was asked for lies in the placed menu, 0..1 on each axis: the corner
      * the menu grows from (the top-left while nothing moved it). Known once the pop-up is placed.
      */
-    var origin by mutableStateOf(TransformOrigin(0f, 0f))
+    override var origin by mutableStateOf(TransformOrigin(0f, 0f))
+        private set
+
+    override var bounds by mutableStateOf<IntRect?>(null)
         private set
 
     override fun calculatePosition(
@@ -389,6 +520,7 @@ internal class ClampedOffsetPositionProvider(private val offset: IntOffset) : Po
             if (popupContentSize.width > 0) ((askedX - x).toFloat() / popupContentSize.width).coerceIn(0f, 1f) else 0f,
             if (popupContentSize.height > 0) ((askedY - y).toFloat() / popupContentSize.height).coerceIn(0f, 1f) else 0f,
         )
+        bounds = IntRect(IntOffset(x, y), popupContentSize)
         return IntOffset(x, y)
     }
 }

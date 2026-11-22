@@ -127,4 +127,8 @@
         <item quantity="one">%d match</item>
         <item quantity="other">%d matches</item>
     </plurals>
+
+    <!-- Submenus -->
+    <string name="dk_submenu">Submenu</string>
+    <string name="dk_submenu_open">Open submenu</string>
 </resources>

@@ -26,7 +26,7 @@ arayüzünden çıkarıldı. Klavye, fare, sağ tık ve dokunmatik aynı uygulam
   verebilirsin. Tüm metinler WCAG AA kontrastını (4.5:1) testle sağlar.
 - **Bileşenler:** düğme, simge düğmesi, segment ve renk seçimi, kaydırıcı (tekerlek ve ok
   tuşları), yoğun tablo (sıralama, çoklu seçim, sütun seçici, satır menüsü), kapak ızgarası, bölünmüş panel, menü
-  çubuğu, sağ tık menüsü (sağ tık, iki parmak dokunma, uzun basma, Menu tuşu), "⋯" sayfası, iletişim kutusu, ipucu
+  çubuğu, sağ tık menüsü (sağ tık, iki parmak dokunma, uzun basma, Menu tuşu), iç içe alt menüler, "⋯" sayfası, iletişim kutusu, ipucu
   (tooltip), ayar satırı; metin, arama ve sayı alanları, onay kutusu, anahtar, ilerleme çubuğu, durum şeridi,
   rozet, bildirim (geri alma düğmeli), kart, liste satırı, seçim çubuğu, sekmeler, yükleniyor yer tutucuları.
   Hepsi kitin kendi çizgisinde (Material bileşeni yok). Her birinde üzerine gelme, odak halkası ve basılı durumu
@@ -195,7 +195,7 @@ Değerlere doğrudan erişim için `DeskTheme.colors.text`, `DeskTheme.type.body
 | `DenseTable` | Cam başlık, sıralama, seçili satır, `rowMenu` ile satır başına sağ tık menüsü. Çoklu seçim ve sütun seçici için aşağıya bak. |
 | `HorizontalSplitPane`, `TwoPane` | Sürüklenebilir ve klavyeyle taşınabilir ayırıcı |
 | `ContextMenuArea`, `Modifier.contextMenuGesture` | Sağ tık, uzun basma, Menu tuşu, Shift+F10 |
-| `MenuPopup`, `MenuBarMenus`, `MenuEntry` | Kenarda taşmayan menüler |
+| `MenuPopup`, `MenuBarMenus`, `MenuEntry` | Kenarda taşmayan menüler; `MenuEntry.Submenu` ile iç içe alt menüler (aşağıya bak) |
 | `TooltipArea` | İmleç durunca ve klavye odağında; kısayolu da gösterir. Simge düğmelerinde kendiliğinden |
 | `PageHeader`, `MessageScreen`, `OverflowScreen` | Hazır ekran parçaları. `PageHeader` başlığı yalnızca kenar çubuklu düzende gösterir (aşağıya bak). |
 | `CompactTopBar`, `TopBarAction` | Telefonda üst çubuğun başlığı, geri düğmesi ve simgeleri (aşağıya bak) |
@@ -211,7 +211,7 @@ Değerlere doğrudan erişim için `DeskTheme.colors.text`, `DeskTheme.type.body
 | `GridZoom`, `rememberGridZoom` | Kapakların büyüklüğü: Ctrl ile tekerlek, kıstırma, Ctrl ile + ve − |
 | `HeightClass`, `LocalHeightClass` | Pencerenin yükseklik sınıfı: yan çevrilmiş telefon telefon kalır |
 | `ExpandablePlayer` | Telefonda mini oynatıcıdan tam ekrana büyüyen oynatıcı, yana kaydırarak parça atlama (aşağıya bak) |
-| `MoreSheet`, `MoreButton`, `GlassBottomSheet`, `ActionGroup` | "⋯" eylemleri: telefonda cam alt sayfa, genişte menü |
+| `MoreSheet`, `MoreButton`, `GlassBottomSheet`, `ActionGroup` | "⋯" eylemleri: telefonda cam alt sayfa, genişte menü; alt menü sayfada bir sayfa olarak açılır |
 | `WorkstationLayout`, `InspectorPane`, `InspectorToggleButton` | Tablet ve DeX'te sekmeli, boyutlandırılabilir ayrıntı paneli |
 | `DeskDialog`, `DialogFrame`, `DialogDismissButton` | İletişim kutusu; klavye varsa "Esc", yoksa × |
 | `DeskTextField`, `DeskSearchField`, `NumberField`, `OptionalNumberField` | Metin, arama ve sayı alanları (aşağıya bak) |
@@ -359,6 +359,38 @@ yalnızca fare ya da donanım klavyesi varken yazılır.
 
 Telefonda üç sekme ve "⋯": `ShellSpec(bottomBar = listOf("muzik", "podcast", "radyo"), moreStyle = MoreStyle.Sheet)`.
 "⋯" sığmayan ekranları bölümleriyle ve `DesktopShell(moreActions = listOf(ActionGroup(…)))` eylemlerini listeler.
+
+### Alt menüler
+
+```kotlin
+val sonAcilanlar = MenuEntry.Submenu("Son açılanlar", dosyalar.map { MenuEntry.Item(it.ad, { ac(it) }) })   // boşsa devre dışı görünür
+val parcalar = MenuEntry.Submenu("Parça ekle", icon = DeskIcons.Plus, entries = listOf(
+    MenuEntry.Submenu("Temel yapı", listOf(MenuEntry.Item("Düğüm", ::dugum), MenuEntry.Item("Dikiş", ::dikis))),
+    MenuEntry.Submenu("Seçenekler", listOf(MenuEntry.Item("Yapışkan seçenek", ::yapiskan))),
+))
+
+DesktopShell(…,
+    menus = shortcuts.menus(resources, perform = ::run, extra = { grup ->                // menü çubuğu
+        if (grup == FileGroup) listOf(MenuEntry.Separator, sonAcilanlar) else emptyList()
+    }) + MenuSpec("Ekle") { parcalar.entries },
+    moreActions = listOf(ActionGroup("Belge", listOf(parcalar, sonAcilanlar))),          // telefonda "⋯" sayfası
+)
+```
+
+`MenuEntry.Submenu(label, entries, icon = null, enabled = true)` bir `MenuEntry` listesinin gösterildiği her yerde
+kullanılır: menü çubuğu, `MenuPopup`, `MenuButton`, `ContextMenuArea`, satır menüleri (`rowMenu`, `itemMenu`),
+`navMenu`, `ActionGroup`. İstenen derinlikte iç içe olur; boş olanı devre dışı görünür.
+
+- **Menüde** satırın sonunda ok vardır; alt menü satırın yanında açılır (bitiş yanında, yer yoksa başlangıç
+  yanında; pencerenin içinde kalır). İmleç satırda 200 ms durunca ya da tıklayınca, parmak dokununca, klavyede →
+  ya da Enter ile açılır. İmleç alt menüye doğru çapraz giderken başka satırların üstünden geçmesi onu kapatmaz. ←,
+  Esc ve Geri bir düzey kapatır; bir öğeyi seçmek ya da dışarı basmak hepsini.
+- **Telefonun "⋯" sayfasında** (`MoreSheet`, `MoreButton`, kabuğun `moreActions`'ı) alt menü aynı sayfanın içinde bir
+  sayfa olarak açılır: üstte alt menünün adı ve geri düğmesi. Geri bir sayfa yukarı çıkar, ilk sayfada sayfayı kapatır.
+- Girişler her bileşimde yeniden kurulabilir (bir onay işareti, değişen bir liste): açık alt menü ve açık sayfa
+  alt menünün adıyla (adı değiştiyse yeriyle) yeniden bulunur ve yeni girişleri gösterir. Üstüne bir giriş gelince
+  başka bir alt menüye dönmez; alt menü gidince kapanır.
+- `CompactTopBar`'ın "⋮" menüsü `TopBarAction` listesidir, alt menü almaz; tablonun sütun menüsünü kit kurar.
 
 ### İş istasyonu (tablet ve DeX)
 

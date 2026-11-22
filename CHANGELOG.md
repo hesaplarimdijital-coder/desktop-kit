@@ -2,10 +2,13 @@
 
 ## 2.10.0 (2026-11-23)
 
-Kitin kod düzenleyicisi: `CodeEditor`. İlk kullanıcısı Inky'nin Android uyarlaması (ink betikleri: uzun düzyazı
-paragrafları ve aralarında işaretler); dil uygulamanındır, kit düzenleyiciyi, görünüşünü ve davranışını verir. Var olan
-bileşenlerin görünüşü, zamanlaması ve API'si değişmedi; ekran görüntülerinin hepsi aynı. Geçiş için bir şey gerekmez
-([MIGRATION.md](MIGRATION.md#290dan-2100a)).
+İki iş: kitin kod düzenleyicisi (`CodeEditor`) ve alt menüler (`MenuEntry.Submenu`). Düzenleyicinin ilk kullanıcısı
+Inky'nin Android uyarlaması (ink betikleri: uzun düzyazı paragrafları ve aralarında işaretler); dil uygulamanındır,
+kit düzenleyiciyi, görünüşünü ve davranışını verir. Alt menüler bir `MenuEntry` listesinin gösterildiği her yerde
+var, telefonun "⋯" sayfasında da. Var olan bileşenlerin görünüşü ve zamanlaması değişmedi: alt menüsü olmayan menü
+ve sayfa eskisi gibi çizilir, var olan ekran görüntüsü referanslarının hepsi tutuyor. Uygulamalar çoğunlukla kod
+değişmeden derlenir; API'de eklemeler dışında iki küçük değişiklik var (aşağıda "Dikkat"; ne yapılacağı
+[MIGRATION.md](MIGRATION.md#290dan-2100a)'de).
 
 ### Kod düzenleyici
 
@@ -66,14 +69,80 @@ bileşenlerin görünüşü, zamanlaması ve API'si değişmedi; ekran görünt�
   bağlantılar, tamamlama, arama, yakınlaştırma ve satır komutları; CI'ın örnek APK'sında telefonda ve tablette
   denenebilir.
 
+### Alt menüler
+
+- **`MenuEntry.Submenu(label, entries, icon = null, enabled = true)`.** Kitin menüleri yalnızca öğe ve
+  ayırıcı biliyordu; iç içe menü (Dosya ▸ Son açılanlar, kategorilere ayrılmış parça menüleri) isteyen uygulama
+  yapamıyordu. Artık bir `MenuEntry` listesinin gösterildiği her yerde alt menü var: menü çubuğu (rayda "≡"in
+  arkasındaki menüler de), `MenuPopup`, `MenuButton`, `IconMenuButton`, `ContextMenuArea`, tablo, ızgara ve liste
+  satırlarının menüleri, `navMenu`, `ShortcutRegistry.menus(extra = …)` ve telefonun "⋯" sayfası. İstenen derinlikte
+  iç içe. Boş alt menü devre dışı görünür, devre dışı olan (`enabled = false`) açılmaz.
+  - **Açılır menülerde** satırın sonunda bir ok durur (sağdan sola düzende ters); alt menü satırın yanında, kendi
+    penceresinde açılır ve menünün kendisiyle aynı kodla çizilir: aynı cam, aynı ölçüler (fare ve dokunma yoğunluğu),
+    aynı büyüyerek belirme ve solma, "Animasyonları kaldır" açıkken hareketsiz. Bitiş yanında açılır, pencerede yer
+    yoksa başlangıç yanında; ilk satırı açan satırla hizalıdır; alta sığmazsa yukarı kayar; sistem çubuklarının,
+    başlık çubuğunun ve ekran klavyesinin altına girmez. Telefonda iki yanda da yer yoksa pencerenin izin verdiği
+    kadar yana, menüsünün üstüne açılır.
+  - **Fare:** imleç satırda 200 ms durunca açılır, tıklayınca hemen. İmleç başka bir satırda durunca o satır
+    devralır (açık alt menü kapanır, satırın kendi alt menüsü varsa açılır). Alt menüye doğru çapraz giderken
+    geçilen satırlar onu kapatmaz: bekleme her yeni satırda ve imleci alt menüye yaklaştıran her harekette yeniden
+    başlar, hareket açan satırdan alt menüye uzanan üçgenin içinde kaldıkça (masaüstü menülerinin "güvenli
+    üçgeni"). Geri giden ya da yerinde titreyen imleç beklemeyi uzatmaz. İmleç menüden çıkınca açık alt menü yerinde
+    kalır.
+  - **Dokunma:** satıra dokunmak açar, aynı satıra yeniden dokunmak kapatır. Bunu yoğunluk değil basan belirler
+    (tablodaki seçim gibi): parmak ve kalem her yoğunlukta böyle; fare tıklaması, Enter ve TalkBack her zaman açar,
+    dokunmatik yoğunluk sabitlenmişken de imlecin açtığını tıklama kapatmaz.
+  - **Klavye:** → (sağdan sola düzende ←) ya da Enter açar ve odağı ilk etkin satıra verir; ← (ya da →), Esc ve
+    Geri bir düzey kapatır, odak açan satıra döner; ↑/↓ bulundukları menüde kalır. Bir öğeyi seçmek ya da menülerin
+    dışına basmak bütün zinciri kapatır; ilk menüde Esc eskisi gibi menüyü kapatır.
+  - **TalkBack:** satır "Alt menü" diye, genişletildi/daraltıldı durumuyla okunur, genişlet ve daralt eylemleri
+    vardır; alt menünün penceresi satırın adını taşır.
+  - **Telefonun "⋯" sayfasında** (`MoreSheet`, `MoreButton`, `DesktopShell(moreActions = …)`) alt menü aynı sayfanın
+    içinde bir sayfa olarak açılır: başlığı alt menünün adı, önünde geri düğmesi; sayfa içeriğinin yüksekliğini alır,
+    sayfalar arasında fade-through oynar. Sistemin Geri'si (öngörülü Geri hareketi de), Esc ve geri düğmesi bir
+    sayfa yukarı çıkar, ilk sayfada sayfayı kapatır. Dönülen sayfa kaydırıldığı yerde durur; klavyeyle dönünce odak
+    alt menünün satırındadır. Sayfadaki bir eylem sayfayı kapatır, `checked` verilmiş öğe (anahtar) sayfasında kalır.
+    `MoreSheet` ve `MoreButton` genişte aynı girişleri, alt menüsü yanında açılan bir menü olarak gösterir (kabuğun
+    `moreActions`'ı yalnızca telefonun sayfasındadır).
+  - **Değişen girişler:** uygulama girişleri menü ya da sayfa açıkken yeniden kurabilir (bir onay işareti, değişen bir
+    liste). Açık alt menü ve sayfa alt menünün adıyla (adı değiştiyse yeriyle) yeniden bulunur: üstüne bir giriş
+    gelince başka bir alt menüye dönmez, alt menü gidince kapanır, Geri her zaman gösterilen sayfadan yukarı çıkar.
+  - Örnek uygulama: menü çubuğunda Dosya ▸ Son açılanlar ve Görünüm ▸ Görünüş ▸ Tema / Arayüz yoğunluğu (ikinci
+    düzeyin öğeleri çalışır); telefonda aynı "Görünüş" "⋯" sayfasında, sayfa sayfa.
+
+  Alt menüsü olmayan menü ve sayfa eskisi gibi çizilir ve aynı zamanlamayla açılıp kapanır; var olan ekran görüntüsü
+  referanslarının hepsi tutuyor, var olan testlere dokunulmadı. API'de eklemeler dışında iki küçük değişiklik var
+  (aşağıda "Dikkat"). Testler: `SubmenuLogicTest` ve `SheetPagesTest` (yerleşim ve çevirme, imlecin niyeti, tuşlar,
+  sayfa yolu), `SubmenuTest`, `SheetSubmenuTest`, `SubmenuCallSitesTest`, `SubmenuScreenshotTest`.
+
+### Dikkat
+
+İki şey derlenmeyebilir:
+
+- `MenuEntry`'ye yeni bir tür geldi (`Submenu`): bir `MenuEntry` üzerinde `else`'siz `when` yazan kod
+  `is MenuEntry.Submenu ->` dalını ya da `else` ister.
+- `ActionGroup.actions` artık `List<MenuEntry>` (önceden `List<MenuEntry.Item>`; alt menü ve ayırıcı eylemlerin
+  arasında istenen sırada durabilsin diye): grup kuran kod değişmeden derlenir; eylemleri geri okuyup öğe alanlarına
+  (`label`, `onClick`) erişen kod `filterIsInstance<MenuEntry.Item>()` kullanır. 2.9.0'a karşı derlenmiş başka bir
+  modül yeniden derlenmeli: eylemleri öğe diye okuyan derlenmiş kod, alt menü ya da ayırıcı içeren bir grupta
+  `ClassCastException` verir.
+
+Ayrıca:
+
+- `CompactTopBar`'ın sığmayan eylemleri ("⋮") `TopBarAction`'dır, `MenuEntry` değil: orada alt menü yok. Tablonun
+  sütun menüsünü kit kurar, uygulama ona giriş vermez.
+- Home ve End tuşları menülerde eskiden de yoktu; eklenmedi.
+
 ### Testler
 
-JVM'de: satır dizini, jeton önbelleği (rastgele düzenlemelerden sonra sıfırdan jetonlamayla aynı, tuş başına bir satır,
-durumu değiştiren düzenleme görünene kadar ve dilimlerle), geçmiş, arama ve değiştirme, satır komutları, ölçüler.
-Robolectric'te: giriş yöntemiyle yazma ve sözcük oluşturma, sözcük yazılırken uygulamanın düzenlemesi, tuşlar,
-fare ve parmak, belge değiştirme, renklerin metinle aynı geçişte gelmesi, işaretler, bağlantılar, menü, kaydırma yeri,
-yakınlaştırma, arama çubuğu, tamamlama listesi, odak (Esc ve Tab), sarılmış satırın kenarı geçmemesi; açık, koyu ve
-OLED temada, fare ve parmakla, geniş pencerede ve telefonda 11 ekran görüntüsü.
+Kod düzenleyicinin testleri (alt menülerinkiler yukarıda). JVM'de: satır dizini, jeton önbelleği (rastgele
+düzenlemelerden sonra sıfırdan jetonlamayla aynı, tuş başına bir satır, durumu değiştiren düzenleme görünene kadar ve
+dilimlerle), geçmiş, arama ve değiştirme, tamamlama listesinin daralması, kapanması ve seçimi, satır komutları, ölçüler.
+Robolectric'te: giriş yöntemiyle yazma ve sözcük oluşturma, sözcük yazılırken uygulamanın düzenlemesi, tuşlar, fare ve
+parmak, belge değiştirme, renklerin metinle aynı geçişte gelmesi, işaretler, bağlantılar, menü, kaydırma yeri,
+yakınlaştırma, arama çubuğu, tamamlama listesi, odak (Esc ve Tab), telefonda kabuğun ekran klavyesiyle birlikte,
+sarılmış satırın kenarı geçmemesi; açık, koyu ve OLED temada, fare ve parmakla, geniş pencerede ve telefonda 11 ekran
+görüntüsü.
 
 ## 2.9.0 (2026-11-13)
 

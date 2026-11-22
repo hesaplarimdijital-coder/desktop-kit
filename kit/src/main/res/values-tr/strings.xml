@@ -127,4 +127,8 @@
         <item quantity="one">%d eşleşme</item>
         <item quantity="other">%d eşleşme</item>
     </plurals>
+
+    <!-- Submenus -->
+    <string name="dk_submenu">Alt menü</string>
+    <string name="dk_submenu_open">Alt menüyü aç</string>
 </resources>

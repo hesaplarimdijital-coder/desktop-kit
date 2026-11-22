@@ -2,6 +2,7 @@
 <resources>
     <string name="app_name">Desktop Kit sample</string>
     <string name="menu_file">File</string>
+    <string name="menu_open_recent">Open recent</string>
     <string name="action_new_folder">New folder</string>
     <string name="action_open">Open</string>
     <string name="action_refresh">Refresh</string>

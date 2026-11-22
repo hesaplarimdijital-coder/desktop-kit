@@ -62,7 +62,9 @@ import desktopkit.shell.ShellSpec
 import desktopkit.shell.WidthClass
 import desktopkit.shell.rememberShellContentPadding
 import desktopkit.theme.Accent
+import desktopkit.theme.DensityPreference
 import desktopkit.theme.DeskTheme
+import desktopkit.theme.ThemeMode
 import kotlinx.coroutines.launch
 
 // ------------------------------------------------------------------ 1. keyboard shortcuts
@@ -133,6 +135,30 @@ class MainActivity : ComponentActivity() {
             val accent = if (followArtwork) Accent.custom("Artwork", tracks[track].artwork) else prefs.accent
             val previous = { track = (track + tracks.size - 1) % tracks.size }
             val next = { track = (track + 1) % tracks.size }
+            // submenus: File ▸ Open recent, and View ▸ Appearance with a second level (Theme, Interface density).
+            // In the menu bar they open beside their line; in the phone's "⋯" sheet as pages of the sheet
+            val recent = MenuEntry.Submenu(stringResource(R.string.menu_open_recent), sampleFiles.take(4).map { file ->
+                MenuEntry.Item(file.name, { scope.launch { toasts.show(context.getString(R.string.not_in_sample, file.name)) } })
+            })
+            val themes = listOf(
+                ThemeMode.System to desktopkit.R.string.dk_theme_system,
+                ThemeMode.Light to desktopkit.R.string.dk_theme_light,
+                ThemeMode.Dark to desktopkit.R.string.dk_theme_dark,
+                ThemeMode.Oled to desktopkit.R.string.dk_theme_oled,
+            )
+            val densities = listOf(
+                DensityPreference.Auto to desktopkit.R.string.dk_theme_system,
+                DensityPreference.Touch to desktopkit.R.string.dk_density_touch,
+                DensityPreference.Pointer to desktopkit.R.string.dk_density_pointer,
+            )
+            val appearance = MenuEntry.Submenu(stringResource(desktopkit.R.string.dk_settings_appearance), icon = DeskIcons.Eye, entries = listOf(
+                MenuEntry.Submenu(stringResource(desktopkit.R.string.dk_settings_theme), themes.map { (mode, label) ->
+                    MenuEntry.Item(stringResource(label), { prefs.updateThemeMode(mode) }, checked = prefs.themeMode == mode)
+                }),
+                MenuEntry.Submenu(stringResource(desktopkit.R.string.dk_settings_density), densities.map { (density, label) ->
+                    MenuEntry.Item(stringResource(label), { prefs.updateDensity(density) }, checked = prefs.density == density)
+                }),
+            ))
             val accentLabel: @Composable (Accent) -> String = {
                 when {
                     it == BrandAccent -> "Brand"
@@ -183,7 +209,13 @@ class MainActivity : ComponentActivity() {
                         put("files", (sampleFiles.size - library.binned.size).toString())
                         if (library.binned.isNotEmpty()) put("bin", library.binned.size.toString())
                     },
-                    menus = shortcuts.menus(context.resources, perform = { perform(it) }),
+                    menus = shortcuts.menus(context.resources, perform = { perform(it) }, extra = { group ->
+                        when (group) {
+                            FileGroup -> listOf(MenuEntry.Separator, recent)
+                            CommonShortcuts.ViewGroup -> listOf(MenuEntry.Separator, appearance)
+                            else -> emptyList()
+                        }
+                    }),
                     onSearch = { perform(CommonShortcuts.SEARCH) },
                     toasts = toasts,
                     navDrop = navDrop,
@@ -219,6 +251,7 @@ class MainActivity : ComponentActivity() {
                         ActionGroup("App", listOf(
                             MenuEntry.Item("Follow artwork colour", { followArtwork = !followArtwork }, icon = DeskIcons.Albums,
                                 checked = followArtwork),
+                            appearance,
                             MenuEntry.Item("About", { about = true }, icon = DeskIcons.Info),
                         )),
                     ),

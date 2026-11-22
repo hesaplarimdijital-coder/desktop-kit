@@ -471,12 +471,28 @@ kabuğun dışında (kendi penceresinde) açan uygulamayı ilgilendirmez. Tablet
 
 ## 2.9.0'dan 2.10.0'a
 
-Kod değişmeden derlenir; sürümü `2.10.0` yapmak yeter. Yeni olan kod düzenleyici (`CodeEditor`, `CodeEditorState`,
-`CodeSearchBar`, `CodeCompleter`, `CodeEditorZoom`; README'de "Kod düzenleyici") ve onun teması (`DeskTheme.syntax`,
-`DeskType.code`). Kendi düzenleyicisini (bir `BasicTextField` ya da `EditText` üstünde) yazmış bir uygulama onu kitinkiyle
-değiştirebilir; uzun belgelerde yazmak hızlanır, renkler, işaretler ve arama kitin görünüşünü alır.
+Çoğunlukla kod değişmeden derlenir; sürümü `2.10.0` yapmak yeter. 2.9.0'a karşı derlenmiş başka bir modül
+(kitaplık) yeniden derlenmelidir. Ne değiştiği [CHANGELOG](CHANGELOG.md#2100-2026-11-23)'da; uygulamanın bakması
+gerekenler:
 
-- `DeskType` veri sınıfına sona, varsayılanlı bir alan eklendi (`code`). Kendi `DeskType(…)`'ini kuran ya da `copy`
-  çağıran kod değişmeden derlenir; `code` verilmezse mono yazıdan ve gövde boyundan yapılır. `DeskType.forMode(…).copy(body
-  = …)` ile gövdeyi büyüten bir uygulama düzenleyicinin yazısını da büyütmek isterse `code`'u da verir.
-- `DesktopKitRoot` ve `DesktopKitTheme` sona (içerikten önce) `syntax` kancasını aldı; konumla çağıran kod etkilenmez.
+- **`MenuEntry.Submenu` (yeni tür):** `MenuEntry` mühürlü bir arayüz ve yeni bir türü var. Bir `MenuEntry` üzerinde
+  `else`'siz `when` yazan kod artık derlenmez; `is MenuEntry.Submenu ->` dalını ya da `else` ekle. Menüyü yalnızca
+  kuran (listeyi kite veren) kod değişmez.
+- **`ActionGroup.actions`:** artık `List<MenuEntry>` (önceden `List<MenuEntry.Item>`). Grup kuran kod aynen derlenir.
+  Eylemleri geri okuyup öğe alanlarına (`label`, `onClick`) erişen kod öğeleri `filterIsInstance<MenuEntry.Item>()`
+  ile alır. 2.9.0'a karşı derlenmiş ve eylemleri öğe diye okuyan bir modül, alt menü ya da ayırıcı içeren bir grupta
+  `ClassCastException` verir: yeniden derlenmeli.
+- **Alt menüler (isteğe bağlı):** iç içe menü kuran uygulama (kendi "▸" satırları, telefonda kendi alt sayfası)
+  bunları `MenuEntry.Submenu` ile değiştirebilir: menü çubuğunda, açılır ve sağ tık menülerinde yanında açılır,
+  telefonun "⋯" sayfasında sayfa olarak. README'nin "Alt menüler" bölümüne bak.
+- **Kod düzenleyici (isteğe bağlı):** kod ya da betik düzenleyen ekran için `CodeEditor` (`CodeEditorState`,
+  `CodeSearchBar`, `CodeCompleter`, `CodeEditorZoom`; README'nin "Kod düzenleyici" bölümüne bak) ve onun teması
+  (`DeskTheme.syntax`, `DeskType.code`). Kendi düzenleyicisini (bir `BasicTextField` ya da `EditText` üstünde) yazmış
+  bir uygulama onu kitinkiyle değiştirebilir; uzun belgelerde yazmak hızlanır, renkler, işaretler ve arama kitin
+  görünüşünü alır.
+- **`DeskType`:** veri sınıfına sona, varsayılanlı bir alan eklendi (`code`). Kendi `DeskType(…)`'ini kuran ya da
+  `copy` çağıran kod değişmeden derlenir; `code` verilmezse mono yazıdan ve gövde boyundan yapılır.
+  `DeskType.forMode(…).copy(body = …)` ile gövdeyi büyüten bir uygulama düzenleyicinin yazısını da büyütmek isterse
+  `code`'u da verir.
+- **`DesktopKitRoot` ve `DesktopKitTheme`:** içerikten önce `syntax` kancasını aldı (sözdizimi renklerinden birini
+  değiştirmek için); içeriği sondaki lambda ile veren çağrılar aynen derlenir.
