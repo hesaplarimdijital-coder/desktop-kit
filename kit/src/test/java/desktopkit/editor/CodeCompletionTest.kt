@@ -88,9 +88,19 @@ class CodeCompletionTest {
         typeAtEndOfLine(1, "a")
         rows().assertCountEquals(1)
         shown("sahil", "bölüm").assertExists()
+        assertEquals("the completer is asked once for the word", 1, asked)
         // a character that ends the word closes it
         typeAtEndOfLine(1, " ")
         rows().assertCountEquals(0)
+        // a word nothing fits: asked once, not again for every letter
+        typeAtEndOfLine(1, "x", "y", "z")
+        rows().assertCountEquals(0)
+        assertEquals(2, asked)
+        // its letters deleted, the place is a new word
+        val view = compose.editorView()
+        compose.runOnUiThread { repeat(3) { view.press(KeyEvent.KEYCODE_DEL) } }
+        typeAtEndOfLine(1, "b")
+        shown("bahce", "bölüm").assertExists()
     }
 
     @Test

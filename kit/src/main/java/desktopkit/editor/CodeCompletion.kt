@@ -105,7 +105,10 @@ internal class CompletionSession {
     private var afterCursor = 0
     private var items: List<CodeCompletionItem> = emptyList()
 
-    /** The start of the word whose list the user closed with Esc: typing on in it does not open the list again. */
+    /**
+     * The start of the word whose list is done: closed with Esc, or nothing offered for it. Typing on in that word
+     * neither opens the list again nor asks the completer again.
+     */
     private var dismissedWord = -1
 
     /**
@@ -114,20 +117,32 @@ internal class CompletionSession {
      */
     fun request(state: CodeEditorState, completer: CodeCompleter, cursor: Int, typed: Boolean) {
         if (typed) {
-            var word = cursor
-            while (word > 0 && isWordChar(state.charAt(word - 1))) word--
-            if (word == cursor || word == dismissedWord) return
+            val word = wordStart(state, cursor)
+            if (word == cursor) {
+                // no word at the cursor (its letters were deleted, a space typed): the next one starts afresh
+                dismissedWord = -1
+                return
+            }
+            if (word == dismissedWord) return
         }
         dismissedWord = -1
         val offered = completer.complete(state, cursor)
         if (offered == null || offered.items.isEmpty()) {
             close()
-            return
+        } else {
+            start = offered.start.coerceIn(0, cursor)
+            afterCursor = (offered.end - cursor).coerceAtLeast(0)
+            items = offered.items
+            refilter(state, cursor, collapsed = true)
         }
-        start = offered.start.coerceIn(0, cursor)
-        afterCursor = (offered.end - cursor).coerceAtLeast(0)
-        items = offered.items
-        refilter(state, cursor, collapsed = true)
+        // a word nothing fits: more letters narrow the list further, so the completer is not asked again for it
+        if (typed && !isOpen) dismissedWord = wordStart(state, cursor)
+    }
+
+    private fun wordStart(state: CodeEditorState, cursor: Int): Int {
+        var word = cursor
+        while (word > 0 && isWordChar(state.charAt(word - 1))) word--
+        return word
     }
 
     /** The text changed or the cursor moved to [cursor]: narrows the list to what is typed, or closes it once the cursor left the word. */
