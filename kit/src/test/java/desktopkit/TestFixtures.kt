@@ -157,6 +157,7 @@ fun TestShell(
     toasts: desktopkit.components.ToastState? = null,
     overlays: @Composable () -> Unit = {},
     iconBadges: desktopkit.shell.NavIconBadges = emptyMap(),
+    menus: List<MenuSpec>? = null,
     content: @Composable (String, ShellNavigator) -> Unit = { route, _ -> SampleScreen(route) },
 ) {
     val navController = rememberNavController()
@@ -171,7 +172,7 @@ fun TestShell(
             sidebarCollapsed = sidebarCollapsed,
             badges = mapOf("documents" to "128", "music" to "4 812", "downloads" to "3 yeni"),
             iconBadges = iconBadges,
-            menus = listOf("Dosya", "Düzen", "Görünüm", "Araçlar", "Yardım").map { title ->
+            menus = menus ?: listOf("Dosya", "Düzen", "Görünüm", "Araçlar", "Yardım").map { title ->
                 MenuSpec(title) { listOf(MenuEntry.Item("$title…", {})) }
             },
             onSearch = {},
@@ -366,6 +367,41 @@ fun SampleStatusBar(kind: NavKind) {
             DeskIconButton(DeskIcons.Close, "İptal", {})
         }
     }
+}
+
+/** A writing app's menu bar: "Dosya" with a submenu of recent files, "Ink" with snippets nested two levels deep. */
+fun sampleNestedMenus(onChoose: (String) -> Unit = {}): List<MenuSpec> {
+    fun item(label: String, shortcut: String? = null) = MenuEntry.Item(label, { onChoose(label) }, shortcut = shortcut)
+    return listOf(
+        MenuSpec("Dosya") {
+            listOf(
+                item("Yeni", "Ctrl+N"),
+                item("Aç…", "Ctrl+O"),
+                MenuEntry.Submenu("Son açılanlar", listOf(item("Kervan.ink"), item("Liman.ink"), MenuEntry.Separator, item("Listeyi temizle"))),
+                MenuEntry.Separator,
+                item("Kaydet", "Ctrl+S"),
+            )
+        },
+        MenuSpec("Ink") { sampleSnippetEntries(onChoose) },
+        MenuSpec("Görünüm") { listOf(item("Yakınlaştır", "Ctrl++")) },
+    )
+}
+
+/** Snippets by category, one category with a submenu of its own, one empty. */
+fun sampleSnippetEntries(onChoose: (String) -> Unit = {}): List<MenuEntry> {
+    fun item(label: String) = MenuEntry.Item(label, { onChoose(label) })
+    return listOf(
+        MenuEntry.Submenu("Temel yapı", icon = DeskIcons.ListView, entries = listOf(
+            item("Düğüm (ana bölüm)"),
+            item("Dikiş (alt bölüm)"),
+            MenuEntry.Submenu("Yönlendirme", listOf(item("Düğüme yönlendir"), item("Tünel"), item("İplik"))),
+            item("Bitiş"),
+        )),
+        MenuEntry.Submenu("Seçenekler", icon = DeskIcons.Check, entries = listOf(item("Tek kullanımlık seçenek"), item("Yapışkan seçenek"))),
+        MenuEntry.Submenu("Değişkenler", icon = DeskIcons.Effects, entries = listOf(item("Genel değişken"), item("Geçici değişken"))),
+        MenuEntry.Separator,
+        MenuEntry.Submenu("Kendi parçalarım", emptyList()),
+    )
 }
 
 /** Four actions: the primary one and the next stay in the compact top bar, two go to its "more" menu. */
