@@ -92,4 +92,17 @@
     <string name="dk_close_sheet">Sayfayı kapat</string>
     <string name="dk_token_invalid">Geçersiz</string>
     <string name="dk_token_remove">Kaldır</string>
+
+    <!-- 2.10: kod düzenleyici -->
+    <string name="dk_editor">Düzenleyici</string>
+    <string name="dk_undo">Geri al</string>
+    <string name="dk_redo">Yinele</string>
+    <string name="dk_cut">Kes</string>
+    <string name="dk_copy">Kopyala</string>
+    <string name="dk_paste">Yapıştır</string>
+    <string name="dk_editor_marker_error">%1$d. satırda hata: %2$s</string>
+    <string name="dk_editor_marker_warning">%1$d. satırda uyarı: %2$s</string>
+    <string name="dk_editor_marker_info">%1$d. satırda not: %2$s</string>
+    <string name="dk_editor_larger">Yazıyı büyüt</string>
+    <string name="dk_editor_smaller">Yazıyı küçült</string>
 </resources>

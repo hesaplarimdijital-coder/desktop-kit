@@ -92,4 +92,17 @@
     <string name="dk_close_sheet">Close sheet</string>
     <string name="dk_token_invalid">Not valid</string>
     <string name="dk_token_remove">Remove</string>
+
+    <!-- 2.10: code editor -->
+    <string name="dk_editor">Editor</string>
+    <string name="dk_undo">Undo</string>
+    <string name="dk_redo">Redo</string>
+    <string name="dk_cut">Cut</string>
+    <string name="dk_copy">Copy</string>
+    <string name="dk_paste">Paste</string>
+    <string name="dk_editor_marker_error">Error on line %1$d: %2$s</string>
+    <string name="dk_editor_marker_warning">Warning on line %1$d: %2$s</string>
+    <string name="dk_editor_marker_info">Note on line %1$d: %2$s</string>
+    <string name="dk_editor_larger">Larger text</string>
+    <string name="dk_editor_smaller">Smaller text</string>
 </resources>
