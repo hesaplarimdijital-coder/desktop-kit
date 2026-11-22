@@ -587,6 +587,9 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
         invalidate()
     }
 
+    /** How many search matches are marked. */
+    val searchMatchCount: Int get() = searchRanges.size / 2
+
     /** The search's matches as `start, end` pairs in order, and which of them is the current one. */
     fun applySearch(ranges: IntArray, current: Int) {
         if (ranges === searchRanges && current == searchCurrent) return

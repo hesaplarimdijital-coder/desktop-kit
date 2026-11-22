@@ -93,6 +93,10 @@ import kotlin.math.roundToInt
  *
  * [onPreviewKeyEvent] sees a hardware key before the editor does and takes it by returning true.
  *
+ * With a [search] the editor searches its document and marks the matches while the search is open (see
+ * [CodeSearchBar]); Ctrl+F opens it with the selection as the query, Ctrl+H with the replace row, F3 and
+ * Shift+F3 step through the matches, Esc closes it.
+ *
  * [softWrap] wraps long lines (the default; a wrapped line has its number on its first row); without
  * it the text scrolls sideways. [proportional] sets the text in the theme's text face instead of the
  * monospace one, for languages that are mostly prose. [contentPadding] is room at the top and the
@@ -130,6 +134,7 @@ fun CodeEditor(
     tintMarkedLines: Boolean = true,
     label: String? = null,
     onPreviewKeyEvent: ((KeyEvent) -> Boolean)? = null,
+    search: CodeSearchState? = null,
 ) {
     val colors = DeskTheme.colors
     val syntax = DeskTheme.syntax
@@ -206,8 +211,18 @@ fun CodeEditor(
     val currentContextMenu by rememberUpdatedState(contextMenu)
     val currentZoom by rememberUpdatedState(zoom)
     val currentKeyHook by rememberUpdatedState(onPreviewKeyEvent)
+    val currentSearch by rememberUpdatedState(search)
     val editorLabel = label ?: stringResource(R.string.dk_editor)
     val zoomLabels = if (zoom == null) null else stringResource(R.string.dk_editor_larger) to stringResource(R.string.dk_editor_smaller)
+
+    // the search runs on the document shown, its matches marked in the text
+    if (search != null) {
+        DisposableEffect(search, state) {
+            search.attach(state)
+            onDispose { search.detach(state) }
+        }
+        LaunchedEffect(search, state) { search.run(state) }
+    }
 
     // known to the shell like the kit's text fields: a tap in the editor or a scroll that starts in it keeps the keyboard
     val shell = LocalShellOverlayHost.current
@@ -257,6 +272,7 @@ fun CodeEditor(
                             }
                         }
                     }
+                    view.keyInterceptor = { event -> currentSearch?.let { searchKey(it, event) } == true }
                     view.selectionActions = {
                         currentContextMenu?.invoke(view.selectionEnd.coerceAtLeast(0)).orEmpty()
                             .filterIsInstance<MenuEntry.Item>().filter { it.enabled }.map { SelectionAction(it.label, it.onClick) }
@@ -291,6 +307,7 @@ fun CodeEditor(
                 view.bind(state)
                 view.applyMarkers(markers)
                 view.applyDecorations(decorations)
+                view.applySearch(if (search != null && search.isOpen) search.matches else CodeSearchState.NO_MATCHES, search?.currentMatch ?: -1)
             },
             onRelease = { view ->
                 view.release()
@@ -326,6 +343,35 @@ fun CodeEditor(
                 offset = menu.offset ?: IntOffset.Zero,
             )
         }
+    }
+}
+
+/**
+ * The editor's keys for its [search]: Ctrl+F opens the bar (the selection becomes the query), Ctrl+H opens it
+ * with the replace row, F3 and Shift+F3 step to the next and the previous match, Esc closes an open bar.
+ */
+private fun searchKey(search: CodeSearchState, event: android.view.KeyEvent): Boolean {
+    val ctrl = event.isCtrlPressed || event.isMetaPressed
+    val plain = !ctrl && !event.isAltPressed && !event.isShiftPressed
+    return when {
+        ctrl && !event.isAltPressed && event.keyCode == android.view.KeyEvent.KEYCODE_F -> {
+            search.open()
+            true
+        }
+        ctrl && !event.isAltPressed && event.keyCode == android.view.KeyEvent.KEYCODE_H -> {
+            search.open(replace = true)
+            true
+        }
+        event.keyCode == android.view.KeyEvent.KEYCODE_F3 && !ctrl && !event.isAltPressed -> {
+            if (!search.isOpen) search.open()
+            if (event.isShiftPressed) search.previous() else search.next()
+            true
+        }
+        event.keyCode == android.view.KeyEvent.KEYCODE_ESCAPE && plain && search.isOpen -> {
+            search.close()
+            true
+        }
+        else -> false
     }
 }
 

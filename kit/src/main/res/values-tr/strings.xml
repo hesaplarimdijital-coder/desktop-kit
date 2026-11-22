@@ -105,4 +105,26 @@
     <string name="dk_editor_marker_info">%1$d. satırda not: %2$s</string>
     <string name="dk_editor_larger">Yazıyı büyüt</string>
     <string name="dk_editor_smaller">Yazıyı küçült</string>
+
+    <!-- 2.10: kod düzenleyicide bul ve değiştir -->
+    <string name="dk_search_find">Bul</string>
+    <string name="dk_search_replace_with">Şununla değiştir</string>
+    <string name="dk_search_previous">Önceki eşleşme</string>
+    <string name="dk_search_next">Sonraki eşleşme</string>
+    <string name="dk_search_match_case">Büyük ve küçük harfe duyarlı</string>
+    <string name="dk_search_whole_word">Yalnızca tam sözcük</string>
+    <string name="dk_search_regex">Düzenli ifade</string>
+    <string name="dk_search_show_replace">Değiştirmeyi göster</string>
+    <string name="dk_search_hide_replace">Değiştirmeyi gizle</string>
+    <string name="dk_search_replace">Değiştir</string>
+    <string name="dk_search_replace_all">Tümünü değiştir</string>
+    <string name="dk_search_close">Aramayı kapat</string>
+    <string name="dk_search_no_results">Sonuç yok</string>
+    <string name="dk_search_invalid">Geçersiz ifade</string>
+    <string name="dk_search_position">%1$d / %2$d</string>
+    <string name="dk_search_position_description">%2$d eşleşmeden %1$d.</string>
+    <plurals name="dk_search_matches">
+        <item quantity="one">%d eşleşme</item>
+        <item quantity="other">%d eşleşme</item>
+    </plurals>
 </resources>

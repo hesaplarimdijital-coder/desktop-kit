@@ -105,4 +105,26 @@
     <string name="dk_editor_marker_info">Note on line %1$d: %2$s</string>
     <string name="dk_editor_larger">Larger text</string>
     <string name="dk_editor_smaller">Smaller text</string>
+
+    <!-- 2.10: find and replace in the code editor -->
+    <string name="dk_search_find">Find</string>
+    <string name="dk_search_replace_with">Replace with</string>
+    <string name="dk_search_previous">Previous match</string>
+    <string name="dk_search_next">Next match</string>
+    <string name="dk_search_match_case">Match case</string>
+    <string name="dk_search_whole_word">Whole word</string>
+    <string name="dk_search_regex">Regular expression</string>
+    <string name="dk_search_show_replace">Show replace</string>
+    <string name="dk_search_hide_replace">Hide replace</string>
+    <string name="dk_search_replace">Replace</string>
+    <string name="dk_search_replace_all">Replace all</string>
+    <string name="dk_search_close">Close search</string>
+    <string name="dk_search_no_results">No results</string>
+    <string name="dk_search_invalid">Invalid expression</string>
+    <string name="dk_search_position">%1$d / %2$d</string>
+    <string name="dk_search_position_description">Match %1$d of %2$d</string>
+    <plurals name="dk_search_matches">
+        <item quantity="one">%d match</item>
+        <item quantity="other">%d matches</item>
+    </plurals>
 </resources>

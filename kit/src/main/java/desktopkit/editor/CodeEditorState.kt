@@ -48,6 +48,9 @@ class CodeEditorState(initialText: String = "") {
     /** The editor showing this document, if one is. */
     internal var host: EditorHost? = null
 
+    /** Told of every change of the text: where it starts, how many characters went and how many came (the search's matches move along). */
+    internal val editObservers = ArrayList<(start: Int, removed: Int, inserted: Int) -> Unit>(1)
+
     /** What the editor is asked to do once it shows this document. */
     internal var pendingReveal: TextRange? = null
     internal var pendingFocus = false
@@ -211,6 +214,7 @@ class CodeEditorState(initialText: String = "") {
      */
     fun setText(text: String) {
         val content = normalizeLineBreaks(text)
+        val oldLength = buffer.length
         history.clear()
         buffer.setLength(0)
         buffer.append(content)
@@ -219,6 +223,7 @@ class CodeEditorState(initialText: String = "") {
         selectionState = TextRange.Zero
         scrollX = 0
         setScrollAnchor(0, 0)
+        for (observer in editObservers) observer(0, oldLength, buffer.length)
         historyChanged()
         textChanged()
         host?.showText()
@@ -317,6 +322,7 @@ class CodeEditorState(initialText: String = "") {
         tokens.linesReplaced(lines.lineOf(start), LineIndex.removedLines(packed), LineIndex.addedLines(packed))
         // the row at the top stays with its text; one whose text went is where the change is
         if (scrollAnchor > start) setScrollAnchor(if (scrollAnchor >= end) scrollAnchor + inserted.length - removed.length else start, scrollAnchorDelta)
+        for (observer in editObservers) observer(start, removed.length, inserted.length)
         if (!replaying) {
             val after = start + inserted.length
             history.record(start, removed, inserted, selectionBefore, pack(TextRange(after)), typed)
@@ -340,9 +346,11 @@ class CodeEditorState(initialText: String = "") {
      * what the user sees, so it becomes the document. The history no longer fits and is dropped.
      */
     internal fun resyncFrom(text: CharSequence) {
+        val oldLength = buffer.length
         history.clear()
         buffer.setLength(0)
         buffer.append(text)
+        for (observer in editObservers) observer(0, oldLength, buffer.length)
         lines.reset(buffer)
         tokens.reset(lines.count)
         setScrollAnchor(scrollAnchor, scrollAnchorDelta)
