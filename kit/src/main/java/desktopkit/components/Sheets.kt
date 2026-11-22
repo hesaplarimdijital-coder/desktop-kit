@@ -381,8 +381,9 @@ private fun SheetPageHeader(label: String, takeFocus: Boolean, onBack: () -> Uni
     Row(Modifier.fillMaxWidth().padding(start = dimens.gapS, end = dimens.gapL + 4.dp), verticalAlignment = Alignment.CenterVertically) {
         DeskIconButton(DeskIcons.ArrowLeft, stringResource(R.string.dk_back), onBack,
             modifier = Modifier.focusRequester(focus).then(if (rtl) Modifier.graphicsLayer { scaleX = -1f } else Modifier))
-        // the label starts where the lines' labels do
-        Spacer(Modifier.width(2.dp))
+        // the label starts where the lines' labels do (past their icon column), in either density
+        val button = dimens.minTarget.coerceAtLeast(dimens.controlHeight)
+        Spacer(Modifier.width(dimens.gapM * 2 + dimens.iconLarge - button))
         Text(label, style = DeskTheme.type.title, color = DeskTheme.colors.text, maxLines = 2, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f).padding(vertical = dimens.gapS).semantics { heading() })
     }

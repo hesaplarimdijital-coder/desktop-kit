@@ -58,6 +58,7 @@ class SheetSubmenuTest {
 
     private var open by mutableStateOf(false)
     private var wrap by mutableStateOf(false)
+    private var density by mutableStateOf(InputMode.Touch)
     private val chosen = mutableListOf<String>()
 
     private fun item(label: String) = MenuEntry.Item(label, { chosen += label })
@@ -81,7 +82,7 @@ class SheetSubmenuTest {
     private fun sheet(groups: () -> List<ActionGroup> = ::groups) {
         compose.setContent {
             inputModeManager = LocalInputModeManager.current
-            DesktopKitTheme(themeMode = ThemeMode.Dark, inputMode = InputMode.Touch) {
+            DesktopKitTheme(themeMode = ThemeMode.Dark, inputMode = density) {
                 TestShell(WidthClass.Compact, content = { _, _ ->
                     MoreSheet(visible = open, onDismiss = { open = false }, groups = groups(), title = "İşlemler")
                 })
@@ -222,6 +223,18 @@ class SheetSubmenuTest {
         key(KeyEvent.KEYCODE_ESCAPE)
         shown("Aç")
         compose.onNodeWithText("Parçalar").assertIsFocused()
+    }
+
+    @Test
+    fun aPagesTitleStartsWhereItsLinesLabelsDoInEitherDensity() {
+        sheet()
+        tap("Parçalar")
+        fun left(text: String) = compose.onNodeWithText(text, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.left
+        assertEquals("touch", left("Düğüm"), left("Parçalar"), 0.5f)
+        // a narrow DeX window: the phone's sheet with the pointer's sizes
+        density = InputMode.Pointer
+        compose.waitForIdle()
+        assertEquals("pointer", left("Düğüm"), left("Parçalar"), 0.5f)
     }
 
     @Test
