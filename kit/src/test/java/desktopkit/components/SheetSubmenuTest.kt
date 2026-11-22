@@ -1,14 +1,19 @@
 package desktopkit.components
 
 import android.view.KeyEvent
+import androidx.activity.BackEventCompat
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.input.InputModeManager
+import androidx.compose.ui.platform.LocalInputModeManager
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -16,7 +21,9 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import desktopkit.TestShell
 import desktopkit.mediaSpec
 import desktopkit.shell.LocalWidthClass
@@ -33,12 +40,13 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowUiAutomation
+import androidx.compose.ui.input.InputMode as ComposeInputMode
 
 /**
  * Submenus in the phone's "⋯" sheet: a submenu's line opens its entries as a page of the same
- * sheet, with the submenu's label and a back button for a head; Back, Esc and the button go up one
- * page before the sheet closes; the sheet is as high as its page, and a page gone back to is where
- * it was.
+ * sheet, with the submenu's label and a back button for a head; Back (the predictive gesture too),
+ * Esc and the button go up one page before the sheet closes; the sheet is as high as its page, a
+ * page gone back to is where it was, and with a keyboard the focus follows the pages.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -68,8 +76,11 @@ class SheetSubmenuTest {
         ActionGroup("Diğer", listOf(item("Kaydet"), MenuEntry.Submenu("Boş", emptyList()))),
     )
 
+    private lateinit var inputModeManager: InputModeManager
+
     private fun sheet(groups: () -> List<ActionGroup> = ::groups) {
         compose.setContent {
+            inputModeManager = LocalInputModeManager.current
             DesktopKitTheme(themeMode = ThemeMode.Dark, inputMode = InputMode.Touch) {
                 TestShell(WidthClass.Compact, content = { _, _ ->
                     MoreSheet(visible = open, onDismiss = { open = false }, groups = groups(), title = "İşlemler")
@@ -89,6 +100,14 @@ class SheetSubmenuTest {
 
     private fun back() {
         compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        compose.waitForIdle()
+    }
+
+    private fun key(code: Int) {
+        compose.runOnUiThread {
+            ShadowUiAutomation.injectInputEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
+            ShadowUiAutomation.injectInputEvent(KeyEvent(KeyEvent.ACTION_UP, code))
+        }
         compose.waitForIdle()
     }
 
@@ -139,6 +158,40 @@ class SheetSubmenuTest {
         assertFalse("on the first page Back closes the sheet, as before", open)
     }
 
+    private fun gesture(progress: Float) = BackEventCompat(40f, 400f, progress, BackEventCompat.EDGE_LEFT)
+
+    @Test
+    fun thePredictiveBackGestureGoesUpOnePageAndOneGivenUpStaysOnIt() {
+        sheet()
+        tap("Parçalar")
+        tap("Derin")
+        val dispatcher = compose.activity.onBackPressedDispatcher
+        compose.runOnUiThread {
+            dispatcher.dispatchOnBackStarted(gesture(0f))
+            dispatcher.dispatchOnBackProgressed(gesture(0.4f))
+            dispatcher.dispatchOnBackCancelled()
+        }
+        compose.waitForIdle()
+        shown("En alt")
+        compose.runOnUiThread {
+            dispatcher.dispatchOnBackStarted(gesture(0f))
+            dispatcher.dispatchOnBackProgressed(gesture(0.6f))
+            dispatcher.onBackPressed()
+        }
+        compose.waitForIdle()
+        shown("Düğüm")
+        gone("En alt")
+        assertTrue("one page up, the sheet still open", open)
+        // the three-button Back of Android 16 starts a gesture without an edge and completes it at once
+        compose.runOnUiThread {
+            dispatcher.dispatchOnBackStarted(BackEventCompat(0f, 0f, 0f, BackEventCompat.EDGE_NONE))
+            dispatcher.onBackPressed()
+        }
+        compose.waitForIdle()
+        shown("Aç")
+        assertTrue(open)
+    }
+
     @Test
     fun theBackButtonAndEscGoUpOnePage() {
         sheet()
@@ -148,13 +201,27 @@ class SheetSubmenuTest {
         compose.waitForIdle()
         shown("Düğüm")
         gone("En alt")
-        compose.runOnUiThread {
-            ShadowUiAutomation.injectInputEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ESCAPE))
-            ShadowUiAutomation.injectInputEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ESCAPE))
-        }
-        compose.waitForIdle()
+        key(KeyEvent.KEYCODE_ESCAPE)
         shown("Aç")
         assertTrue("Esc on a page goes up, it does not close the sheet", open)
+    }
+
+    @Test
+    fun withAKeyboardTheFocusGoesWithThePages() {
+        // a keyboard is in use: lines take the focus (the test window starts in touch mode, as a phone's does)
+        InstrumentationRegistry.getInstrumentation().setInTouchMode(false)
+        sheet()
+        compose.runOnIdle { inputModeManager.requestInputMode(ComposeInputMode.Keyboard) }
+        compose.onNodeWithText("Parçalar").performSemanticsAction(SemanticsActions.RequestFocus)
+        compose.waitForIdle()
+        compose.onNodeWithText("Parçalar").assertIsFocused()
+        key(KeyEvent.KEYCODE_ENTER)
+        shown("Düğüm")
+        // the line that opened the page is gone with its page: the focus goes on from the page's back button
+        compose.onNodeWithContentDescription("Back").assertIsFocused()
+        key(KeyEvent.KEYCODE_ESCAPE)
+        shown("Aç")
+        compose.onNodeWithText("Parçalar").assertIsFocused()
     }
 
     @Test
@@ -265,11 +332,7 @@ class SheetSubmenuTest {
         tap("Parçalar")
         shown("Düğüm")
         // the sheet is a pop-up window there, and Back reaches that window
-        compose.runOnUiThread {
-            ShadowUiAutomation.injectInputEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_BACK))
-            ShadowUiAutomation.injectInputEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_BACK))
-        }
-        compose.waitForIdle()
+        key(KeyEvent.KEYCODE_BACK)
         shown("Aç")
         assertTrue(open)
     }
