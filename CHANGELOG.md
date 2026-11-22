@@ -1,5 +1,54 @@
 # Değişiklikler
 
+## Yayımlanmamış
+
+### Yeni
+
+- **Alt menüler: `MenuEntry.Submenu(label, entries, icon = null, enabled = true)`.** Kitin menüleri yalnızca öğe ve
+  ayırıcı biliyordu; iç içe menü (Dosya ▸ Son açılanlar, kategorilere ayrılmış parça menüleri) isteyen uygulama
+  yapamıyordu. Artık bir `MenuEntry` listesinin gösterildiği her yerde alt menü var: menü çubuğu (rayda "≡"in
+  arkasındaki menüler de), `MenuPopup`, `MenuButton`, `IconMenuButton`, `ContextMenuArea`, tablo, ızgara ve liste
+  satırlarının menüleri, `navMenu`, `ShortcutRegistry.menus(extra = …)` ve telefonun "⋯" sayfası. İstenen derinlikte
+  iç içe. Boş alt menü devre dışı görünür, devre dışı olan (`enabled = false`) açılmaz.
+  - **Açılır menülerde** satırın sonunda bir ok durur (sağdan sola düzende ters); alt menü satırın yanında, kendi
+    penceresinde açılır ve menünün kendisiyle aynı kodla çizilir: aynı cam, aynı ölçüler (fare ve dokunma yoğunluğu),
+    aynı büyüyerek belirme ve solma, "Animasyonları kaldır" açıkken hareketsiz. Bitiş yanında açılır, pencerede yer
+    yoksa başlangıç yanında; ilk satırı açan satırla hizalıdır; alta sığmazsa yukarı kayar; sistem çubuklarının,
+    başlık çubuğunun ve ekran klavyesinin altına girmez. Telefonda iki yanda da yer yoksa pencerenin izin verdiği
+    kadar yana, menüsünün üstüne açılır.
+  - **Fare:** imleç satırda 200 ms durunca açılır, tıklayınca hemen. İmleç başka bir satırda durunca o satır
+    devralır (açık alt menü kapanır, satırın kendi alt menüsü varsa açılır). Alt menüye doğru çapraz giderken
+    geçilen satırlar onu kapatmaz: bekleme her yeni satırda ve alt menüye doğru her harekette yeniden başlar
+    (masaüstü menülerinin "güvenli üçgeni"). İmleç menüden çıkınca açık alt menü yerinde kalır.
+  - **Dokunma:** satıra dokunmak açar, aynı satıra yeniden dokunmak kapatır.
+  - **Klavye:** → (sağdan sola düzende ←) ya da Enter açar ve odağı ilk etkin satıra verir; ← (ya da →), Esc ve
+    Geri bir düzey kapatır, odak açan satıra döner; ↑/↓ bulundukları menüde kalır. Bir öğeyi seçmek ya da menülerin
+    dışına basmak bütün zinciri kapatır; ilk menüde Esc eskisi gibi menüyü kapatır.
+  - **TalkBack:** satır "Alt menü" diye, genişletildi/daraltıldı durumuyla okunur, genişlet ve daralt eylemleri
+    vardır; alt menünün penceresi satırın adını taşır.
+  - **Telefonun "⋯" sayfasında** (`MoreSheet`, `MoreButton`, `DesktopShell(moreActions = …)`) alt menü aynı sayfanın
+    içinde bir sayfa olarak açılır: başlığı alt menünün adı, önünde geri düğmesi; sayfa içeriğinin yüksekliğini alır,
+    sayfalar arasında fade-through oynar. Sistemin Geri'si (öngörülü Geri hareketi de), Esc ve geri düğmesi bir
+    sayfa yukarı çıkar, ilk sayfada sayfayı kapatır. Dönülen sayfa kaydırıldığı yerde durur; klavyeyle dönünce odak
+    alt menünün satırındadır. Sayfadaki bir eylem sayfayı kapatır, `checked` verilmiş öğe (anahtar) sayfasında kalır.
+    Genişte aynı girişler yanında açılan alt menülü bir menüdür.
+  - Örnek uygulama: menü çubuğunda Dosya ▸ Son açılanlar ve Görünüm ▸ Görünüş ▸ Tema / Arayüz yoğunluğu (ikinci
+    düzeyin öğeleri çalışır); telefonda aynı "Görünüş" "⋯" sayfasında, sayfa sayfa.
+
+  Alt menüsü olmayan menü ve sayfa eskisi gibi çizilir ve aynı zamanlamayla açılıp kapanır; var olan ekran görüntüsü
+  referanslarının hepsi tutuyor, var olan testlere dokunulmadı. API'de yalnızca ekleme var (bir tür genişledi, aşağıda
+  "Dikkat"). Testler: `SubmenuLogicTest` ve `SheetPagesTest` (yerleşim ve çevirme, imlecin niyeti, tuşlar, sayfa
+  yolu), `SubmenuTest`, `SheetSubmenuTest`, `SubmenuCallSitesTest`, `SubmenuScreenshotTest`.
+
+### Dikkat
+
+- `ActionGroup.actions` artık `List<MenuEntry>` (önceden `List<MenuEntry.Item>`): alt menü ve ayırıcı, eylemlerin
+  arasında istenen sırada durabilsin diye. Grup **kuran** kod değişmeden derlenir. Bir grubun eylemlerini geri
+  **okuyan** kod (`grup.actions.first().label`) öğeleri `filterIsInstance<MenuEntry.Item>()` ile alır.
+- `CompactTopBar`'ın sığmayan eylemleri ("⋮") `TopBarAction`'dır, `MenuEntry` değil: orada alt menü yok. Tablonun
+  sütun menüsünü kit kurar, uygulama ona giriş vermez.
+- Home ve End tuşları menülerde eskiden de yoktu; eklenmedi.
+
 ## 2.9.0 (2026-11-13)
 
 ### Yeni
