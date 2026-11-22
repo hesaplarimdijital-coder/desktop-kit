@@ -35,6 +35,8 @@ Standardı" belgesinde, sürümler arası geçiş [MIGRATION.md](MIGRATION.md)'d
   durumu verilir.
 - Kısayollar tek bir `ShortcutRegistry`'de; menü çubuğu, Meta+/ listesi ve komut paleti oradan
   beslenir.
+- Kod ya da betik düzenleyen ekran `CodeEditor` kullanır (dil uygulamanın `LineTokenizer`'ı, renkler
+  `DeskTheme.syntax`'tan, arama `CodeSearchBar`); metin alanından düzenleyici yazılmaz.
 
 ## Kitte çalışırken
 
