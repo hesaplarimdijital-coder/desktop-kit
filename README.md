@@ -378,13 +378,14 @@ kullanılır: menü çubuğu, `MenuPopup`, `MenuButton`, `ContextMenuArea`, sat�
 `navMenu`, `ActionGroup`. İstenen derinlikte iç içe olur; boş olanı devre dışı görünür.
 
 - **Menüde** satırın sonunda ok vardır; alt menü satırın yanında açılır (bitiş yanında, yer yoksa başlangıç
-  yanında; pencerenin içinde kalır). Fare satırda 200 ms durunca ya da tıklayınca, dokununca, → ya da Enter ile
-  açılır. İmleç alt menüye doğru çapraz giderken başka satırların üstünden geçmesi onu kapatmaz. ←, Esc ve Geri bir
-  düzey kapatır; bir öğeyi seçmek ya da dışarı basmak hepsini.
+  yanında; pencerenin içinde kalır). İmleç satırda 200 ms durunca ya da tıklayınca, parmak dokununca, klavyede →
+  ya da Enter ile açılır. İmleç alt menüye doğru çapraz giderken başka satırların üstünden geçmesi onu kapatmaz. ←,
+  Esc ve Geri bir düzey kapatır; bir öğeyi seçmek ya da dışarı basmak hepsini.
 - **Telefonun "⋯" sayfasında** (`MoreSheet`, `MoreButton`, kabuğun `moreActions`'ı) alt menü aynı sayfanın içinde bir
   sayfa olarak açılır: üstte alt menünün adı ve geri düğmesi. Geri bir sayfa yukarı çıkar, ilk sayfada sayfayı kapatır.
 - Girişler her bileşimde yeniden kurulabilir (bir onay işareti, değişen bir liste): açık alt menü ve açık sayfa
   yerinde kalır ve yeni girişleri gösterir.
+- `CompactTopBar`'ın "⋮" menüsü `TopBarAction` listesidir, alt menü almaz; tablonun sütun menüsünü kit kurar.
 
 ### İş istasyonu (tablet ve DeX)
 
