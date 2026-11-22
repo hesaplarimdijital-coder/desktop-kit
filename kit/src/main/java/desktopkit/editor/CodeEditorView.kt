@@ -225,7 +225,7 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
     private val syntaxLook = SyntaxLook()
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND }
-    private val numberPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.RIGHT }
+    private val numberPaint = TextPaint(Paint.ANTI_ALIAS_FLAG or TEXT_METRICS).apply { textAlign = Paint.Align.RIGHT }
     private val path = Path()
     private val rect = RectF()
     private var gutterWidth = 0
@@ -341,6 +341,9 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
 
     init {
         background = null
+        // the line breaker measures plain text, a slanted or bold token is drawn with its style: with hinted widths
+        // the two can differ (a slant turns hinting off), and a row's last letters land past the edge, cut off
+        paintFlags = paintFlags or TEXT_METRICS
         setPadding(0, 0, 0, 0)
         gravity = Gravity.TOP or Gravity.START
         includeFontPadding = false
@@ -1722,6 +1725,9 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
 
     companion object {
         private val EMPTY_INTS = IntArray(0)
+
+        /** Unhinted, fractional glyph widths: the same for a token whatever its slant or weight, at every size. */
+        private const val TEXT_METRICS = Paint.LINEAR_TEXT_FLAG or Paint.SUBPIXEL_TEXT_FLAG
         private const val NO_REVEAL = Long.MIN_VALUE
 
         /** Lines coloured above and below the view, so a short scroll finds them done. */

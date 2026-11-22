@@ -686,6 +686,32 @@ class CodeEditorTest {
         compose.runOnIdle { assertEquals(size, view.textSize, 0.01f) }
     }
 
+    /**
+     * A wrapped row never reaches past the text's width, whatever its tokens' styles and the text's size: the
+     * platform breaks lines with the plain text's widths, so a slant or a thicker stroke must not change them
+     * (app-ui's report: on a DeX window an italic comment's last letter was laid out past the edge and cut off).
+     */
+    @Test
+    fun aWrappedRowNeverReachesPastTheEdge() {
+        val comment = "// Story states: these can be done using read counts of knots; or functions that collect up more complex logic; or variables"
+        document = CodeEditorState((1..10).joinToString("\n") { "VAR x$it = 0" } + "\n" + comment + "\n== " + "uzun bir başlık ".repeat(8) + "==")
+        editorWidth = 835.dp
+        zoom = CodeEditorZoom()
+        show()
+        val view = view()
+        for (step in 0..3) {
+            compose.runOnIdle {
+                val layout = view.layout
+                val width = view.width - view.compoundPaddingLeft - view.compoundPaddingRight
+                for (row in 0 until layout.lineCount) {
+                    assertTrue("row $row at size ${view.textSize} reaches ${layout.getLineMax(row)} of $width", layout.getLineMax(row) <= width + 0.5f)
+                }
+                zoom!!.zoomIn()
+            }
+            compose.waitForIdle()
+        }
+    }
+
     @Test
     fun theZoomIsKeptInThePreferences() {
         val store = compose.activity.getSharedPreferences("editor-zoom-test", 0).also { it.edit().clear().commit() }
