@@ -142,6 +142,99 @@ class CodeEditorStateTest {
     }
 
     @Test
+    fun linesMoveUpAndDownWithTheSelection() {
+        val state = CodeEditorState("bir\niki\nüç\ndört")
+        // the selection from "ki" to "ü": lines 2 and 3 move
+        state.select(5, 9)
+        assertTrue(state.moveLinesUp())
+        assertEquals("iki\nüç\nbir\ndört", state.text)
+        assertEquals("ki\nü", state.selectedText)
+        assertFalse("nothing above the first line", state.moveLinesUp())
+        assertTrue(state.moveLinesDown())
+        assertTrue(state.moveLinesDown())
+        assertEquals("bir\ndört\niki\nüç", state.text)
+        assertEquals("ki\nü", state.selectedText)
+        assertFalse("nothing below the last line", state.moveLinesDown())
+        // each move one step
+        assertTrue(state.undo())
+        assertEquals("bir\niki\nüç\ndört", state.text)
+        assertEquals("ki\nü", state.selectedText)
+    }
+
+    @Test
+    fun aLineIsDuplicatedUnderItselfAndTheCursorGoesAlong() {
+        val state = CodeEditorState("VAR a = 1\nson")
+        state.select(4)
+        state.duplicateLines()
+        assertEquals("VAR a = 1\nVAR a = 1\nson", state.text)
+        assertEquals(state.lineStart(1) + 4, state.cursor)
+        assertTrue(state.undo())
+        assertEquals("VAR a = 1\nson", state.text)
+    }
+
+    @Test
+    fun deletingLinesKeepsTheColumn() {
+        val state = CodeEditorState("bir\niki\nüçüncü\ndört")
+        state.select(state.lineStart(1) + 2)
+        state.deleteLines()
+        assertEquals("bir\nüçüncü\ndört", state.text)
+        assertEquals("the line that took the place, same column", state.lineStart(1) + 2, state.cursor)
+        // the last line goes with the line break before it
+        state.select(state.lineEnd(2))
+        state.deleteLines()
+        assertEquals("bir\nüçüncü", state.text)
+        assertEquals(state.lineStart(1) + 4, state.cursor)
+        state.selectAll()
+        state.deleteLines()
+        assertEquals("", state.text)
+        assertTrue(state.undo())
+        assertEquals("bir\nüçüncü", state.text)
+    }
+
+    @Test
+    fun aLineCommentIsPutAtTheLeastIndentationAndTakenAwayAgain() {
+        val state = CodeEditorState("== bahce ==\n    ~ cay = 1\n\n  -> son\nsatır")
+        state.select(state.lineStart(1) + 6, state.lineStart(3) + 3)
+        state.toggleLineComment("//")
+        assertEquals("== bahce ==\n  //   ~ cay = 1\n\n  // -> son\nsatır", state.text)
+        assertEquals("the selection stays on its text", "cay = 1\n\n  // -", state.selectedText)
+        state.toggleLineComment("//")
+        assertEquals("== bahce ==\n    ~ cay = 1\n\n  -> son\nsatır", state.text)
+        // one of the lines not commented: all of them are
+        state.select(0, state.lineEnd(1))
+        state.replace(0, 0, "// ")
+        state.toggleLineComment("//")
+        assertEquals("// // == bahce ==\n//     ~ cay = 1\n\n  -> son\nsatır", state.text)
+        // each toggle is one undo step
+        assertTrue(state.undo())
+        assertEquals("// == bahce ==\n    ~ cay = 1\n\n  -> son\nsatır", state.text)
+    }
+
+    @Test
+    fun selectLinesGrowsLineByLine() {
+        val state = CodeEditorState("bir\niki\nüç")
+        state.select(1)
+        state.selectLines()
+        assertEquals("bir\n", state.selectedText)
+        state.selectLines()
+        assertEquals("bir\niki\n", state.selectedText)
+        state.selectLines()
+        assertEquals("bir\niki\nüç", state.selectedText)
+        state.selectLines()
+        assertEquals("bir\niki\nüç", state.selectedText)
+    }
+
+    @Test
+    fun goToLinePutsTheCursorThereForAnEditorToShow() {
+        val state = CodeEditorState("bir\niki\nüç")
+        state.goToLine(2, 1)
+        assertEquals(state.lineStart(2) + 1, state.cursor)
+        assertTrue(state.pendingFocus)
+        state.goToLine(1, 99)
+        assertEquals(state.lineEnd(1), state.cursor)
+    }
+
+    @Test
     fun aSelectionEndingAtALinesStartDoesNotTouchThatLine() {
         val state = CodeEditorState("bir\niki\nüç")
         state.select(0, state.lineStart(2))

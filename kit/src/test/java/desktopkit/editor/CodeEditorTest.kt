@@ -358,6 +358,28 @@ class CodeEditorTest {
         assertInStep()
     }
 
+    @Test
+    fun theLineCommandsWorkThroughTheEditor() {
+        show()
+        onUi { view ->
+            view.requestFocus()
+            // the cursor in "VAR sehir": the line moves up, is copied, commented, and goes
+            document.select(document.lineStart(2) + 4)
+            document.moveLinesUp()
+        }
+        assertEquals("VAR sehir = \"Kemer\"", document.lineText(1))
+        assertEquals("the cursor went along", document.lineStart(1) + 4, document.cursor)
+        onUi { document.duplicateLines() }
+        assertEquals(document.lineText(1), document.lineText(2))
+        onUi { document.toggleLineComment("//") }
+        assertEquals("// VAR sehir = \"Kemer\"", document.lineText(2))
+        onUi { document.deleteLines() }
+        assertEquals("VAR cay = 2", document.lineText(2))
+        onUi { repeat(4) { document.undo() } }
+        assertEquals(sampleScript, document.text)
+        assertInStep()
+    }
+
     // ---------------------------------------------------------------- documents
 
     @Test

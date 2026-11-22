@@ -491,6 +491,140 @@ class CodeEditorState(initialText: String = "") {
         if (several) select(lines.start(range.first), lines.end(range.last))
     }
 
+    /**
+     * Moves the lines the selection touches (the cursor's line when nothing is selected) one line up, past the
+     * line above them; the selection moves along. One undo step. False at the top of the document.
+     */
+    fun moveLinesUp(): Boolean {
+        val range = selectedLines()
+        if (range.first == 0) return false
+        val aboveStart = lines.start(range.first - 1)
+        val above = buffer.substring(aboveStart, lines.end(range.first - 1))
+        val blockEnd = lines.end(range.last)
+        val block = buffer.substring(lines.start(range.first), blockEnd)
+        val selection = selectionState
+        val shift = above.length + 1
+        edit {
+            change(aboveStart, blockEnd, block + "\n" + above)
+            select(selection.start - shift, selection.end - shift)
+        }
+        revealCursor()
+        return true
+    }
+
+    /** [moveLinesUp] the other way: the lines go past the line below them. False at the end of the document. */
+    fun moveLinesDown(): Boolean {
+        val range = selectedLines()
+        if (range.last + 1 >= lines.count) return false
+        val blockStart = lines.start(range.first)
+        val block = buffer.substring(blockStart, lines.end(range.last))
+        val belowEnd = lines.end(range.last + 1)
+        val below = buffer.substring(lines.start(range.last + 1), belowEnd)
+        val selection = selectionState
+        val shift = below.length + 1
+        edit {
+            change(blockStart, belowEnd, below + "\n" + block)
+            select(selection.start + shift, selection.end + shift)
+        }
+        revealCursor()
+        return true
+    }
+
+    /** Puts a copy of the lines the selection touches under them; the selection moves to the copy. One undo step. */
+    fun duplicateLines() {
+        val range = selectedLines()
+        val blockEnd = lines.end(range.last)
+        val block = buffer.substring(lines.start(range.first), blockEnd)
+        val selection = selectionState
+        val shift = block.length + 1
+        edit {
+            change(blockEnd, blockEnd, "\n" + block)
+            select(selection.start + shift, selection.end + shift)
+        }
+        revealCursor()
+    }
+
+    /**
+     * Deletes the lines the selection touches, their line breaks with them; the cursor goes to the line that takes
+     * their place, in the same column as far as it reaches. One undo step.
+     */
+    fun deleteLines() {
+        val range = selectedLines()
+        val column = selectionState.end - lines.start(lines.lineOf(selectionState.end))
+        var start = lines.start(range.first)
+        val end = if (range.last + 1 < lines.count) lines.start(range.last + 1) else lines.end(range.last)
+        // the last line goes with the line break before it
+        if (range.last + 1 >= lines.count && range.first > 0) start--
+        edit {
+            change(start, end, "")
+            val line = range.first.coerceAtMost(lines.count - 1)
+            select(lines.start(line) + column.coerceAtMost(lines.end(line) - lines.start(line)))
+        }
+        revealCursor()
+    }
+
+    /**
+     * Comments the lines the selection touches out with [prefix] (`//`, `#`, `--`) and a space, at the
+     * indentation of the least indented of them; when every one of them already starts with [prefix] after its
+     * indentation, takes it (and one space after it) away instead. Blank lines are left as they are, unless only
+     * blank lines are touched. One undo step; the selection stays on its text.
+     */
+    fun toggleLineComment(prefix: String) {
+        require(prefix.isNotEmpty()) { "a comment needs a prefix" }
+        val range = selectedLines()
+        val written = range.filter { line -> (lines.start(line) until lines.end(line)).any { !buffer[it].isWhitespace() } }
+        val targets = written.ifEmpty { range.toList() }
+        val commented = written.isNotEmpty() && written.all { line -> buffer.startsWith(prefix, lines.start(line) + indentation(line)) }
+        val column = targets.minOf { indentation(it) }
+        edit {
+            // from the last line up, so the offsets of the lines still to do stay as they are
+            for (line in targets.asReversed()) {
+                val start = lines.start(line)
+                if (commented) {
+                    val at = start + indentation(line)
+                    var end = at + prefix.length
+                    if (end < lines.end(line) && buffer[end] == ' ') end++
+                    change(at, end, "")
+                } else {
+                    change(start + column, start + column, "$prefix ")
+                }
+            }
+        }
+    }
+
+    /** How many tabs and spaces [line] starts with. */
+    private fun indentation(line: Int): Int {
+        val start = lines.start(line)
+        val end = lines.end(line)
+        var at = start
+        while (at < end && (buffer[at] == ' ' || buffer[at] == '\t')) at++
+        return at - start
+    }
+
+    /**
+     * Selects the lines the selection touches, their line breaks with them; when it already is whole lines, one
+     * line more. Pressed again and again it selects line after line, as in desktop editors.
+     */
+    fun selectLines() {
+        val range = selectedLines()
+        val start = lines.start(range.first)
+        fun endOf(line: Int) = if (line + 1 < lines.count) lines.start(line + 1) else lines.end(line)
+        var end = endOf(range.last)
+        if (selectionState.min == start && selectionState.max == end && range.last + 1 < lines.count) end = endOf(range.last + 1)
+        select(start, end)
+    }
+
+    /**
+     * Puts the cursor on [line] (zero-based) at [column] (as far as the line reaches), scrolls it into view and
+     * gives the editor the keyboard focus: the end of an app's "go to line".
+     */
+    @JvmOverloads
+    fun goToLine(line: Int, column: Int = 0) {
+        val offset = offsetOf(line, column)
+        select(offset)
+        reveal(offset, offset, focus = true)
+    }
+
     private fun revealCursor() {
         host?.reveal(selectionState.end, selectionState.end)
     }
