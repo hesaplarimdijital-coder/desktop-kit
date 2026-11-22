@@ -237,6 +237,48 @@ class SheetSubmenuTest {
         assertEquals("pointer", left("Düğüm"), left("Parçalar"), 0.5f)
     }
 
+    private var withSubmenu by mutableStateOf(true)
+    private var extra by mutableStateOf(false)
+
+    /** Groups whose entries come and go, built from state as apps build them. */
+    private fun changing() = listOf(
+        ActionGroup(null, listOfNotNull(
+            if (extra) item("Yeni") else null,
+            item("Aç"),
+            if (withSubmenu) MenuEntry.Submenu("Parçalar", listOf(item("Düğüm"))) else item("Parça yok"),
+            MenuEntry.Submenu("Tema", listOf(item("Koyu"), item("Sistem"))),
+        )),
+    )
+
+    @Test
+    fun backOnTheFirstPageClosesTheSheetWhenThePagesSubmenuWentAway() {
+        sheet(::changing)
+        tap("Parçalar")
+        shown("Düğüm")
+        withSubmenu = false
+        compose.waitForIdle()
+        // the page's submenu is gone: the first page shows, and Back there closes the sheet, as on any first page
+        shown("Aç")
+        shown("İşlemler")
+        back()
+        assertFalse(open)
+    }
+
+    @Test
+    fun aPageStaysItsSubmenusWhenAnEntryComesInAboveIt() {
+        sheet(::changing)
+        tap("Tema")
+        shown("Koyu")
+        extra = true
+        compose.waitForIdle()
+        shown("Koyu")
+        gone("Düğüm")
+        // and Back goes up to the first page as it is now
+        back()
+        shown("Yeni")
+        assertTrue(open)
+    }
+
     @Test
     fun anActionOnAPageClosesTheSheetAndASwitchStaysOnItsPage() {
         sheet()

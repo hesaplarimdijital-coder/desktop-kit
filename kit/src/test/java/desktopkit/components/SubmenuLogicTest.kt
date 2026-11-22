@@ -198,7 +198,7 @@ class SubmenuLogicTest {
     fun aClickOpensAtOnceAndStopsTheWait() {
         val level = MenuLevel()
         level.pointerMoved(0, Offset(10f, 10f), slack)
-        level.open(0, focus = true)
+        level.open(0, "Son açılanlar", focus = true)
         assertEquals(0, level.openIndex)
         assertTrue(level.focusChild)
         assertEquals("nothing waits", 0, level.wait)
@@ -207,6 +207,31 @@ class SubmenuLogicTest {
         assertEquals(0, level.openIndex)
         level.close()
         assertEquals(-1, level.openIndex)
+    }
+
+    private val snippets = MenuEntry.Submenu("Parçalar", listOf(MenuEntry.Item("Düğüm", {})))
+
+    @Test
+    fun aSubmenuIsFoundAgainByItsLabelThenAtItsPlace() {
+        val entries = listOf(MenuEntry.Item("Yeni", {}), recent, snippets)
+        assertEquals("where it was", 2, findSubmenu(entries, 2, "Parçalar"))
+        assertEquals("moved down by an entry above it", 3, findSubmenu(listOf(MenuEntry.Item("Aç", {})) + entries, 2, "Parçalar"))
+        val renamed = listOf(MenuEntry.Item("Yeni", {}), recent, MenuEntry.Submenu("Parçalar (2)", snippets.entries))
+        assertEquals("renamed where it was", 2, findSubmenu(renamed, 2, "Parçalar"))
+        assertEquals("gone, an item in its place", -1, findSubmenu(listOf(MenuEntry.Item("Yeni", {}), recent, MenuEntry.Item("Parça yok", {})), 2, "Parçalar"))
+        assertEquals("one that cannot open is not found", -1, findSubmenu(listOf(MenuEntry.Item("Yeni", {}), recent, empty), 2, "Boş"))
+    }
+
+    @Test
+    fun theOpenSubmenuFollowsItsEntries() {
+        val level = MenuLevel()
+        level.open(2, "Parçalar", focus = false)
+        level.follow(listOf(MenuEntry.Item("Aç", {}), MenuEntry.Item("Yeni", {}), recent, snippets))
+        assertEquals("an entry came in above it", 3, level.openIndex)
+        level.follow(listOf(MenuEntry.Item("Aç", {}), recent))
+        assertEquals("it went", -1, level.openIndex)
+        level.follow(listOf(MenuEntry.Item("Aç", {}), recent, snippets))
+        assertEquals("and does not open again when it comes back", -1, level.openIndex)
     }
 
     @Test

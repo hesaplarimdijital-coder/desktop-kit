@@ -237,6 +237,20 @@ internal fun firstFocusableEntry(entries: List<MenuEntry>): Int = entries.indexO
     }
 }
 
+/**
+ * Where the submenu last seen at [place] with [label] is in [entries] now (an app builds its entries
+ * anew whenever something changes): by its label first, at its own place when it is still there,
+ * else the first submenu with that label (something came in above it, or went); when no line has
+ * that label any more, at its place (a submenu renamed where it was). -1 when neither is a submenu
+ * that opens: it is gone.
+ */
+internal fun findSubmenu(entries: List<MenuEntry>, place: Int, label: String): Int {
+    fun opens(index: Int) = (entries.getOrNull(index) as? MenuEntry.Submenu)?.opens == true
+    fun labelled(index: Int) = (entries.getOrNull(index) as? MenuEntry.Submenu)?.label == label
+    if (opens(place) && labelled(place)) return place
+    return entries.indices.firstOrNull { opens(it) && labelled(it) } ?: if (opens(place)) place else NONE
+}
+
 /** What a key means to the submenus, where it was pressed. */
 internal enum class SubmenuKey { Open, Close, None }
 
@@ -277,17 +291,33 @@ internal class MenuLevel {
     var wait by mutableIntStateOf(0)
         private set
 
+    /** The label of the open submenu, by which [follow] finds it again in entries built anew. */
+    private var openLabel = ""
+
     private val hover = SubmenuHover()
     private var waits = 0
     private val lines = mutableStateMapOf<Int, IntRect>()
     private val corners = HashMap<Int, Offset>()
     private val focus = HashMap<Int, FocusRequester>()
 
-    fun open(index: Int, focus: Boolean) {
+    fun open(index: Int, label: String, focus: Boolean) {
         focusChild = focus
         openIndex = index
+        openLabel = label
         opened++
         stopWaiting()
+    }
+
+    /**
+     * The menu's [entries] as they are now, told while the menu is composed: the open submenu is
+     * found again ([findSubmenu]: by its label, else at its place), so an entry that comes in above
+     * it does not hand its place to another submenu, and it closes when it is gone.
+     */
+    fun follow(entries: List<MenuEntry>) {
+        if (openIndex == NONE) return
+        val found = findSubmenu(entries, openIndex, openLabel)
+        if (found != openIndex) openIndex = found
+        if (found != NONE) openLabel = (entries[found] as MenuEntry.Submenu).label
     }
 
     /** Closes the submenu of [index] (of whichever is open by default); another one that has opened since stays. */
@@ -325,7 +355,7 @@ internal class MenuLevel {
         val index = hover.settle()
         if (index == NONE) return
         val entry = entries.getOrNull(index)
-        if (entry is MenuEntry.Submenu && entry.opens) open(index, focus = false) else close()
+        if (entry is MenuEntry.Submenu && entry.opens) open(index, entry.label, focus = false) else close()
     }
 
     private fun apply(change: HoverWait) {
@@ -429,19 +459,19 @@ internal fun SubmenuRow(submenu: MenuEntry.Submenu, index: Int, level: MenuLevel
             .onKeyEvent { event ->
                 val opens = enabled && event.type == KeyEventType.KeyDown &&
                     submenuKey(event.key, rtl, onSubmenuLine = true, inSubmenu = false) == SubmenuKey.Open
-                if (opens) level.open(index, focus = true)
+                if (opens) level.open(index, submenu.label, focus = true)
                 opens
             }
             .deskClickable(
                 interaction,
-                onClick = { if (open && press.finger) level.close(index) else level.open(index, focus = true) },
+                onClick = { if (open && press.finger) level.close(index) else level.open(index, submenu.label, focus = true) },
                 enabled = enabled,
                 onClickLabel = openLabel,
             )
             .semantics {
                 stateDescription = said
                 if (enabled) {
-                    if (open) collapse { level.close(index); true } else expand { level.open(index, focus = true); true }
+                    if (open) collapse { level.close(index); true } else expand { level.open(index, submenu.label, focus = true); true }
                 }
             },
         icon = submenu.icon,
@@ -496,6 +526,7 @@ private fun SubmenuPopup(
     SideEffect { transition.targetState = target }
     if (!target && !transition.currentState && !transition.targetState) return
     val level = remember { MenuLevel() }
+    level.follow(shown.value.entries)
     // closing takes its own open submenu along, and it opens again without one
     if (!target) SideEffect { level.close() }
     // a submenu that is fading out no longer chooses anything (another line has taken over)

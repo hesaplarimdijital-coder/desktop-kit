@@ -205,12 +205,14 @@ internal fun ActionSheet(
     // it closes (MoreButton) would otherwise take the page away from under the finger
     val shown = if (paged) held.value else groups
     val trail = resolveSheetPath(shown, pages.path)
+    // Back and the next page go on from the page on screen, even when the app's entries changed under the way down
+    SideEffect { pages.settle(trail.steps) }
     val latestDismiss by rememberUpdatedState(onDismiss)
     SheetLayer(
         visible = visible,
         onDismiss = onDismiss,
         modifier = modifier,
-        label = trail.lastOrNull()?.label ?: title,
+        label = trail.submenus.lastOrNull()?.label ?: title,
         goBack = pages::back,
     ) { pull ->
         if (!paged) {
@@ -220,7 +222,7 @@ internal fun ActionSheet(
                 ActionGroupList(shown, onDismiss)
             }
         } else {
-            ActionSheetPages(shown, trail, pages, title, pull) { latestDismiss() }
+            ActionSheetPages(shown, trail.submenus, pages, title, pull) { latestDismiss() }
         }
     }
 }
@@ -229,14 +231,23 @@ internal fun ActionSheet(
 private class GroupsHolder(var value: List<ActionGroup>)
 
 /**
- * The pages of an action sheet: the way down through its submenus, as the place of each among the
- * entries of the page it is on (on the first page: among all the actions, group after group, as
- * [ActionGroupList] lists them). Places, not the submenus themselves: the app builds its entries
- * anew whenever something changes (a switch on a page flips), and the page follows.
+ * One step of a sheet's way down: the submenu's [label] and its [place] among the entries of the page
+ * it is on (on the first page: among all the actions, group after group, as [ActionGroupList] lists
+ * them).
+ */
+internal data class SheetStep(val place: Int, val label: String)
+
+/** Where a sheet's way down leads in the entries as they are now: the [steps] found again and the [submenus] they open. */
+internal class SheetTrail(val steps: List<SheetStep>, val submenus: List<MenuEntry.Submenu>)
+
+/**
+ * The pages of an action sheet: the way down through its submenus, a [SheetStep] for each. Steps,
+ * not the submenus themselves: the app builds its entries anew whenever something changes (a switch
+ * on a page flips, an entry comes or goes), and the page follows its submenu ([resolveSheetPath]).
  */
 @Stable
 internal class SheetPages {
-    var path by mutableStateOf(emptyList<Int>())
+    var path by mutableStateOf(emptyList<SheetStep>())
         private set
 
     /** The line of the page gone back to (its place there) that opened the page just left: it gets the keyboard focus back. */
@@ -247,10 +258,10 @@ internal class SheetPages {
 
     val depth: Int get() = path.size
 
-    /** Opens the submenu at [index] of the page that is up. */
-    fun open(index: Int) {
+    /** Opens [submenu], at [place] among the entries of the page that is up. */
+    fun open(place: Int, submenu: MenuEntry.Submenu) {
         cameFrom = null
-        path = path + index
+        path = path + SheetStep(place, submenu.label)
     }
 
     /** One page up; false on the first page, where there is nowhere to go. */
@@ -258,9 +269,21 @@ internal class SheetPages {
         if (path.isEmpty()) return false
         // the page left starts at its top the next time; the one gone back to is where it was
         scrolls.remove(path.size)
-        cameFrom = path.last()
+        cameFrom = path.last().place
         path = path.dropLast(1)
         return true
+    }
+
+    /**
+     * The way down as the app's entries have it now ([resolveSheetPath]): the steps found again, at
+     * their places now, and none past the first that is gone. So Back always goes up from the page on
+     * screen, and a page opened next goes on from it.
+     */
+    fun settle(steps: List<SheetStep>) {
+        if (steps == path) return
+        // a page that is gone starts at its top if it comes again
+        scrolls.keys.removeAll { it > steps.size }
+        path = steps
     }
 
     /** Whether the sheet was up when [follow] was last told; not state, nothing is drawn from it. */
@@ -290,20 +313,23 @@ internal class SheetPages {
 internal fun sheetEntries(groups: List<ActionGroup>): List<MenuEntry> = groups.filter { it.actions.isNotEmpty() }.flatMap { it.actions }
 
 /**
- * The submenus [path] leads through, outermost first. It stops where the path no longer leads to a
- * submenu that opens (the app's entries changed under it): the sheet then shows the last page that
- * is still there.
+ * Where [path] leads in [groups] as they are now, outermost first. Each step is found again by its
+ * label, else at its place ([findSubmenu]). It stops at the first step that leads to no submenu that
+ * opens (the app's entries changed under it): the sheet then shows the last page that is still there.
  */
-internal fun resolveSheetPath(groups: List<ActionGroup>, path: List<Int>): List<MenuEntry.Submenu> {
+internal fun resolveSheetPath(groups: List<ActionGroup>, path: List<SheetStep>): SheetTrail {
     var entries = sheetEntries(groups)
-    val trail = ArrayList<MenuEntry.Submenu>(path.size)
-    for (index in path) {
-        val submenu = entries.getOrNull(index) as? MenuEntry.Submenu ?: break
-        if (!submenu.opens) break
-        trail += submenu
+    val steps = ArrayList<SheetStep>(path.size)
+    val submenus = ArrayList<MenuEntry.Submenu>(path.size)
+    for (step in path) {
+        val place = findSubmenu(entries, step.place, step.label)
+        if (place < 0) break
+        val submenu = entries[place] as MenuEntry.Submenu
+        steps += SheetStep(place, submenu.label)
+        submenus += submenu
         entries = submenu.entries
     }
-    return trail
+    return SheetTrail(steps, submenus)
 }
 
 /** The shell's fade-through, between the pages of a sheet: the page left is gone before the next one shows. */
@@ -463,7 +489,7 @@ private fun SheetSubmenuRow(submenu: MenuEntry.Submenu, place: Int, pages: Sheet
             .focusRing(state, shape)
             .background(animatedStateBackground(state).value, shape)
             .focusRequester(focus)
-            .deskClickable(interaction, { pages?.open(place) }, enabled = enabled, onClickLabel = stringResource(R.string.dk_submenu_open))
+            .deskClickable(interaction, { pages?.open(place, submenu) }, enabled = enabled, onClickLabel = stringResource(R.string.dk_submenu_open))
             .semantics { stateDescription = said }
             .padding(horizontal = dimens.gapM),
         verticalAlignment = Alignment.CenterVertically,

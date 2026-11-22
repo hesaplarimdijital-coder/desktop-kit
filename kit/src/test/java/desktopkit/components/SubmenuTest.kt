@@ -484,6 +484,56 @@ class SubmenuTest {
         assertEquals(1, menus().size)
     }
 
+    private var above by mutableStateOf(false)
+    private var withRecent by mutableStateOf(true)
+
+    /** A menu whose entries are built from state, as apps build them: an entry comes in at the top, a submenu goes. */
+    private fun changingMenu() {
+        compose.runOnUiThread { compose.activity.actionBar?.hide() }
+        compose.setContent {
+            DesktopKitTheme(themeMode = ThemeMode.Light, inputMode = InputMode.Pointer) {
+                Box(Modifier.fillMaxSize().background(DeskTheme.colors.background)) {
+                    val entries = listOfNotNull(
+                        if (above) item("Yeni pencere") else null,
+                        item("Yeni"),
+                        if (withRecent) MenuEntry.Submenu("Son açılanlar", listOf(item("a.ink"))) else item("Son açılan yok"),
+                        MenuEntry.Submenu("Parçalar", listOf(item("Düğüm"))),
+                    )
+                    MenuPopup(visible = open, onDismiss = { open = false }, entries = if (open) entries else emptyList(), offset = IntOffset(100, 80))
+                }
+            }
+        }
+        compose.waitForIdle()
+    }
+
+    @Test
+    fun anOpenSubmenuStaysItselfWhenAnEntryComesInAboveIt() {
+        changingMenu()
+        click(line("Parçalar", 0).center)
+        shown("Düğüm")
+        above = true
+        compose.waitForIdle()
+        // not the submenu that took its place
+        shown("Düğüm")
+        gone("a.ink")
+        assertEquals("beside its line, one line further down", line("Parçalar", 0).top, line("Düğüm", 1).top)
+    }
+
+    @Test
+    fun anOpenSubmenuThatGoesAwayStaysClosedWhenItComesBack() {
+        changingMenu()
+        click(line("Son açılanlar", 0).center)
+        shown("a.ink")
+        withRecent = false
+        compose.waitForIdle()
+        gone("a.ink")
+        assertEquals(1, menus().size)
+        withRecent = true
+        compose.waitForIdle()
+        gone("a.ink")
+        assertEquals(1, menus().size)
+    }
+
     @Test
     fun anEmptyOrDisabledSubmenuIsShownButDoesNotOpen() {
         menu()

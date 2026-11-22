@@ -384,7 +384,8 @@ kullanılır: menü çubuğu, `MenuPopup`, `MenuButton`, `ContextMenuArea`, sat�
 - **Telefonun "⋯" sayfasında** (`MoreSheet`, `MoreButton`, kabuğun `moreActions`'ı) alt menü aynı sayfanın içinde bir
   sayfa olarak açılır: üstte alt menünün adı ve geri düğmesi. Geri bir sayfa yukarı çıkar, ilk sayfada sayfayı kapatır.
 - Girişler her bileşimde yeniden kurulabilir (bir onay işareti, değişen bir liste): açık alt menü ve açık sayfa
-  yerinde kalır ve yeni girişleri gösterir.
+  alt menünün adıyla (adı değiştiyse yeriyle) yeniden bulunur ve yeni girişleri gösterir. Üstüne bir giriş gelince
+  başka bir alt menüye dönmez; alt menü gidince kapanır.
 - `CompactTopBar`'ın "⋮" menüsü `TopBarAction` listesidir, alt menü almaz; tablonun sütun menüsünü kit kurar.
 
 ### İş istasyonu (tablet ve DeX)

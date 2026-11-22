@@ -35,6 +35,9 @@
     alt menünün satırındadır. Sayfadaki bir eylem sayfayı kapatır, `checked` verilmiş öğe (anahtar) sayfasında kalır.
     `MoreSheet` ve `MoreButton` genişte aynı girişleri, alt menüsü yanında açılan bir menü olarak gösterir (kabuğun
     `moreActions`'ı yalnızca telefonun sayfasındadır).
+  - **Değişen girişler:** uygulama girişleri menü ya da sayfa açıkken yeniden kurabilir (bir onay işareti, değişen bir
+    liste). Açık alt menü ve sayfa alt menünün adıyla (adı değiştiyse yeriyle) yeniden bulunur: üstüne bir giriş
+    gelince başka bir alt menüye dönmez, alt menü gidince kapanır, Geri her zaman gösterilen sayfadan yukarı çıkar.
   - Örnek uygulama: menü çubuğunda Dosya ▸ Son açılanlar ve Görünüm ▸ Görünüş ▸ Tema / Arayüz yoğunluğu (ikinci
     düzeyin öğeleri çalışır); telefonda aynı "Görünüş" "⋯" sayfasında, sayfa sayfa.
 
