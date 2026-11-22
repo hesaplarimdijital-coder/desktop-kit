@@ -2,12 +2,23 @@ package desktopkit.components
 
 import android.graphics.Rect
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
@@ -43,6 +54,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.currentCompositionLocalContext
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -72,13 +84,16 @@ import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
@@ -107,9 +122,13 @@ import desktopkit.theme.rememberDeskHaptics
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-/** A titled group of actions for [MoreSheet] and menus ("Play", "Edit", "Share"); a null [title] draws a plain gap. */
+/**
+ * A titled group of actions for [MoreSheet] and menus ("Play", "Edit", "Share"); a null [title] draws a plain gap.
+ * The [actions] are items as a rule; a [MenuEntry.Submenu] among them opens a page of the sheet
+ * (a submenu of the menu), a [MenuEntry.Separator] draws a rule.
+ */
 @Immutable
-data class ActionGroup(val title: String?, val actions: List<MenuEntry.Item>)
+data class ActionGroup(val title: String?, val actions: List<MenuEntry>)
 
 /** The groups as one menu, separated by rules; empty groups are left out. */
 fun List<ActionGroup>.toMenuEntries(): List<MenuEntry> =
@@ -120,6 +139,10 @@ fun List<ActionGroup>.toMenuEntries(): List<MenuEntry> =
  * listing [groups] with their icons; on wider windows the same entries as a menu at [menuOffset]
  * from the caller's top-left corner. Every entry is reachable with the keyboard (Tab, arrows,
  * Enter); Esc, Back, a tap on the scrim or a swipe down close it.
+ *
+ * A [MenuEntry.Submenu] opens as a page of the same sheet on a phone, with the submenu's label for
+ * a title and a back button; Back and Esc go up one page before they close the sheet. In the menu
+ * it is a submenu beside its line.
  */
 @Composable
 fun MoreSheet(
@@ -131,9 +154,7 @@ fun MoreSheet(
     menuOffset: IntOffset = IntOffset.Zero,
 ) {
     if (currentWidthClass() == WidthClass.Compact) {
-        GlassBottomSheet(visible = visible, onDismiss = onDismiss, modifier = modifier, title = title) {
-            ActionGroupList(groups, onDismiss)
-        }
+        ActionSheet(visible = visible, onDismiss = onDismiss, groups = groups, modifier = modifier, title = title)
     } else {
         MenuPopup(visible = visible, onDismiss = onDismiss, entries = if (visible) groups.toMenuEntries() else emptyList(), offset = menuOffset)
     }
@@ -161,23 +182,290 @@ fun MoreButton(
     }
 }
 
-/** The rows of [MoreSheet]: group captions, then one row per action. */
+/**
+ * A glass bottom sheet of [groups]: the "⋯" sheet of [MoreSheet] and of the shell. A sheet without
+ * submenus is [GlassBottomSheet] with the list in it, as before. With submenus, the sheet turns
+ * pages: a submenu's line opens its entries as a page of the same sheet (to any depth), the sheet
+ * taking the page's height; the page's title is the submenu's label, with a back button before it.
+ */
 @Composable
-internal fun ActionGroupList(groups: List<ActionGroup>, onDismiss: () -> Unit) {
+internal fun ActionSheet(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    groups: List<ActionGroup>,
+    modifier: Modifier = Modifier,
+    title: String? = null,
+) {
+    val pages = remember { SheetPages() }
+    // a sheet opens on its first page
+    LaunchedEffect(visible) { if (visible) pages.reset() }
+    val held = remember { GroupsHolder(groups) }
+    if (visible) held.value = groups
+    val paged = held.value.any { group -> group.actions.any { it is MenuEntry.Submenu } }
+    // a sheet with pages goes on showing what it showed while it slides out: a caller that empties the groups as
+    // it closes (MoreButton) would otherwise take the page away from under the finger
+    val shown = if (paged) held.value else groups
+    val trail = resolveSheetPath(shown, pages.path)
+    val latestDismiss by rememberUpdatedState(onDismiss)
+    SheetLayer(
+        visible = visible,
+        onDismiss = onDismiss,
+        modifier = modifier,
+        label = trail.lastOrNull()?.label ?: title,
+        goBack = pages::back,
+    ) { pull ->
+        if (!paged) {
+            SheetTitle(title)
+            val scroll = rememberScrollState()
+            Column(Modifier.nestedScroll(pull).verticalScrollbar(scroll).verticalScroll(scroll)) {
+                ActionGroupList(shown, onDismiss)
+            }
+        } else {
+            ActionSheetPages(shown, trail, pages, title, pull) { latestDismiss() }
+        }
+    }
+}
+
+/** Plain holder for the groups a paged sheet shows while it slides out; not state. */
+private class GroupsHolder(var value: List<ActionGroup>)
+
+/**
+ * The pages of an action sheet: the way down through its submenus, as the place of each among the
+ * entries of the page it is on (on the first page: among all the actions, group after group, as
+ * [ActionGroupList] lists them). Places, not the submenus themselves: the app builds its entries
+ * anew whenever something changes (a switch on a page flips), and the page follows.
+ */
+@Stable
+internal class SheetPages {
+    var path by mutableStateOf(emptyList<Int>())
+        private set
+
+    /** The line of the page gone back to (its place there) that opened the page just left: it gets the keyboard focus back. */
+    var cameFrom: Int? = null
+        private set
+
+    private val scrolls = HashMap<Int, ScrollState>()
+
+    val depth: Int get() = path.size
+
+    /** Opens the submenu at [index] of the page that is up. */
+    fun open(index: Int) {
+        cameFrom = null
+        path = path + index
+    }
+
+    /** One page up; false on the first page, where there is nowhere to go. */
+    fun back(): Boolean {
+        if (path.isEmpty()) return false
+        // the page left starts at its top the next time; the one gone back to is where it was
+        scrolls.remove(path.size)
+        cameFrom = path.last()
+        path = path.dropLast(1)
+        return true
+    }
+
+    fun reset() {
+        cameFrom = null
+        scrolls.clear()
+        path = emptyList()
+    }
+
+    /** How far the page at [depth] is scrolled; kept while deeper pages are up. */
+    fun scrollOf(depth: Int): ScrollState = scrolls.getOrPut(depth) { ScrollState(0) }
+}
+
+/** The actions of [groups] as the first page lists them: the empty groups left out, group after group. */
+internal fun sheetEntries(groups: List<ActionGroup>): List<MenuEntry> = groups.filter { it.actions.isNotEmpty() }.flatMap { it.actions }
+
+/**
+ * The submenus [path] leads through, outermost first. It stops where the path no longer leads to a
+ * submenu that opens (the app's entries changed under it): the sheet then shows the last page that
+ * is still there.
+ */
+internal fun resolveSheetPath(groups: List<ActionGroup>, path: List<Int>): List<MenuEntry.Submenu> {
+    var entries = sheetEntries(groups)
+    val trail = ArrayList<MenuEntry.Submenu>(path.size)
+    for (index in path) {
+        val submenu = entries.getOrNull(index) as? MenuEntry.Submenu ?: break
+        if (!submenu.opens) break
+        trail += submenu
+        entries = submenu.entries
+    }
+    return trail
+}
+
+/** The shell's fade-through, between the pages of a sheet: the page left is gone before the next one shows. */
+private const val PAGE_OUT_MS = 90
+private const val PAGE_IN_MS = 210
+
+/**
+ * The page of a paged action sheet that is up, changing with a fade-through along the reading
+ * direction (a deeper page comes from the end side, going back from the start side) while the
+ * sheet takes the new page's height. Every page has its own scroll position; the one of a page gone
+ * back to is where it was left.
+ */
+@Composable
+private fun ActionSheetPages(
+    groups: List<ActionGroup>,
+    trail: List<MenuEntry.Submenu>,
+    pages: SheetPages,
+    title: String?,
+    pull: NestedScrollConnection,
+    onDismiss: () -> Unit,
+) {
+    val tier = LocalMotionTier.current
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val shift = with(LocalDensity.current) { DeskTheme.dimens.gapXl.roundToPx() }
+    // the page being left is no longer on the path while it fades out: what it showed is kept here
+    val known = remember { HashMap<Int, MenuEntry.Submenu>() }
+    trail.forEachIndexed { index, submenu -> known[index + 1] = submenu }
+    AnimatedContent(
+        targetState = trail.size,
+        transitionSpec = {
+            if (tier == MotionTier.Reduced) {
+                (EnterTransition.None togetherWith ExitTransition.None).using(SizeTransform { _, _ -> snap() })
+            } else {
+                val way = if ((targetState > initialState) != rtl) 1 else -1
+                val slide = DeskMotion.spatial(tier, tween<IntOffset>(PAGE_OUT_MS + PAGE_IN_MS, easing = DeskMotion.Emphasized), IntOffset.VisibilityThreshold)
+                val enter = fadeIn(tween(PAGE_IN_MS, delayMillis = PAGE_OUT_MS, easing = DeskMotion.EmphasizedDecelerate)) +
+                    slideInHorizontally(slide) { way * shift }
+                val exit = fadeOut(tween(PAGE_OUT_MS, easing = DeskMotion.EmphasizedAccelerate)) + slideOutHorizontally(slide) { -way * shift }
+                (enter togetherWith exit).using(
+                    SizeTransform { _, _ -> DeskMotion.spatial(tier, tween(DeskMotion.LONG_MS, easing = DeskMotion.Emphasized), IntSize.VisibilityThreshold) },
+                )
+            }
+        },
+        label = "sheetPage",
+    ) { depth ->
+        val submenu = if (depth == 0) null else trail.getOrNull(depth - 1) ?: known[depth]
+        val scroll = pages.scrollOf(depth)
+        // only the page that is up takes part: the one fading out no longer opens or closes anything
+        val current = depth == trail.size
+        Column {
+            if (submenu == null) {
+                SheetTitle(title)
+            } else {
+                SheetPageHeader(submenu.label, takeFocus = current && pages.cameFrom == null, onBack = { if (current) pages.back() })
+            }
+            Column(Modifier.nestedScroll(pull).verticalScrollbar(scroll).verticalScroll(scroll)) {
+                if (submenu == null) {
+                    ActionGroupList(groups, onDismiss, pages.takeIf { current })
+                } else {
+                    SheetEntryList(submenu.entries, start = 0, pages = pages.takeIf { current }, onDismiss = onDismiss)
+                }
+            }
+        }
+    }
+}
+
+/** The title of a sheet, above its list. */
+@Composable
+private fun SheetTitle(title: String?) {
+    if (title == null) return
     val dimens = DeskTheme.dimens
+    Text(title, style = DeskTheme.type.title, color = DeskTheme.colors.text, maxLines = 2, overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.padding(horizontal = dimens.gapL + 4.dp, vertical = dimens.gapS))
+}
+
+/**
+ * The head of a submenu's page: a back button (pointing the other way in a right-to-left layout)
+ * and the submenu's label. Opened going deeper, the button takes the keyboard focus ([takeFocus]).
+ */
+@Composable
+private fun SheetPageHeader(label: String, takeFocus: Boolean, onBack: () -> Unit) {
+    val dimens = DeskTheme.dimens
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    // the line that opened the page went with the page before: with a keyboard the focus goes on from the back button
+    val focus = remember { FocusRequester() }
+    if (takeFocus) LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    Row(Modifier.fillMaxWidth().padding(start = dimens.gapS, end = dimens.gapL + 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        DeskIconButton(DeskIcons.ArrowLeft, stringResource(R.string.dk_back), onBack,
+            modifier = Modifier.focusRequester(focus).then(if (rtl) Modifier.graphicsLayer { scaleX = -1f } else Modifier))
+        // the label starts where the lines' labels do
+        Spacer(Modifier.width(2.dp))
+        Text(label, style = DeskTheme.type.title, color = DeskTheme.colors.text, maxLines = 2, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f).padding(vertical = dimens.gapS).semantics { heading() })
+    }
+}
+
+/**
+ * The rows of [MoreSheet]: group captions, then one row per action. With [pages] (in an action
+ * sheet) a submenu's line opens its page; without them there is nowhere for it to open, and it is
+ * shown disabled.
+ */
+@Composable
+internal fun ActionGroupList(groups: List<ActionGroup>, onDismiss: () -> Unit, pages: SheetPages? = null) {
+    val dimens = DeskTheme.dimens
+    var start = 0
     groups.filter { it.actions.isNotEmpty() }.forEachIndexed { index, group ->
         if (group.title != null) {
             SectionCaption(group.title, Modifier.padding(start = dimens.gapL + 4.dp, top = if (index == 0) 0.dp else dimens.gapM, bottom = 4.dp))
         } else if (index > 0) {
             HorizontalRule(Modifier.padding(vertical = dimens.gapXs, horizontal = dimens.gapL))
         }
-        group.actions.forEach { action ->
-            SheetActionRow(action) {
+        SheetEntryList(group.actions, start, pages, onDismiss)
+        start += group.actions.size
+    }
+}
+
+/** The lines of one list of a sheet; [start] is the place of its first entry on the page (see [SheetPages]). */
+@Composable
+private fun SheetEntryList(entries: List<MenuEntry>, start: Int, pages: SheetPages?, onDismiss: () -> Unit) {
+    val dimens = DeskTheme.dimens
+    entries.forEachIndexed { offset, entry ->
+        when (entry) {
+            is MenuEntry.Item -> SheetActionRow(entry) {
                 // a switch stays in view while it flips; any other action closes the sheet
-                if (action.checked == null) onDismiss()
-                action.onClick()
+                if (entry.checked == null) onDismiss()
+                entry.onClick()
             }
+            is MenuEntry.Submenu -> SheetSubmenuRow(entry, place = start + offset, pages = pages)
+            MenuEntry.Separator -> HorizontalRule(Modifier.padding(vertical = dimens.gapXs, horizontal = dimens.gapL))
         }
+    }
+}
+
+/**
+ * A submenu in a sheet: a line like an action's with a chevron at its end, which opens the
+ * submenu's page. Coming back from that page with the keyboard, the line has the focus again.
+ */
+@Composable
+private fun SheetSubmenuRow(submenu: MenuEntry.Submenu, place: Int, pages: SheetPages?) {
+    val interaction = remember { MutableInteractionSource() }
+    val state = interaction.collectState()
+    val colors = DeskTheme.colors
+    val dimens = DeskTheme.dimens
+    val shape = RoundedCornerShape(dimens.radiusControl)
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val enabled = submenu.opens && pages != null
+    val content = if (enabled) colors.text else colors.textTertiary
+    val said = stringResource(R.string.dk_submenu)
+    val focus = remember { FocusRequester() }
+    if (pages != null && pages.cameFrom == place) LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = dimens.gapS)
+            .heightIn(min = dimens.rowHeight.coerceAtLeast(dimens.minTarget))
+            .focusRing(state, shape)
+            .background(animatedStateBackground(state).value, shape)
+            .focusRequester(focus)
+            .deskClickable(interaction, { pages?.open(place) }, enabled = enabled, onClickLabel = stringResource(R.string.dk_submenu_open))
+            .semantics { stateDescription = said }
+            .padding(horizontal = dimens.gapM),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // the icon column stays when a submenu has no icon, so the labels line up
+        Box(Modifier.size(dimens.iconLarge), contentAlignment = Alignment.Center) {
+            if (submenu.icon != null) Icon(submenu.icon, contentDescription = null, tint = if (enabled) colors.textSecondary else content,
+                modifier = Modifier.size(dimens.icon))
+        }
+        Spacer(Modifier.width(dimens.gapM))
+        Text(submenu.label, style = DeskTheme.type.body, color = content, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f))
+        Spacer(Modifier.width(dimens.gapM))
+        Icon(if (rtl) DeskIcons.ChevronLeft else DeskIcons.ChevronRight, contentDescription = null,
+            tint = if (enabled) colors.textSecondary else content, modifier = Modifier.size(dimens.icon))
     }
 }
 
@@ -263,6 +551,28 @@ fun GlassBottomSheet(
     title: String? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    SheetLayer(visible, onDismiss, modifier, label = title, goBack = { false }) { pull ->
+        SheetTitle(title)
+        val scroll = rememberScrollState()
+        Column(Modifier.nestedScroll(pull).verticalScrollbar(scroll).verticalScroll(scroll), content = content)
+    }
+}
+
+/**
+ * The sheet behind [GlassBottomSheet] and [ActionSheet]: the scrim, the glass surface with its
+ * handle, the way in and out, and [body] under the handle ([body] gets the connection that lets a
+ * list at its top pull the sheet down). [label] names the sheet for TalkBack. Back and Esc first ask
+ * [goBack] (a sheet with pages goes up one); when it has nowhere to go they close the sheet.
+ */
+@Composable
+private fun SheetLayer(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    modifier: Modifier,
+    label: String?,
+    goBack: () -> Boolean,
+    body: @Composable ColumnScope.(NestedScrollConnection) -> Unit,
+) {
     val tier = LocalMotionTier.current
     val way = remember { SheetWay() }
     val progress = way.progress
@@ -284,14 +594,16 @@ fun GlassBottomSheet(
     val showing = visible || progress.value > 0f || progress.isRunning
     if (!showing) return
     val latestDismiss by rememberUpdatedState(onDismiss)
+    val latestGoBack by rememberUpdatedState(goBack)
+    val back = remember { { if (!latestGoBack()) latestDismiss() } }
     val sheet: @Composable () -> Unit = {
-        SheetSurface(way, tier, title, modifier, { latestDismiss() }, content)
+        SheetSurface(way, tier, label, modifier, { latestDismiss() }, back, body)
     }
     val host = LocalShellOverlayHost.current
     if (host != null) {
-        OverlayLayer(host) { SheetSurface(way, tier, title, modifier, { latestDismiss() }, content, host.systemBottomPx) }
+        OverlayLayer(host) { SheetSurface(way, tier, label, modifier, { latestDismiss() }, back, body, host.systemBottomPx) }
         ReturnFocusOnClose(host, visible)
-        BackHandler(enabled = visible) { latestDismiss() }
+        BackHandler(enabled = visible) { back() }
         // one sheet at a time: opening this one closes the one that was up
         val token = remember { Any() }
         DisposableEffect(host, visible) {
@@ -307,7 +619,7 @@ fun GlassBottomSheet(
         }
         Popup(
             popupPositionProvider = remember(frameTop) { TopLeftPositionProvider(frameTop) },
-            onDismissRequest = { latestDismiss() },
+            onDismissRequest = back,
             properties = PopupProperties(focusable = true),
         ) { sheet() }
     }
@@ -367,10 +679,11 @@ internal fun OverlayLayer(host: ShellOverlayHost, content: @Composable () -> Uni
 private fun SheetSurface(
     way: SheetWay,
     tier: MotionTier,
-    title: String?,
+    name: String?,
     modifier: Modifier,
     onDismiss: () -> Unit,
-    content: @Composable ColumnScope.() -> Unit,
+    onBack: () -> Unit,
+    body: @Composable ColumnScope.(NestedScrollConnection) -> Unit,
     bottomInset: () -> Int = { 0 },
 ) {
     val progress = way.progress
@@ -381,7 +694,7 @@ private fun SheetSurface(
     var sheetHeight by remember { mutableIntStateOf(0) }
     val focus = remember { FocusRequester() }
     val shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
-    val label = title ?: stringResource(R.string.dk_more_options)
+    val label = name ?: stringResource(R.string.dk_more_options)
     val closeLabel = stringResource(R.string.dk_close_sheet)
     val haptics = rememberDeskHaptics()
     val latestDismiss by rememberUpdatedState(onDismiss)
@@ -433,7 +746,7 @@ private fun SheetSurface(
                 .semantics { paneTitle = label }
                 .onPreviewKeyEvent { event ->
                     val esc = event.key == Key.Escape && event.type == KeyEventType.KeyDown
-                    if (esc) onDismiss()
+                    if (esc) onBack()
                     esc
                 }
                 // the keyboard's focus stays in the sheet while it is up: Tab and Shift+Tab do not reach the screen behind.
@@ -480,12 +793,7 @@ private fun SheetSurface(
                     Box(Modifier.padding(top = 4.dp).size(width = 36.dp, height = 4.dp).background(colors.borderStrong, RoundedCornerShape(2.dp)))
                 }
             }
-            if (title != null) {
-                Text(title, style = DeskTheme.type.title, color = colors.text, maxLines = 2, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(horizontal = dimens.gapL + 4.dp, vertical = dimens.gapS))
-            }
-            val scroll = rememberScrollState()
-            Column(Modifier.nestedScroll(pull).verticalScrollbar(scroll).verticalScroll(scroll), content = content)
+            body(pull)
         }
     }
 }
