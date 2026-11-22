@@ -92,4 +92,8 @@
     <string name="dk_close_sheet">Sayfayı kapat</string>
     <string name="dk_token_invalid">Geçersiz</string>
     <string name="dk_token_remove">Kaldır</string>
+
+    <!-- Submenus -->
+    <string name="dk_submenu">Alt menü</string>
+    <string name="dk_submenu_open">Alt menüyü aç</string>
 </resources>
