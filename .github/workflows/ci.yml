@@ -17,6 +17,18 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # Robolectric's two large jars. Maven Central answers GitHub's runners HTTP 429 for them at
+  # random, so they come from this workflow's cache or from Google's mirror of Central (checked
+  # against Central's SHA-1), never from Central. The versions follow the build; when it changes,
+  # change them here (a failed test run names the version it wanted):
+  # - nativeruntime-dist-compat: a dependency of Robolectric, whose version is in
+  #   gradle/libs.versions.toml (4.17);
+  # - android-all-instrumented: the Android the tests run on (sdk=36 in
+  #   kit/src/test/resources/robolectric.properties), as Robolectric 4.17 builds it (i7).
+  ROBOLECTRIC_NATIVERUNTIME: '1.0.19'
+  ROBOLECTRIC_ANDROID_ALL: '16-robolectric-13921718-i7'
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -33,6 +45,74 @@ jobs:
           java-version: '21'
 
       - uses: gradle/actions/setup-gradle@v4
+
+      - name: Robolectric's jars from the cache
+        id: robolectric-jars
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-nativeruntime-${{ env.ROBOLECTRIC_NATIVERUNTIME }}-android-all-${{ env.ROBOLECTRIC_ANDROID_ALL }}
+
+      - name: Robolectric's jars from the mirror
+        env:
+          CACHE_HIT: ${{ steps.robolectric-jars.outputs.cache-hit }}
+        run: |
+          set -euo pipefail
+          repo="$HOME/.m2/repository"
+          if [ "$CACHE_HIT" = true ]; then
+            echo "Restored from this workflow's cache:"
+            find "$repo/org/robolectric" -type f -printf '  %p (%s bytes)\n'
+            exit 0
+          fi
+          mirror=https://maven-central.storage-download.googleapis.com/maven2
+          central=https://repo1.maven.org/maven2
+          fetch() { curl -fsSL --retry 6 --retry-delay 10 --retry-all-errors "$@"; }
+          for module in "nativeruntime-dist-compat:$ROBOLECTRIC_NATIVERUNTIME" "android-all-instrumented:$ROBOLECTRIC_ANDROID_ALL"; do
+            artifact=${module%%:*}
+            version=${module#*:}
+            dir="org/robolectric/$artifact/$version"
+            mkdir -p "$repo/$dir"
+            for ext in pom jar; do
+              name="$artifact-$version.$ext"
+              # Central serves small files; its checksum is the one to trust
+              if sum=$(fetch "$central/$dir/$name.sha1"); then
+                from="Maven Central's SHA-1"
+              else
+                sum=$(fetch "$mirror/$dir/$name.sha1")
+                from="the mirror's SHA-1 (Central refused its .sha1)"
+                echo "::warning title=Robolectric jars::Maven Central refused $name.sha1; $name is checked against the mirror's"
+              fi
+              expected=$(printf '%s' "$sum" | awk '{print $1}')
+              fetch -o "$RUNNER_TEMP/$name" "$mirror/$dir/$name"
+              actual=$(sha1sum "$RUNNER_TEMP/$name" | awk '{print $1}')
+              if [ "$actual" != "$expected" ]; then
+                echo "::error title=Robolectric jars::$name from the mirror has SHA-1 $actual; $from is $expected"
+                exit 1
+              fi
+              mv "$RUNNER_TEMP/$name" "$repo/$dir/$name"
+              echo "$name: from Google's mirror of Maven Central, $(stat -c %s "$repo/$dir/$name") bytes, SHA-1 $actual = $from"
+            done
+          done
+
+      # Gradle takes nativeruntime-dist-compat (that module only) from ~/.m2; Robolectric finds
+      # android-all there by itself
+      - name: Gradle takes Robolectric's native runtime from ~/.m2
+        run: |
+          mkdir -p ~/.gradle/init.d
+          cat > ~/.gradle/init.d/robolectric-local.init.gradle.kts <<'EOF'
+          // Written by CI: Robolectric's native runtime jar comes from the local Maven repository,
+          // where the workflow put a copy checked against Maven Central's SHA-1. Nothing else comes
+          // from there through this script.
+          beforeSettings {
+              dependencyResolutionManagement {
+                  repositories {
+                      mavenLocal {
+                          content { includeModule("org.robolectric", "nativeruntime-dist-compat") }
+                      }
+                  }
+              }
+          }
+          EOF
 
       # the design standard's mechanical checks: no new raw colours, platform toasts, dead buttons, endless
       # motion, off-scale sizes or shouting strings (tools/design_check.py; known ones are in its baseline)
