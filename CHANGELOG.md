@@ -1,5 +1,80 @@
 # Değişiklikler
 
+## 2.10.0 (2026-11-23)
+
+Kitin kod düzenleyicisi: `CodeEditor`. İlk kullanıcısı Inky'nin Android uyarlaması (ink betikleri: uzun düzyazı
+paragrafları ve aralarında işaretler); dil uygulamanındır, kit düzenleyiciyi, görünüşünü ve davranışını verir. Var olan
+bileşenlerin görünüşü, zamanlaması ve API'si değişmedi; ekran görüntülerinin hepsi aynı. Geçiş için bir şey gerekmez
+([MIGRATION.md](MIGRATION.md#290dan-2100a)).
+
+### Kod düzenleyici
+
+- **`CodeEditor` ve belgesi `CodeEditorState`.** Belge uygulamanındır, her açık dosya için bir tane: metin, seçim,
+  kaydırma yeri ve geri alma geçmişi onunla durur, başka belgeyi göstermek düzenleyiciye başka durum vermektir.
+  `version` metnin değiştiğini kopyalamadan söyler; satır ↔ konum çevirileri; geçmişe giren düzenlemeler (`insert`,
+  `replace`, `replaceSelection`, tek adım için `edit { }`), diskten yeniden okunan belge için `setText`, `undo` ve
+  `redo`, `reveal` ve `revealLine` (isteğe bağlı seçip odaklayarak), `firstVisibleLine` ve `scrollToLine` (süreç
+  durduktan sonra yer geri gelir; pencere daralıp genişleyince, yazı büyüyünce en üstteki satır yerinde kalır).
+  Ekran klavyesi bir sözcük yazarken gelen düzenleme önce sözcüğü bitirir: hiçbir şey kaybolmaz.
+- **Çekirdek platformun `EditText`'i.** Ölçüldü: 5.000 satırlık, 337.000 karakterlik belgenin ortasına bir harf
+  yazmak Compose'un `BasicTextField`'ında her tuşta bütün metni yeniden yerleştiriyordu (~600 ms, sözdizimi renkleriyle
+  5 s); `EditText` yalnız düzenlenen paragrafı yerleştirir. Yazmanın kendisi (giriş yöntemi, otomatik düzeltme,
+  tutamaçlar, büyüteç, pano, donanım tuşları, TalkBack) platformun; herkese açık API Compose'dur. 5.000 satırda bir tuşun
+  düzenleyicideki işi 50 satırdakiyle aynı (bu makinede 3–8 ms; `CodeEditorSizeTest`, `DocumentSizeTest`).
+- **Sözdizimi renkleri.** Uygulamanın `LineTokenizer`'ı satırı, önceki satırın bitiş durumuyla jetonlar; jeton renk
+  değil rol taşır (`SyntaxRole`: yorum, anahtar sözcük, dize, sayı, sabit, ad, işlev, tür, işleç, noktalama, etiket,
+  bağlantı, başlık, vurgu, koyu, yönerge, geçersiz). Düzenleyici satırları saklar; bir düzenlemeden sonra değişen
+  satırdan durum eskisini tutana kadar, en çok görünen yer ve 40 satır daha, aynı geçişte yeniden jetonlar; gerisi
+  çerçeveler arasında 4 ms'lik dilimlerle biter. Hiçbir karede yeni metin eski renkle görünmez. Durumu her sonraki
+  satırı değiştiren bir düzenleme (ink'te seçenek satırı) tuş başına yalnız görünen yere kadar öder.
+- **Tema.** `DeskTheme.syntax` (`DeskSyntax`): her role bir renk ve isteğe bağlı kalın ya da eğik; temanın renklerinden
+  yapılır (griler, metin rengi, vurgu ve dört sakin ton). Her rol açık, koyu ve OLED temada, hazır ve zorlayıcı özel
+  vurgularla sayfada ve geçerli satırda 4,5:1 (`SyntaxContrastTest`). Bir rolü değiştirmek için
+  `DesktopKitRoot(prefs, syntax = { it.with(SyntaxRole.Tag, …) })`. Yeni yazı stili `DeskType.code`: mono, gövde
+  boyunda, 1,5 satır aralığı.
+- **Kenar, işaretler, süslemeler.** Satır numaraları (sarılmış satırda ilk sırada, basamak kadar geniş), uygulamanın
+  işaretleri (`LineMarker`: hata, uyarı, not; kitin simgeleri, satırda ince ton, fareyle ve dokununca ileti, TalkBack'e
+  "7. satırda hata: …", tıklanınca uygulamaya haber), geçerli satır, imlecin yanındaki parantezin eşi (yorum ve dize
+  içindekiler sayılmaz), süslemeler (`CodeDecoration`: arka plan, alt çizgi, tüm satır).
+- **Bağlantılar, menü, tuşlar.** Ctrl ya da Alt basılıyken bağlantının altı çizilir ve imleç el olur, tıklamak
+  uygulamaya konumu söyler (`CodeLinks`, `onLinkClick`). Sağ tık, iki parmak dokunma, Menü tuşu ve Shift+F10 kitin
+  menüsünü açar: Geri al, Yinele, Kes, Kopyala, Yapıştır, Tümünü seç ve uygulamanın tıklanan yer için girişleri;
+  dokunmatikte platformun seçim araç çubuğu (tutamaçlar ve büyüteç onundur) aynı girişleri taşır. Tab girintiler
+  (çok satırlı seçimde satırları), Shift+Tab geri alır, Enter girintiyi korur; Tab yazdığı için düzenleyiciden Esc ve
+  ardından Tab ile çıkılır. Yapıştırılan metin biçimsiz gelir. `onPreviewKeyEvent` uygulamaya tuşu önce verir.
+- **Bul ve değiştir.** `CodeSearchState` ve `CodeSearchBar`: büyük/küçük harf, tam sözcük, düzenli ifade (Alt+C, W,
+  R), "3 / 17", önceki ve sonraki (Enter, Shift+Enter, F3, Shift+F3), değiştir ve tek geri alma adımı olarak tümünü
+  değiştir, geçersiz ifade uyarısı; düzenleyicide Ctrl+F (seçim aranan olur), Ctrl+H, Esc. Arama ana iş parçacığının
+  dışında çalışır ve yeni bir sorgu ya da düzenleme onu keser; eşleşmeler düzenlemeyle birlikte hemen kayar. Telefonda
+  seçenekler ve değiştirme düğmeleri kendi satırlarında.
+- **Tamamlama.** Uygulamanın `CodeCompleter`'ı imlecin yerine uyan öğeleri verir; düzenleyici onları sözcük yazılırken
+  (`liveCompletion`), Ctrl+Space'te ya da `showCompletion()`'da imlecin altında bir listede gösterir, yazdıkça komut
+  paletinin eşleşmesiyle daraltır; ↑/↓, Enter ya da Tab, Esc, dokunuş. Liste düzenleyicinin içinde, ekran klavyesinin
+  üstünde kalır ve odağı metinden almaz.
+- **Satır komutları.** `moveLinesUp`, `moveLinesDown`, `duplicateLines`, `deleteLines`, `toggleLineComment`,
+  `selectLines`, `goToLine`, `indentSelection`, `outdentSelection`: uygulama bunları kendi kısayollarına ve menülerine
+  bağlar; kit tuş bağlamaz, `CommonShortcuts` ile çakışmaz.
+- **Yakınlaştırma.** `CodeEditorZoom`, `rememberCodeEditorZoom(prefs, key)`: Ctrl ile tekerlek, kıstırma, Ctrl ile
+  + − 0 ve TalkBack'in "Yazıyı büyüt / küçült" eylemleri; seçim `DeskPreferences`'ta saklanır
+  (`editorTextScale(key)`). Düzenleyici olmayan bir metin aynı hareketleri `Modifier.textZoom(zoom)`, boyunu
+  `TextStyle.zoomed(zoom)` ile alır.
+- **Telefonda.** `contentPadding = rememberShellContentPadding()` ile metin cam çubukların altından geçer; düzenleyiciye
+  dokunmak ya da metnini kaydırmak ekran klavyesini kapatmaz, imleçli satır klavyenin üstünde kalır. Parmakla kaydırmak
+  imleci yerinden oynatmaz.
+- **Simgeler.** `DeskIcons.MatchCase`, `WholeWord`, `Regex`.
+- **Örnek uygulama.** "Editor" sayfası: uydurma bir hikâye dili, renkleri, bir "derleyicinin" kenardaki bulguları,
+  bağlantılar, tamamlama, arama, yakınlaştırma ve satır komutları; CI'ın örnek APK'sında telefonda ve tablette
+  denenebilir.
+
+### Testler
+
+JVM'de: satır dizini, jeton önbelleği (rastgele düzenlemelerden sonra sıfırdan jetonlamayla aynı, tuş başına bir satır,
+durumu değiştiren düzenleme görünene kadar ve dilimlerle), geçmiş, arama ve değiştirme, satır komutları, ölçüler.
+Robolectric'te: giriş yöntemiyle yazma ve sözcük oluşturma, sözcük yazılırken uygulamanın düzenlemesi, tuşlar,
+fare ve parmak, belge değiştirme, renklerin metinle aynı geçişte gelmesi, işaretler, bağlantılar, menü, kaydırma yeri,
+yakınlaştırma, arama çubuğu, tamamlama listesi, odak (Esc ve Tab), sarılmış satırın kenarı geçmemesi; açık, koyu ve
+OLED temada, fare ve parmakla, geniş pencerede ve telefonda 11 ekran görüntüsü.
+
 ## 2.9.0 (2026-11-13)
 
 ### Yeni

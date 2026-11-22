@@ -468,3 +468,15 @@ ekran onu çağırırsa alt gezinme çubuğu o sürece görünmez ve kaydırınc
 uzar. Böyle bir formu kabuğun içinde açan uygulama formun içinde (ya da formu saran sayfada) çağırır; formun alt
 boşluğu `rememberShellContentPadding()`'den geliyorsa ayrıca bir şey yapmaz, boşluk çubuğu artık saymaz. Formu
 kabuğun dışında (kendi penceresinde) açan uygulamayı ilgilendirmez. Tablette ve DeX'te hiçbir şey değişmez.
+
+## 2.9.0'dan 2.10.0'a
+
+Kod değişmeden derlenir; sürümü `2.10.0` yapmak yeter. Yeni olan kod düzenleyici (`CodeEditor`, `CodeEditorState`,
+`CodeSearchBar`, `CodeCompleter`, `CodeEditorZoom`; README'de "Kod düzenleyici") ve onun teması (`DeskTheme.syntax`,
+`DeskType.code`). Kendi düzenleyicisini (bir `BasicTextField` ya da `EditText` üstünde) yazmış bir uygulama onu kitinkiyle
+değiştirebilir; uzun belgelerde yazmak hızlanır, renkler, işaretler ve arama kitin görünüşünü alır.
+
+- `DeskType` veri sınıfına sona, varsayılanlı bir alan eklendi (`code`). Kendi `DeskType(…)`'ini kuran ya da `copy`
+  çağıran kod değişmeden derlenir; `code` verilmezse mono yazıdan ve gövde boyundan yapılır. `DeskType.forMode(…).copy(body
+  = …)` ile gövdeyi büyüten bir uygulama düzenleyicinin yazısını da büyütmek isterse `code`'u da verir.
+- `DesktopKitRoot` ve `DesktopKitTheme` sona (içerikten önce) `syntax` kancasını aldı; konumla çağıran kod etkilenmez.
