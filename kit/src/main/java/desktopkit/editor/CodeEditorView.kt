@@ -1430,15 +1430,23 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
         saveAnchor()
     }
 
-    /** The cursor's place in the view, for what floats beside it (the completion list): left, top, bottom. */
-    fun cursorAnchor(out: IntArray): Boolean {
-        val layout = layout ?: return false
+    /** The cursor's place in the view, for what floats beside it (the completion list): its left edge, its line's top and bottom. */
+    fun cursorAnchor(): IntArray {
+        val layout = layout ?: return IntArray(3)
         val offset = selectionEnd.coerceIn(0, length())
         val row = layout.getLineForOffset(offset)
-        out[0] = (compoundPaddingLeft + layout.getPrimaryHorizontal(offset) - scrollX).roundToInt()
-        out[1] = layout.getLineTop(row) - scrollY
-        out[2] = layout.getLineBottom(row) - scrollY
-        return true
+        return intArrayOf(
+            (compoundPaddingLeft + layout.getPrimaryHorizontal(offset) - scrollX).roundToInt(),
+            layout.getLineTop(row) - scrollY,
+            layout.getLineBottom(row) - scrollY,
+        )
+    }
+
+    /** Ctrl+Space or the app ([CodeEditorState.showCompletion]): the completion list is asked for. */
+    var onShowCompletion: (() -> Unit)? = null
+
+    override fun showCompletion() {
+        onShowCompletion?.invoke()
     }
 
     /** How far the text has scrolled, how long it is and how much of it shows, for the scrollbar. */

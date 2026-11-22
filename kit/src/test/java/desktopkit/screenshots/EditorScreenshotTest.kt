@@ -16,9 +16,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import desktopkit.TestShell
+import desktopkit.components.DeskIcons
 import desktopkit.editor.CodeDecoration
 import desktopkit.editor.CodeEditor
+import desktopkit.editor.CodeCompleter
+import desktopkit.editor.CodeCompletionItem
+import desktopkit.editor.CodeCompletions
 import desktopkit.editor.CodeEditorState
+import desktopkit.editor.inputConnection
 import desktopkit.editor.CodeSearchBar
 import desktopkit.editor.CodeSearchState
 import desktopkit.editor.DecorationKind
@@ -178,6 +183,40 @@ class EditorScreenshotTest {
     fun searchPhoneLight() = capture("editor-search-phone-light", ThemeMode.Light, InputMode.Touch, ::findCay,
         ready = { search.matchCount > 0 }) { state ->
         TestShell(WidthClass.Compact, content = { _, _ -> SearchedEditor(state, rememberShellContentPadding()) })
+    }
+
+    /** The sample language's sections and words, for the word at the cursor. */
+    private val completer = CodeCompleter { state, cursor ->
+        var start = cursor
+        while (start > 0 && (state.textIn(start - 1, start)[0].isLetterOrDigit() || state.textIn(start - 1, start) == "_")) start--
+        CodeCompletions(start, cursor, listOf(
+            CodeCompletionItem("bahce", "bölüm", DeskIcons.Folder),
+            CodeCompletionItem("cay_soyle", "bölüm", DeskIcons.Folder),
+            CodeCompletionItem("sahil", "bölüm", DeskIcons.Folder),
+            CodeCompletionItem("CONST", "sözcük", DeskIcons.Command),
+            CodeCompletionItem("END", "sözcük", DeskIcons.Command),
+        ))
+    }
+
+    /** "-> s" typed at the end of line 8: the list under the cursor, narrowed to what has an "s". */
+    private fun typeJump(state: CodeEditorState) {
+        val view = compose.editorView()
+        state.select(state.lineEnd(7))
+        view.inputConnection().commitText(" -> ", 1)
+        view.inputConnection().commitText("s", 1)
+    }
+
+    @Test @Config(qualifiers = "tr-w1000dp-h640dp-mdpi")
+    fun completionDarkPointer() = capture("editor-completion-dark-pointer", ThemeMode.Dark, InputMode.Pointer, ::typeJump) {
+        CodeEditor(it, Modifier.fillMaxSize(), tokenizer = sampleTokenizer, markers = markers, completer = completer)
+    }
+
+    @Test @Config(qualifiers = "tr-w411dp-h891dp-hdpi")
+    fun completionPhoneLight() = capture("editor-completion-phone-light", ThemeMode.Light, InputMode.Touch, ::typeJump) { state ->
+        TestShell(WidthClass.Compact, content = { _, _ ->
+            CodeEditor(state, Modifier.fillMaxSize(), tokenizer = sampleTokenizer, markers = markers, completer = completer,
+                contentPadding = rememberShellContentPadding())
+        })
     }
 }
 

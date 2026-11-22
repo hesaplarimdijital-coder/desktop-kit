@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalFontFamilyResolver
@@ -39,6 +40,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Popup
@@ -93,6 +95,11 @@ import kotlin.math.roundToInt
  *
  * [onPreviewKeyEvent] sees a hardware key before the editor does and takes it by returning true.
  *
+ * With a [completer] the editor offers completions in a list at the cursor: while a word is typed (unless
+ * [liveCompletion] is off) and on Ctrl+Space or [CodeEditorState.showCompletion]. The list narrows as the typing
+ * goes on; Up and Down move in it, Enter or Tab chooses (one undo step), Esc closes it, a tap or a click
+ * chooses on touch and with a mouse.
+ *
  * With a [search] the editor searches its document and marks the matches while the search is open (see
  * [CodeSearchBar]); Ctrl+F opens it with the selection as the query, Ctrl+H with the replace row, F3 and
  * Shift+F3 step through the matches, Esc closes it.
@@ -135,6 +142,8 @@ fun CodeEditor(
     label: String? = null,
     onPreviewKeyEvent: ((KeyEvent) -> Boolean)? = null,
     search: CodeSearchState? = null,
+    completer: CodeCompleter? = null,
+    liveCompletion: Boolean = true,
 ) {
     val colors = DeskTheme.colors
     val syntax = DeskTheme.syntax
@@ -212,6 +221,11 @@ fun CodeEditor(
     val currentZoom by rememberUpdatedState(zoom)
     val currentKeyHook by rememberUpdatedState(onPreviewKeyEvent)
     val currentSearch by rememberUpdatedState(search)
+    val currentState by rememberUpdatedState(state)
+    val currentCompleter by rememberUpdatedState(completer)
+    val currentLiveCompletion by rememberUpdatedState(liveCompletion)
+    val completion = remember { CompletionSession() }
+    var boxSize by remember { mutableStateOf(IntSize.Zero) }
     val editorLabel = label ?: stringResource(R.string.dk_editor)
     val zoomLabels = if (zoom == null) null else stringResource(R.string.dk_editor_larger) to stringResource(R.string.dk_editor_smaller)
 
@@ -239,6 +253,7 @@ fun CodeEditor(
             .background(syntax.background)
             .clipToBounds()
             .onGloballyPositioned { field.coordinates = it }
+            .onSizeChanged { boxSize = it }
             .scrollbar(editor.scrollbar),
     ) {
         AndroidView(
@@ -246,8 +261,37 @@ fun CodeEditor(
                 CodeEditorView(context).also { view ->
                     editor.view = view
                     view.onMarkersShown = { shownMarkers = it }
-                    view.onViewportChanged = { editor.viewportChanged() }
-                    view.onFocusChange = { focused -> field.focused = focused }
+                    view.onViewportChanged = {
+                        editor.viewportChanged()
+                        if (completion.isOpen) completion.anchor = view.cursorAnchor()
+                    }
+                    view.onFocusChange = { focused ->
+                        field.focused = focused
+                        if (!focused) completion.close()
+                    }
+                    view.onCursorActivity = { typed ->
+                        val completer = currentCompleter
+                        val document = currentState
+                        val cursor = view.selectionEnd
+                        val collapsed = view.selectionStart == cursor
+                        if (completer == null || document.lines.length != view.length()) {
+                            completion.close()
+                        } else {
+                            if (completion.isOpen) completion.refilter(document, cursor, collapsed)
+                            // typing a word opens the list (live completion)
+                            if (!completion.isOpen && typed && collapsed && currentLiveCompletion && view.hasFocus()) {
+                                completion.request(document, completer, cursor, typed = true)
+                            }
+                        }
+                        if (completion.isOpen) completion.anchor = view.cursorAnchor()
+                    }
+                    view.onShowCompletion = {
+                        val completer = currentCompleter
+                        if (completer != null && view.selectionStart == view.selectionEnd) {
+                            completion.request(currentState, completer, view.selectionEnd, typed = false)
+                            if (completion.isOpen) completion.anchor = view.cursorAnchor()
+                        }
+                    }
                     view.onLeave = { forward -> focusManager.moveFocus(if (forward) FocusDirection.Next else FocusDirection.Previous) }
                     view.onContextMenu = { x, y, offset ->
                         menuOffset = offset
@@ -272,7 +316,12 @@ fun CodeEditor(
                             }
                         }
                     }
-                    view.keyInterceptor = { event -> currentSearch?.let { searchKey(it, event) } == true }
+                    view.keyInterceptor = { event ->
+                        completion.key(currentState, event) ||
+                            (event.keyCode == android.view.KeyEvent.KEYCODE_SPACE && (event.isCtrlPressed || event.isMetaPressed) &&
+                                !event.isAltPressed && currentCompleter != null && run { view.onShowCompletion?.invoke(); true }) ||
+                            currentSearch?.let { searchKey(it, event) } == true
+                    }
                     view.selectionActions = {
                         currentContextMenu?.invoke(view.selectionEnd.coerceAtLeast(0)).orEmpty()
                             .filterIsInstance<MenuEntry.Item>().filter { it.enabled }.map { SelectionAction(it.label, it.onClick) }
@@ -333,6 +382,8 @@ fun CodeEditor(
                 }
             }
         }
+
+        CompletionList(completion, boxSize.width, boxSize.height) { index -> completion.accept(state, index) }
 
         // a new pop-up for every opening, as ContextMenuArea does
         key(menu.generation) {

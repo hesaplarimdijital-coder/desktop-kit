@@ -412,6 +412,14 @@ class CodeEditorState(initialText: String = "") {
         if (line != firstVisibleLineState) firstVisibleLineState = line
     }
 
+    /**
+     * Opens the editor's completion list at the cursor, as Ctrl+Space does (for an app's menu entry or its own
+     * key): when an editor shows this document and has a [CodeCompleter] with something to offer.
+     */
+    fun showCompletion() {
+        host?.showCompletion()
+    }
+
     /** Gives the editor the keyboard focus (and opens the on-screen keyboard when there is no other). */
     fun requestFocus() {
         val host = host
@@ -518,6 +526,9 @@ internal interface EditorHost {
 
     /** Several edits follow ([begin]) or are over: the editor lays out and tells the keyboard once. */
     fun batch(begin: Boolean)
+
+    /** Opens the completion list at the cursor. */
+    fun showCompletion()
 }
 
 /**
