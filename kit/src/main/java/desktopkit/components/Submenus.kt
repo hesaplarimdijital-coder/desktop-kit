@@ -4,6 +4,8 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
 import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -36,6 +38,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -64,7 +67,6 @@ import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import desktopkit.R
 import desktopkit.theme.DeskTheme
-import desktopkit.theme.InputMode
 import kotlinx.coroutines.delay
 
 // Submenus of the kit's menus: a line of a menu that opens another menu beside it, to any depth.
@@ -380,6 +382,16 @@ internal fun Modifier.submenuLine(level: MenuLevel, index: Int, menu: PlacedMenu
     }
 
 /**
+ * Whether the press behind a line's next click is a finger's or a pen's (true) or a mouse's (false).
+ * Such a click toggles the submenu, as a finger has no other way to close it. A mouse's click, a
+ * key's and TalkBack's always open it: a click never closes what the resting pointer has just
+ * opened. What pressed decides, not the density, as in [DenseTable]'s selection.
+ */
+private class LinePress {
+    var finger = false
+}
+
+/**
  * A line that opens a submenu: the label, the icon and a chevron at the end (pointing the other way
  * in a right-to-left layout). It stays lit while its submenu is open. TalkBack hears "submenu" and
  * whether it is expanded, and can expand and collapse it.
@@ -391,7 +403,7 @@ internal fun SubmenuRow(submenu: MenuEntry.Submenu, index: Int, level: MenuLevel
     val colors = DeskTheme.colors
     val dimens = DeskTheme.dimens
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-    val touch = DeskTheme.inputMode == InputMode.Touch
+    val press = remember { LinePress() }
     val enabled = submenu.opens
     val open = level.openIndex == index
     val content = if (enabled) colors.text else colors.textTertiary
@@ -403,6 +415,17 @@ internal fun SubmenuRow(submenu: MenuEntry.Submenu, index: Int, level: MenuLevel
         state = state,
         background = if (enabled) animatedStateBackground(state.copy(hovered = state.hovered || open)).value else Color.Transparent,
         behaviour = Modifier
+            // what pressed the line, seen before the click its release makes; forgotten once that click is done
+            .pointerInput(press) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                    press.finger = down.type != PointerType.Mouse
+                    do {
+                        val event = awaitPointerEvent(PointerEventPass.Final)
+                    } while (event.changes.any { it.pressed })
+                    press.finger = false
+                }
+            }
             .onKeyEvent { event ->
                 val opens = enabled && event.type == KeyEventType.KeyDown &&
                     submenuKey(event.key, rtl, onSubmenuLine = true, inSubmenu = false) == SubmenuKey.Open
@@ -411,10 +434,7 @@ internal fun SubmenuRow(submenu: MenuEntry.Submenu, index: Int, level: MenuLevel
             }
             .deskClickable(
                 interaction,
-                onClick = {
-                    // a click never closes what the resting pointer has just opened; a finger has no other way to close it
-                    if (open && touch) level.close(index) else level.open(index, focus = true)
-                },
+                onClick = { if (open && press.finger) level.close(index) else level.open(index, focus = true) },
                 enabled = enabled,
                 onClickLabel = openLabel,
             )

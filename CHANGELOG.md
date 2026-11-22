@@ -20,7 +20,9 @@
     devralır (açık alt menü kapanır, satırın kendi alt menüsü varsa açılır). Alt menüye doğru çapraz giderken
     geçilen satırlar onu kapatmaz: bekleme her yeni satırda ve alt menüye doğru her harekette yeniden başlar
     (masaüstü menülerinin "güvenli üçgeni"). İmleç menüden çıkınca açık alt menü yerinde kalır.
-  - **Dokunma:** satıra dokunmak açar, aynı satıra yeniden dokunmak kapatır.
+  - **Dokunma:** satıra dokunmak açar, aynı satıra yeniden dokunmak kapatır. Bunu yoğunluk değil basan belirler
+    (tablodaki seçim gibi): parmak ve kalem her yoğunlukta böyle; fare tıklaması, Enter ve TalkBack her zaman açar,
+    dokunmatik yoğunluk sabitlenmişken de imlecin açtığını tıklama kapatmaz.
   - **Klavye:** → (sağdan sola düzende ←) ya da Enter açar ve odağı ilk etkin satıra verir; ← (ya da →), Esc ve
     Geri bir düzey kapatır, odak açan satıra döner; ↑/↓ bulundukları menüde kalır. Bir öğeyi seçmek ya da menülerin
     dışına basmak bütün zinciri kapatır; ilk menüde Esc eskisi gibi menüyü kapatır.

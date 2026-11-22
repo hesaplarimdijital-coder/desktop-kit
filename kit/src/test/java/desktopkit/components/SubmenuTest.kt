@@ -321,6 +321,42 @@ class SubmenuTest {
         assertTrue(compose.onNodeWithText("Yorum").fetchSemanticsNode().size.height >= 48)
     }
 
+    /**
+     * What closes a submenu is the press, not the density: with Touch sizes pinned in the settings (DeskPreferences)
+     * and a mouse, a click on the line the resting pointer has just opened keeps it open, as with Pointer sizes.
+     */
+    @Test
+    fun withTouchSizesAMouseClickKeepsOpenWhatTheRestingPointerOpened() {
+        menu(inputMode = InputMode.Touch)
+        compose.mainClock.autoAdvance = false
+        rest("Son açılanlar")
+        advance(SUBMENU_HOVER_MS + 100)
+        shown("a.ink")
+        click(line("Son açılanlar", 0).center)
+        advance(16)
+        val line = compose.onNodeWithText("Son açılanlar").fetchSemanticsNode().config
+        assertNotNull("still expanded right after the click", line.getOrNull(SemanticsActions.Collapse))
+        advance(300)
+        shown("a.ink")
+        // nor does a click without a press (TalkBack's, a key's) close it
+        compose.onNodeWithText("Son açılanlar").performSemanticsAction(SemanticsActions.OnClick)
+        advance(300)
+        shown("a.ink")
+        assertTrue(open)
+    }
+
+    @Test
+    fun withPointerSizesAFingersSecondTapClosesIt() {
+        menu(inputMode = InputMode.Pointer)
+        compose.onNodeWithText("Son açılanlar").performClick()
+        compose.waitForIdle()
+        shown("a.ink")
+        compose.onNodeWithText("Son açılanlar").performClick()
+        compose.waitForIdle()
+        gone("a.ink")
+        assertTrue("only the submenu closed", open)
+    }
+
     // ---------------------------------------------------------------- keyboard
 
     @Test
