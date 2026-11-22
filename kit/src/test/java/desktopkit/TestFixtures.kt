@@ -397,7 +397,7 @@ fun sampleSnippetEntries(onChoose: (String) -> Unit = {}): List<MenuEntry> {
             MenuEntry.Submenu("Yönlendirme", listOf(item("Düğüme yönlendir"), item("Tünel"), item("İplik"))),
             item("Bitiş"),
         )),
-        MenuEntry.Submenu("Seçenekler", icon = DeskIcons.Check, entries = listOf(item("Tek kullanımlık seçenek"), item("Yapışkan seçenek"))),
+        MenuEntry.Submenu("Seçenekler", icon = DeskIcons.Queue, entries = listOf(item("Tek kullanımlık seçenek"), item("Yapışkan seçenek"))),
         MenuEntry.Submenu("Değişkenler", icon = DeskIcons.Effects, entries = listOf(item("Genel değişken"), item("Geçici değişken"))),
         MenuEntry.Separator,
         MenuEntry.Submenu("Kendi parçalarım", emptyList()),
