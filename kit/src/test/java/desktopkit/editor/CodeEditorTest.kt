@@ -778,6 +778,15 @@ class CodeEditorTest {
     }
 
     @Test
+    fun talkBackNamesTheEditorAndAnEmptyOneByItsPlaceholder() {
+        show()
+        val view = view()
+        compose.runOnIdle { assertEquals("Düzenleyici", view.createAccessibilityNodeInfo().hintText) }
+        onUi { document.setText("") }
+        compose.runOnIdle { assertEquals("Düzenleyici", view.createAccessibilityNodeInfo().hintText.toString()) }
+    }
+
+    @Test
     fun theGutterGrowsWithTheDigitsAndGoesWithoutNumbers() {
         document = CodeEditorState("bir")
         show()

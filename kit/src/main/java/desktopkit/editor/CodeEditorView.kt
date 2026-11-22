@@ -817,7 +817,8 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
     override fun onInitializeAccessibilityNodeInfo(info: AccessibilityNodeInfo) {
         super.onInitializeAccessibilityNodeInfo(info)
         val label = accessibilityLabel
-        if (ready && label != null && info.hintText.isNullOrEmpty()) info.hintText = label
+        // TalkBack names a text field by its hint: the editor's name, or the placeholder while it is the one shown
+        if (ready && label != null && (length() > 0 || info.hintText.isNullOrEmpty())) info.hintText = label
     }
 
     // ------------------------------------------------------------------ keys
