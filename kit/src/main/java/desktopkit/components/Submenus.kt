@@ -477,7 +477,7 @@ private fun SubmenuPopup(
     if (!target && !transition.currentState && !transition.targetState) return
     val level = remember { MenuLevel() }
     // closing takes its own open submenu along, and it opens again without one
-    LaunchedEffect(target) { if (!target) level.close() }
+    if (!target) SideEffect { level.close() }
     // a submenu that is fading out no longer chooses anything (another line has taken over)
     val live by rememberUpdatedState(target)
     val latestChoose by rememberUpdatedState(choose)

@@ -429,6 +429,26 @@ class SubmenuTest {
     }
 
     @Test
+    fun aMenuOpenedAgainWhileItFadesOutStartsWithoutItsSubmenu() {
+        menu()
+        click(line("Son açılanlar", 0).center)
+        shown("a.ink")
+        compose.mainClock.autoAdvance = false
+        open = false
+        // the change reaches the composition first, then one frame of the fade-out (100 ms) runs
+        compose.waitForIdle()
+        advance(32)
+        assertEquals("both still fading out", 2, menus().size)
+        // asked for again while it fades, as a second click on a menu bar title does
+        open = true
+        compose.waitForIdle()
+        advance(400)
+        shown("Yeni")
+        gone("a.ink")
+        assertEquals(1, menus().size)
+    }
+
+    @Test
     fun anEmptyOrDisabledSubmenuIsShownButDoesNotOpen() {
         menu()
         compose.onNodeWithText("Boş").assertIsNotEnabled()

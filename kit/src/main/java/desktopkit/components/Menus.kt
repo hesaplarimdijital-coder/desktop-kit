@@ -173,6 +173,8 @@ fun MenuPopup(
     val provider = remember(shown.offset) { ClampedOffsetPositionProvider(shown.offset) }
     // which of this menu's submenus is open; a menu without submenus never opens one
     val level = remember { MenuLevel() }
+    // closing takes the open submenu along: opened again while it still fades out, the menu starts without one
+    if (!target) SideEffect { level.close() }
     val choose = remember {
         { item: MenuEntry.Item ->
             if (open) {
