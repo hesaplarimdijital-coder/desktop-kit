@@ -31,23 +31,56 @@
     sayfalar arasında fade-through oynar. Sistemin Geri'si (öngörülü Geri hareketi de), Esc ve geri düğmesi bir
     sayfa yukarı çıkar, ilk sayfada sayfayı kapatır. Dönülen sayfa kaydırıldığı yerde durur; klavyeyle dönünce odak
     alt menünün satırındadır. Sayfadaki bir eylem sayfayı kapatır, `checked` verilmiş öğe (anahtar) sayfasında kalır.
-    Genişte aynı girişler yanında açılan alt menülü bir menüdür.
+    `MoreSheet` ve `MoreButton` genişte aynı girişleri, alt menüsü yanında açılan bir menü olarak gösterir (kabuğun
+    `moreActions`'ı yalnızca telefonun sayfasındadır).
   - Örnek uygulama: menü çubuğunda Dosya ▸ Son açılanlar ve Görünüm ▸ Görünüş ▸ Tema / Arayüz yoğunluğu (ikinci
     düzeyin öğeleri çalışır); telefonda aynı "Görünüş" "⋯" sayfasında, sayfa sayfa.
 
   Alt menüsü olmayan menü ve sayfa eskisi gibi çizilir ve aynı zamanlamayla açılıp kapanır; var olan ekran görüntüsü
-  referanslarının hepsi tutuyor, var olan testlere dokunulmadı. API'de yalnızca ekleme var (bir tür genişledi, aşağıda
-  "Dikkat"). Testler: `SubmenuLogicTest` ve `SheetPagesTest` (yerleşim ve çevirme, imlecin niyeti, tuşlar, sayfa
-  yolu), `SubmenuTest`, `SheetSubmenuTest`, `SubmenuCallSitesTest`, `SubmenuScreenshotTest`.
+  referanslarının hepsi tutuyor, var olan testlere dokunulmadı. API'de eklemeler dışında iki küçük değişiklik var
+  (aşağıda "Dikkat"). Testler: `SubmenuLogicTest` ve `SheetPagesTest` (yerleşim ve çevirme, imlecin niyeti, tuşlar,
+  sayfa yolu), `SubmenuTest`, `SheetSubmenuTest`, `SubmenuCallSitesTest`, `SubmenuScreenshotTest`.
 
 ### Dikkat
 
-- `ActionGroup.actions` artık `List<MenuEntry>` (önceden `List<MenuEntry.Item>`): alt menü ve ayırıcı, eylemlerin
-  arasında istenen sırada durabilsin diye. Grup **kuran** kod değişmeden derlenir. Bir grubun eylemlerini geri
-  **okuyan** kod (`grup.actions.first().label`) öğeleri `filterIsInstance<MenuEntry.Item>()` ile alır.
+İki şey derlenmeyebilir:
+
+- `MenuEntry`'ye yeni bir tür geldi (`Submenu`): bir `MenuEntry` üzerinde `else`'siz `when` yazan kod
+  `is MenuEntry.Submenu ->` dalını ya da `else` ister.
+- `ActionGroup.actions` artık `List<MenuEntry>` (önceden `List<MenuEntry.Item>`; alt menü ve ayırıcı eylemlerin
+  arasında istenen sırada durabilsin diye): grup kuran kod değişmeden derlenir; eylemleri geri okuyup öğe alanlarına
+  (`label`, `onClick`) erişen kod `filterIsInstance<MenuEntry.Item>()` kullanır. 2.9.0'a karşı derlenmiş başka bir
+  modül yeniden derlenmeli: eylemleri öğe diye okuyan derlenmiş kod, alt menü ya da ayırıcı içeren bir grupta
+  `ClassCastException` verir.
+
+Ayrıca:
+
 - `CompactTopBar`'ın sığmayan eylemleri ("⋮") `TopBarAction`'dır, `MenuEntry` değil: orada alt menü yok. Tablonun
   sütun menüsünü kit kurar, uygulama ona giriş vermez.
 - Home ve End tuşları menülerde eskiden de yoktu; eklenmedi.
+
+### MIGRATION.md için (sürüm PR'ı taşır, sonra bu bölüm silinir)
+
+MIGRATION.md'nin sürüm bölümü sürüm PR'ının (#19) işi. "2.9.0'dan 2.10.0'a" bölümüne alt menülerden şu metin girer
+(üst bilgiler, sürümün öbür değişiklikleriyle birlikte):
+
+```markdown
+## 2.9.0'dan 2.10.0'a
+
+Çoğunlukla kod değişmeden derlenir; sürümü `2.10.0` yapmak yeter. 2.9.0'a karşı derlenmiş başka bir modül
+(kitaplık) yeniden derlenmelidir. Ne değiştiği [CHANGELOG](CHANGELOG.md)'da; uygulamanın bakması gerekenler:
+
+- **`MenuEntry.Submenu` (yeni tür):** `MenuEntry` mühürlü bir arayüz ve yeni bir türü var. Bir `MenuEntry` üzerinde
+  `else`'siz `when` yazan kod artık derlenmez; `is MenuEntry.Submenu ->` dalını ya da `else` ekle. Menüyü yalnızca
+  kuran (listeyi kite veren) kod değişmez.
+- **`ActionGroup.actions`:** artık `List<MenuEntry>` (önceden `List<MenuEntry.Item>`). Grup kuran kod aynen derlenir.
+  Eylemleri geri okuyup öğe alanlarına (`label`, `onClick`) erişen kod öğeleri `filterIsInstance<MenuEntry.Item>()`
+  ile alır. 2.9.0'a karşı derlenmiş ve eylemleri öğe diye okuyan bir modül, alt menü ya da ayırıcı içeren bir grupta
+  `ClassCastException` verir: yeniden derlenmeli.
+- **Alt menüler (isteğe bağlı):** iç içe menü kuran uygulama (kendi "▸" satırları, telefonda kendi alt sayfası)
+  bunları `MenuEntry.Submenu` ile değiştirebilir: menü çubuğunda, açılır ve sağ tık menülerinde yanında açılır,
+  telefonun "⋯" sayfasında sayfa olarak. README'nin "Alt menüler" bölümüne bak.
+```
 
 ## 2.9.0 (2026-11-13)
 
