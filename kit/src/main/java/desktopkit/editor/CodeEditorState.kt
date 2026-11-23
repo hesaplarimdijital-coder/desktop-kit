@@ -51,6 +51,9 @@ class CodeEditorState(initialText: String = "") {
     /** The editor showing this document, if one is. */
     internal var host: EditorHost? = null
 
+    /** An editor this document was taken from by another one: it shows the document again once that one lets go. */
+    internal var waiting: (() -> Unit)? = null
+
     /** Told of every change of the text: where it starts, how many characters went and how many came (the search's matches move along). */
     internal val editObservers = ArrayList<(start: Int, removed: Int, inserted: Int) -> Unit>(1)
 

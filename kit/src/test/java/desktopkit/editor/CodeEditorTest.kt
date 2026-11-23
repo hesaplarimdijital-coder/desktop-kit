@@ -15,6 +15,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
@@ -401,6 +402,68 @@ class CodeEditorTest {
     }
 
     // ---------------------------------------------------------------- documents
+
+    /** Every editor's view in the window, in the order they are laid out. */
+    private fun editorViews(): List<CodeEditorView> {
+        val views = ArrayList<CodeEditorView>()
+        fun collect(view: android.view.View) {
+            if (view is CodeEditorView) views += view
+            if (view is android.view.ViewGroup) for (i in 0 until view.childCount) collect(view.getChildAt(i))
+        }
+        compose.runOnIdle { collect(compose.activity.window.decorView) }
+        return views
+    }
+
+    @Test
+    fun aDocumentShowsInOneEditorAtATimeAndTheOtherTakesNoInput() {
+        // a misuse an app can make by accident (a split view, a screen composed twice in a transition): two
+        // editors on one document. The one that took it last shows it; the other shows nothing and takes nothing.
+        val shared = CodeEditorState("bir\niki")
+        var second by mutableStateOf(true)
+        var label by mutableStateOf("Betik")
+        compose.setContent {
+            DesktopKitTheme(themeMode = ThemeMode.Dark, inputMode = InputMode.Pointer) {
+                Row(Modifier.fillMaxSize()) {
+                    CodeEditor(shared, Modifier.weight(1f), label = label)
+                    if (second) CodeEditor(shared, Modifier.weight(1f))
+                }
+            }
+        }
+        compose.waitForIdle()
+        val (left, right) = editorViews()
+        assertTrue("the second editor took the document", right.document === shared)
+        compose.runOnIdle {
+            assertEquals("the first shows nothing", "", left.text.toString())
+            assertFalse("and takes no focus", left.isFocusable)
+            left.requestFocus()
+            assertFalse(left.hasFocus())
+            // whatever reaches it anyway is refused
+            left.editableText.insert(0, "kayıp")
+            assertEquals("", left.text.toString())
+        }
+        // the first editor composed again does not take the document back
+        label = "Betik 2"
+        compose.waitForIdle()
+        compose.runOnIdle {
+            assertTrue(right.document === shared)
+            right.requestFocus()
+            shared.select(3)
+            right.inputConnection().commitText(" ve üç", 1)
+        }
+        assertEquals("bir ve üç\niki", shared.text)
+        // once the second editor lets go, the first shows the document again, and takes input
+        second = false
+        compose.waitForIdle()
+        compose.runOnIdle {
+            assertTrue(left.document === shared)
+            assertEquals(shared.text, left.text.toString())
+            assertTrue(left.isFocusable)
+            left.requestFocus()
+            shared.select(shared.length)
+            left.inputConnection().commitText(" dört", 1)
+        }
+        assertEquals("bir ve üç\niki dört", shared.text)
+    }
 
     @Test
     fun eachDocumentComesBackAsItWasLeft() {

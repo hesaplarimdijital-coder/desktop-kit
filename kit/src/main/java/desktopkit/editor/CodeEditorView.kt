@@ -146,6 +146,9 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
     var document: CodeEditorState? = null
         private set
 
+    /** The document the editor was last asked to show: another editor may have taken it for now (see [bind]). */
+    private var requested: CodeEditorState? = null
+
     /** The whole text is being replaced: the watcher stays out of it. */
     private var loading = false
 
@@ -377,24 +380,34 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
         ready = true
     }
 
-    /** Refuses the user's edits while the editor is read-only; first in line, so nothing else sees them. */
+    /** Refuses the user's edits while the editor is read-only or shows no document; first in line, so nothing else sees them. */
     private inner class ReadOnlyGate : InputFilter {
         override fun filter(source: CharSequence, start: Int, end: Int, dest: Spanned, dstart: Int, dend: Int): CharSequence? {
-            return if (readOnly && !programmatic && !loading) dest.subSequence(dstart, dend) else null
+            return if ((readOnly || document == null) && !programmatic && !loading) dest.subSequence(dstart, dend) else null
         }
     }
 
     // ------------------------------------------------------------------ the document
 
-    /** Shows [state]'s document; the one shown before keeps its scroll position for its next time. */
+    /**
+     * Shows [state]'s document; the one shown before keeps its scroll position for its next time. A document shows
+     * in one editor at a time: asked for one another editor shows, this editor takes it, and the other shows
+     * nothing and takes no input until it gets the document back (when this one lets go of it). Asked again for a
+     * document that was taken from it, the editor waits instead of taking it back: two editors on one document never
+     * take it from each other at every composition.
+     */
     fun bind(state: CodeEditorState?) {
+        val askedAgain = state === requested
+        requested = state
         if (state === document) return
+        if (state != null && askedAgain && state.host != null && state.host !== this) return
         release()
         document = state
         if (state == null) return
-        // an editor still showing this document lets go of it: one editor at a time
-        (state.host as? CodeEditorView)?.release()
+        (state.host as? CodeEditorView)?.giveUp(state)
         state.host = this
+        isFocusable = true
+        isFocusableInTouchMode = true
         load(state)
         Selection.setSelection(editableText, state.selection.start.coerceIn(0, length()), state.selection.end.coerceIn(0, length()))
         restoreScroll = true
@@ -407,7 +420,7 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
         requestLayout()
     }
 
-    /** Lets go of the document: it remembers where the view was. */
+    /** Lets go of the document: it remembers where the view was, and an editor it was taken from shows it again. */
     fun release() {
         val state = document ?: return
         stopFling()
@@ -415,8 +428,30 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
         if (state.host === this) {
             saveAnchor()
             state.host = null
+            val waiting = state.waiting
+            state.waiting = null
+            waiting?.invoke()
         }
         document = null
+    }
+
+    /**
+     * Another editor takes [state]: this one shows nothing, takes neither focus nor input, and shows the document
+     * again once the other lets go of it (if it is still asked to).
+     */
+    private fun giveUp(state: CodeEditorState) {
+        release()
+        if (hasFocus()) clearFocus()
+        isFocusable = false
+        isFocusableInTouchMode = false
+        loading = true
+        try {
+            applied.clear()
+            setText("", BufferType.EDITABLE)
+        } finally {
+            loading = false
+        }
+        state.waiting = { post { if (isAttachedToWindow && requested === state && document == null && state.host == null) bind(state) } }
     }
 
     private fun load(state: CodeEditorState) {
@@ -502,6 +537,8 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
     }
 
     override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
+        // an editor whose document another one took takes no typing
+        if (ready && document == null && requested != null) return null
         val connection = super.onCreateInputConnection(outAttrs) ?: return null
         return if (ready) KeyboardConnection(connection) else connection
     }
@@ -1599,6 +1636,8 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
     // ------------------------------------------------------------------ drawing
 
     override fun onDraw(canvas: Canvas) {
+        // an editor whose document another one took shows nothing
+        if (ready && document == null && requested != null) return
         val layout = layout
         val look = look
         val state = document

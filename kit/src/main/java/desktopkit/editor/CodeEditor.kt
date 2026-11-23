@@ -75,7 +75,10 @@ import kotlin.math.roundToInt
  * [markers] the compiler's findings, [links] what leads elsewhere.
  *
  * The document is [state], owned by the app, one for each open document; giving the editor another
- * state shows that document as it was left (text, cursor, scroll position, undo history).
+ * state shows that document as it was left (text, cursor, scroll position, undo history). A document
+ * shows in one editor at a time: a second editor given the same state takes it, and the first shows
+ * nothing and takes no input until the second lets go of it (leaves the composition or is given
+ * another state); then the first shows it again.
  *
  * Typing is the platform's own (input method, autocorrect and swipe typing when [autoCorrect] asks
  * for them, selection handles, the magnifier, the clipboard, TalkBack), and its cost does not grow
