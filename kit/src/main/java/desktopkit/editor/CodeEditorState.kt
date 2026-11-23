@@ -30,8 +30,11 @@ data class CodePosition(val line: Int, val column: Int)
  *
  * Edits made here ([insert], [replace], [replaceSelection], the commands) go through the undo
  * history like typing, each as one step; [edit] makes several one step. They are safe while the
- * on-screen keyboard is composing a word: the composition is finished first. [setText] is for a
- * document loaded again from disk: it replaces everything and forgets the history.
+ * on-screen keyboard is composing a word: the composition is finished first. So is every move of
+ * the cursor the keyboard did not make ([select], [goToLine], a key, a tap): the word the keyboard
+ * holds ends where it stands, and the keyboard starts afresh at the new place instead of writing
+ * over that word. [setText] is for a document loaded again from disk: it replaces everything and
+ * forgets the history.
  *
  * Use the state from the main thread only.
  */

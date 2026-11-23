@@ -18,7 +18,9 @@ değişmeden derlenir; API'de eklemeler dışında iki küçük değişiklik var
   `replace`, `replaceSelection`, tek adım için `edit { }`), diskten yeniden okunan belge için `setText`, `undo` ve
   `redo`, `reveal` ve `revealLine` (isteğe bağlı seçip odaklayarak), `firstVisibleLine` ve `scrollToLine` (süreç
   durduktan sonra yer geri gelir; pencere daralıp genişleyince, yazı büyüyünce en üstteki satır yerinde kalır).
-  Ekran klavyesi bir sözcük yazarken gelen düzenleme önce sözcüğü bitirir: hiçbir şey kaybolmaz.
+  Ekran klavyesi bir sözcük yazarken gelen düzenleme önce sözcüğü bitirir: hiçbir şey kaybolmaz. Klavyenin
+  yapmadığı her imleç hareketi de (tuşlar, dokunuş, tıklama, uygulamanın seçimi, satıra gitme, arama) klavyenin
+  tuttuğu sözcüğü olduğu yerde bitirir; klavye yeni yerde baştan başlar, uzaktaki bir sözcüğün üstüne yazmaz.
 - **Çekirdek platformun `EditText`'i.** Ölçüldü: 5.000 satırlık, 337.000 karakterlik belgenin ortasına bir harf
   yazmak Compose'un `BasicTextField`'ında her tuşta bütün metni yeniden yerleştiriyordu (~600 ms, sözdizimi renkleriyle
   5 s); `EditText` yalnız düzenlenen paragrafı yerleştirir. Yazmanın kendisi (giriş yöntemi, otomatik düzeltme,
@@ -138,7 +140,8 @@ Ayrıca:
 Kod düzenleyicinin testleri (alt menülerinkiler yukarıda). JVM'de: satır dizini, jeton önbelleği (rastgele
 düzenlemelerden sonra sıfırdan jetonlamayla aynı, tuş başına bir satır, durumu değiştiren düzenleme görünene kadar ve
 dilimlerle), geçmiş, arama ve değiştirme, tamamlama listesinin daralması, kapanması ve seçimi, satır komutları, ölçüler.
-Robolectric'te: giriş yöntemiyle yazma ve sözcük oluşturma, sözcük yazılırken uygulamanın düzenlemesi, tuşlar, fare ve
+Robolectric'te: giriş yöntemiyle yazma ve sözcük oluşturma, sözcük yazılırken uygulamanın düzenlemesi, klavyenin
+tuttuğu sözcük ve klavyenin yapmadığı her imleç hareketi (tuş, dokunuş, tıklama, seçim, arama), tuşlar, fare ve
 parmak, belge değiştirme, renklerin metinle aynı geçişte gelmesi, işaretler, bağlantılar, menü, kaydırma yeri,
 yakınlaştırma, arama çubuğu, tamamlama listesi, odak (Esc ve Tab), telefonda kabuğun ekran klavyesiyle birlikte,
 sarılmış satırın kenarı geçmemesi; açık, koyu ve OLED temada, fare ve parmakla, geniş pencerede ve telefonda 11 ekran

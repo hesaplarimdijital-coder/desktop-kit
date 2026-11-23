@@ -8,6 +8,7 @@ import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.os.Bundle
 import android.text.Editable
 import android.text.InputFilter
 import android.text.InputType
@@ -41,14 +42,23 @@ import android.view.ViewConfiguration
 import android.view.WindowInsets
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.inputmethod.BaseInputConnection
+import android.view.inputmethod.CompletionInfo
+import android.view.inputmethod.CorrectionInfo
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.HandwritingGesture
+import android.view.inputmethod.InputConnection
+import android.view.inputmethod.InputConnectionWrapper
+import android.view.inputmethod.InputContentInfo
 import android.view.inputmethod.InputMethodManager
+import android.view.inputmethod.TextAttribute
 import android.widget.EditText
 import android.widget.OverScroller
 import android.widget.TextView
 import androidx.core.view.NestedScrollingChildHelper
 import androidx.core.view.ViewCompat
 import java.util.IdentityHashMap
+import java.util.concurrent.Executor
+import java.util.function.IntConsumer
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.max
@@ -143,6 +153,9 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
     private var programmatic = false
     private var removedText = ""
     private var selectionBefore = 0L
+
+    /** Inside a call of the on-screen keyboard's (its connection): what changes now is the keyboard's own doing. */
+    private var keyboardCalls = 0
 
     // ---- options, set by CodeEditor
     var softWrap = true
@@ -432,7 +445,11 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
     }
 
     override fun select(start: Int, end: Int) {
-        Selection.setSelection(editableText, start.coerceIn(0, length()), end.coerceIn(0, length()))
+        val from = start.coerceIn(0, length())
+        val to = end.coerceIn(0, length())
+        if (from == selectionStart && to == selectionEnd) return
+        finishComposition()
+        Selection.setSelection(editableText, from, to)
     }
 
     override fun showText() {
@@ -482,6 +499,54 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
         if (BaseInputConnection.getComposingSpanStart(editable) < 0) return
         BaseInputConnection.removeComposingSpans(editable)
         context.getSystemService(InputMethodManager::class.java)?.restartInput(this)
+    }
+
+    override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
+        val connection = super.onCreateInputConnection(outAttrs) ?: return null
+        return if (ready) KeyboardConnection(connection) else connection
+    }
+
+    /**
+     * The on-screen keyboard's connection, unchanged but for one thing: while one of its calls runs, the selection's
+     * changes are the keyboard's own (it types, it moves within the word it holds), so they do not end its word. A
+     * key it sends (Delete, Enter) arrives later as a key event and counts as any key does.
+     */
+    private inner class KeyboardConnection(target: InputConnection) : InputConnectionWrapper(target, false) {
+        private inline fun <T> own(block: () -> T): T {
+            keyboardCalls++
+            try {
+                return block()
+            } finally {
+                keyboardCalls--
+            }
+        }
+
+        override fun beginBatchEdit(): Boolean = own { super.beginBatchEdit() }
+        override fun endBatchEdit(): Boolean = own { super.endBatchEdit() }
+        override fun commitText(text: CharSequence?, newCursorPosition: Int): Boolean = own { super.commitText(text, newCursorPosition) }
+        override fun commitText(text: CharSequence, newCursorPosition: Int, textAttribute: TextAttribute?): Boolean =
+            own { super.commitText(text, newCursorPosition, textAttribute) }
+        override fun setComposingText(text: CharSequence?, newCursorPosition: Int): Boolean = own { super.setComposingText(text, newCursorPosition) }
+        override fun setComposingText(text: CharSequence, newCursorPosition: Int, textAttribute: TextAttribute?): Boolean =
+            own { super.setComposingText(text, newCursorPosition, textAttribute) }
+        override fun setComposingRegion(start: Int, end: Int): Boolean = own { super.setComposingRegion(start, end) }
+        override fun setComposingRegion(start: Int, end: Int, textAttribute: TextAttribute?): Boolean =
+            own { super.setComposingRegion(start, end, textAttribute) }
+        override fun finishComposingText(): Boolean = own { super.finishComposingText() }
+        override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean = own { super.deleteSurroundingText(beforeLength, afterLength) }
+        override fun deleteSurroundingTextInCodePoints(beforeLength: Int, afterLength: Int): Boolean =
+            own { super.deleteSurroundingTextInCodePoints(beforeLength, afterLength) }
+        override fun replaceText(start: Int, end: Int, text: CharSequence, newCursorPosition: Int, textAttribute: TextAttribute?): Boolean =
+            own { super.replaceText(start, end, text, newCursorPosition, textAttribute) }
+        override fun setSelection(start: Int, end: Int): Boolean = own { super.setSelection(start, end) }
+        override fun commitCompletion(text: CompletionInfo?): Boolean = own { super.commitCompletion(text) }
+        override fun commitCorrection(correctionInfo: CorrectionInfo?): Boolean = own { super.commitCorrection(correctionInfo) }
+        override fun commitContent(inputContentInfo: InputContentInfo, flags: Int, opts: Bundle?): Boolean =
+            own { super.commitContent(inputContentInfo, flags, opts) }
+        override fun performContextMenuAction(id: Int): Boolean = own { super.performContextMenuAction(id) }
+        override fun performEditorAction(editorAction: Int): Boolean = own { super.performEditorAction(editorAction) }
+        override fun performHandwritingGesture(gesture: HandwritingGesture, executor: Executor?, consumer: IntConsumer?) =
+            own { super.performHandwritingGesture(gesture, executor, consumer) }
     }
 
     // ------------------------------------------------------------------ options and look
@@ -800,6 +865,9 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
     override fun onSelectionChanged(selStart: Int, selEnd: Int) {
         super.onSelectionChanged(selStart, selEnd)
         if (!ready || loading) return
+        // a move the keyboard did not make (a key, a tap, a click, the app, the search) ends the word the keyboard
+        // holds where it stands; otherwise its next letters would replace that word, wherever it is
+        if (keyboardCalls == 0) finishComposition()
         document?.hostSelected(selStart, selEnd)
         followSoon()
         updateBrackets()
