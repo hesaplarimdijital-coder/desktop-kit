@@ -20,6 +20,7 @@ import android.text.Spanned
 import android.text.TextPaint
 import android.text.TextWatcher
 import android.text.method.ArrowKeyMovementMethod
+import android.text.method.TextKeyListener
 import android.text.style.CharacterStyle
 import android.text.style.MetricAffectingSpan
 import android.text.style.ParagraphStyle
@@ -588,13 +589,27 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
 
     // ------------------------------------------------------------------ options and look
 
-    /** The keyboard's help for prose ([autoCorrect], [capitalize] sentences) or none of it, for code. */
+    /**
+     * The on-screen keyboard's help for prose ([autoCorrect], [capitalize] sentences) or none of it, for code. A
+     * hardware keyboard types what is pressed: the platform would give it the input type's capitals and automatic
+     * corrections too (a line's first letter came out capitalised on a tablet), so its keys go through a listener
+     * without them, and the input type only tells the on-screen keyboard.
+     */
     fun applyInputType(autoCorrect: Boolean, capitalize: Boolean) {
         var type = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
         type = type or if (autoCorrect) InputType.TYPE_TEXT_FLAG_AUTO_CORRECT else InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
         if (capitalize) type = type or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
-        if (inputType == type) return
+        if (inputType == type && keyListener === HARDWARE_KEYS) return
         inputType = type
+        // the listener sets an input type of its own: the keyboard's comes back after it, and the keyboard hears of it
+        keyListener = HARDWARE_KEYS
+        setRawInputType(type)
+        // setting a listener makes the view focusable again; an editor whose document another took stays out of reach
+        if (ready && document == null && requested != null) {
+            isFocusable = false
+            isFocusableInTouchMode = false
+        }
+        if (ready) context.getSystemService(InputMethodManager::class.java)?.restartInput(this)
         // setting the input type puts the wrapping back on
         setHorizontallyScrolling(!softWrap)
     }
@@ -1870,6 +1885,9 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
         private const val RANGE_TINT = 0.24f
         private const val CURRENT_MATCH_TINT = 0.55f
         private const val FIRST_ACTION_ID = 0x00dc0000
+
+        /** Hardware keys type what is pressed: no capitals of the listener's own, no automatic corrections. */
+        private val HARDWARE_KEYS: TextKeyListener = TextKeyListener.getInstance(false, TextKeyListener.Capitalize.NONE)
         private val EDITING_ITEMS = intArrayOf(android.R.id.cut, android.R.id.paste, android.R.id.pasteAsPlainText, android.R.id.replaceText, android.R.id.undo, android.R.id.redo)
 
         fun markerTone(severity: MarkerSeverity): DecorationTone = when (severity) {

@@ -1,9 +1,12 @@
 package desktopkit.editor
 
+import android.text.InputType
+import android.text.method.TextKeyListener
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.inputmethod.BaseInputConnection
+import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
@@ -17,6 +20,8 @@ import desktopkit.theme.DesktopKitTheme
 import desktopkit.theme.InputMode
 import desktopkit.theme.ThemeMode
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -28,7 +33,8 @@ import org.robolectric.annotation.GraphicsMode
  * whenever the cursor touches one (Gboard takes it back to offer corrections: `setComposingRegion`); its next
  * letters replace what it holds. A cursor moved by anything but the keyboard (a key, a tap, a click, the app, the
  * search) must end that word where it stands, or the keyboard writes over it from far away: on the device run
- * "Smoke" became "Imeword" after Ctrl+Home. The keyboard's own moves keep its word.
+ * "Smoke" became "Imeword" after Ctrl+Home. The keyboard's own moves keep its word. And a hardware keyboard types
+ * the case that is pressed, whatever the on-screen keyboard is asked to capitalise.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -227,6 +233,37 @@ class CodeEditorCompositionTest {
         // the cursor goes to the start of the line
         holdMoveType(0, 5, "sol", withLine(4, "sol    -> END")) { view ->
             view.tap(Offset(2f, pointOf(view, document.lineStart(4)).y))
+        }
+    }
+
+    @Test
+    fun aHardwareKeyboardTypesTheCaseThatIsPressed() {
+        // the device run (tablet, no on-screen keyboard): "keptword" at a line's start became "Keptword". Capitalising
+        // sentences is a hint for on-screen keyboards; a hardware keyboard types what is pressed
+        show()
+        onUi { view ->
+            view.requestFocus()
+            document.select(document.lineStart(2))
+            for (key in listOf(KeyEvent.KEYCODE_K, KeyEvent.KEYCODE_E, KeyEvent.KEYCODE_P, KeyEvent.KEYCODE_T)) view.press(key)
+            // after a full stop too, and Shift still makes a capital
+            document.select(document.lineEnd(1))
+            view.press(KeyEvent.KEYCODE_SPACE)
+            view.press(KeyEvent.KEYCODE_A)
+            view.press(KeyEvent.KEYCODE_B, KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON)
+        }
+        assertEquals("kept", document.lineText(2))
+        assertEquals("Once upon a time... aB", document.lineText(1))
+        // the hardware keys go through a listener that never changes what is typed (no capitals of its own, no
+        // automatic corrections): the platform's listener for the input type capitalised a line's first letter
+        // on the tablet, where hardware keys reach it
+        onUi { view -> assertSame(TextKeyListener.getInstance(false, TextKeyListener.Capitalize.NONE), view.keyListener) }
+        // the on-screen keyboard is still asked to capitalise sentences and to correct
+        onUi { view ->
+            val info = EditorInfo()
+            view.onCreateInputConnection(info)
+            assertTrue(info.inputType and InputType.TYPE_TEXT_FLAG_CAP_SENTENCES != 0)
+            assertTrue(info.inputType and InputType.TYPE_TEXT_FLAG_AUTO_CORRECT != 0)
+            assertTrue(info.inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE != 0)
         }
     }
 
