@@ -52,8 +52,9 @@ değişmeden derlenir; API'de eklemeler dışında iki küçük değişiklik var
 - **Bul ve değiştir.** `CodeSearchState` ve `CodeSearchBar`: büyük/küçük harf, tam sözcük, düzenli ifade (Alt+C, W,
   R), "3 / 17", önceki ve sonraki (Enter, Shift+Enter, F3, Shift+F3), değiştir ve tek geri alma adımı olarak tümünü
   değiştir, geçersiz ifade uyarısı; düzenleyicide Ctrl+F (seçim aranan olur), Ctrl+H, Esc. Arama ana iş parçacığının
-  dışında çalışır ve yeni bir sorgu ya da düzenleme onu keser; eşleşmeler düzenlemeyle birlikte hemen kayar. Telefonda
-  seçenekler ve değiştirme düğmeleri kendi satırlarında.
+  dışında çalışır ve yeni bir sorgu ya da düzenleme onu keser; eşleşmeler düzenlemeyle birlikte hemen kayar.
+  Değiştirmek, sorgunun o anki aramasının bitmesini bekler (`canReplace`). Telefonda seçenekler ve değiştirme
+  düğmeleri kendi satırlarında.
 - **Tamamlama.** Uygulamanın `CodeCompleter`'ı imlecin yerine uyan öğeleri verir; düzenleyici onları sözcük yazılırken
   (`liveCompletion`), Ctrl+Space'te ya da `showCompletion()`'da imlecin altında bir listede gösterir, yazdıkça komut
   paletinin eşleşmesiyle daraltır; ↑/↓, Enter ya da Tab, Esc, dokunuş. Liste düzenleyicinin içinde, ekran klavyesinin

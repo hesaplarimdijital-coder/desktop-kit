@@ -105,10 +105,18 @@ class CodeEditorColoursTest {
         show()
         onUi { view ->
             view.requestFocus()
+            search.open(replace = true)
             search.query = "x"
             search.replacement = "z"
-            search.replaceAll()
         }
+        // replacing waits for the query's search, which runs off the main thread
+        val until = System.currentTimeMillis() + 5_000
+        while (!search.canReplace) {
+            check(System.currentTimeMillis() < until) { "the search did not finish" }
+            Thread.sleep(10)
+            compose.waitForIdle()
+        }
+        onUi { search.replaceAll() }
         assertEquals("VAR z = 1\nVAR z = 2\nEND", document.text)
         onUi { view ->
             assertEveryLineColoured(view)
