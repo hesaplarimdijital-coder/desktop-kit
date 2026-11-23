@@ -57,6 +57,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import kotlin.math.roundToInt
 
 /**
  * The editor as a user meets it: typing through an input method (composing words included), the
@@ -772,9 +773,19 @@ class CodeEditorTest {
         }
         val top = document.firstVisibleLine
         assertTrue(top > 0)
+        // a notch: the drawing grows at once, the size is laid out once the steps pause
         onUi { it.wheel(KeyEvent.META_CTRL_ON, 1f) }
+        compose.runOnIdle {
+            assertEquals("the size waits", 1f, zoom!!.scale, 0.001f)
+            assertEquals(size, view.textSize, 0.01f)
+            assertEquals("the drawing shows it", 1.1f, view.scaleX, 0.001f)
+        }
+        settleZoom()
         assertEquals(1.1f, zoom!!.scale, 0.001f)
-        compose.runOnIdle { assertEquals(size * 1.1f, view.textSize, 0.01f) }
+        compose.runOnIdle {
+            assertEquals(size * 1.1f, view.textSize, 0.01f)
+            assertEquals("the laid-out size replaced the preview", 1f, view.scaleX, 0.001f)
+        }
         assertEquals("the line at the top stays there", top, document.firstVisibleLine)
         // TalkBack has the same steps
         compose.runOnIdle {
@@ -785,10 +796,80 @@ class CodeEditorTest {
         }
         assertEquals(1.2f, zoom!!.scale, 0.001f)
         onUi { it.press(KeyEvent.KEYCODE_MINUS, KeyEvent.META_CTRL_ON) }
+        settleZoom()
         assertEquals(1.1f, zoom!!.scale, 0.001f)
         onUi { it.press(KeyEvent.KEYCODE_0, KeyEvent.META_CTRL_ON) }
-        assertEquals(1f, zoom!!.scale, 0.001f)
-        compose.runOnIdle { assertEquals(size, view.textSize, 0.01f) }
+        assertEquals("Ctrl+0 at once", 1f, zoom!!.scale, 0.001f)
+        compose.runOnIdle { assertEquals(size, view().textSize, 0.01f) }
+    }
+
+    @Test
+    fun quickZoomStepsAreOneNewSize() {
+        // a new size lays out the whole text again: notches in quick succession make one, not one each
+        val commits = mutableListOf<Float>()
+        zoom = CodeEditorZoom(1f) { commits += it }
+        show()
+        val view = view()
+        val size = view.textSize
+        onUi { repeat(3) { _ -> it.wheel(KeyEvent.META_CTRL_ON, 1f) } }
+        compose.runOnIdle { assertEquals("the drawing follows every notch", 1.3f, view.scaleX, 0.001f) }
+        onUi { it.press(KeyEvent.KEYCODE_MINUS, KeyEvent.META_CTRL_ON) }
+        compose.runOnIdle { assertEquals(1.2f, view.scaleX, 0.001f) }
+        settleZoom()
+        assertEquals(listOf(1.2f), commits)
+        compose.runOnIdle {
+            assertEquals(size * 1.2f, view.textSize, 0.01f)
+            assertEquals(1f, view.scaleX, 0.001f)
+        }
+    }
+
+    /** Lets the time pass in which gathered zoom steps wait for more. */
+    private fun settleZoom() {
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(300))
+        compose.waitForIdle()
+    }
+
+    @Test
+    fun aPinchScalesTheDrawingAndLaysTheTextOutOnceTheFingersLift() {
+        // a new text size lays out the whole document (about 0.2 s at 5,000 lines on the review's machine): a
+        // pinch must not ask for it on every frame
+        document = CodeEditorState((1..300).joinToString("\n") { "satır $it" })
+        val commits = mutableListOf<Float>()
+        zoom = CodeEditorZoom(1f) { commits += it }
+        show(InputMode.Touch)
+        val view = view()
+        val size = view.textSize
+        val node = compose.onNodeWithTag("editor")
+        // fingers far enough apart for the platform's pinch, spreading in steps
+        node.performTouchInput {
+            down(0, center - Offset(120f, 0f))
+            down(1, center + Offset(120f, 0f))
+        }
+        for (half in listOf(150f, 180f, 210f, 240f)) {
+            node.performTouchInput {
+                moveTo(0, center - Offset(half, 0f))
+                moveTo(1, center + Offset(half, 0f))
+            }
+        }
+        var shown = 1f
+        compose.runOnIdle {
+            assertEquals("the size waits for the fingers", 1f, zoom!!.scale, 0.001f)
+            assertEquals(size, view.textSize, 0.01f)
+            shown = view.scaleX
+            assertTrue("the drawing follows them ($shown)", shown > 1.3f)
+            assertTrue(commits.isEmpty())
+        }
+        node.performTouchInput {
+            up(1)
+            up(0)
+        }
+        compose.waitForIdle()
+        val expected = (shown * 10f).roundToInt() / 10f
+        assertEquals("one new size, once, the one the drawing showed", listOf(expected), commits)
+        compose.runOnIdle {
+            assertEquals(size * expected, view.textSize, 0.05f)
+            assertEquals(1f, view.scaleX, 0.001f)
+        }
     }
 
     /**

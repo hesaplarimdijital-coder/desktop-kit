@@ -943,7 +943,11 @@ Column(Modifier.fillMaxSize()) {
   `placeholder`.
 - **Boyut**: çekirdek platformun `EditText`'idir; bir düzenleme yalnızca düzenlenen paragrafı yeniden yerleştirir. 5.000
   satırlık, 350.000 karakterlik belgede bir tuşun düzenleyicideki işi 50 satırlık belgedekiyle aynı (bu makinede 3–8 ms).
-  Compose'un metin alanı aynı belgede her tuşta bütün metni yerleştiriyordu (~600 ms).
+  Compose'un metin alanı aynı belgede her tuşta bütün metni yerleştiriyordu (~600 ms). Bütün metni yeniden yerleştiren
+  üç şey var: yeni yazı boyu (~180 ms), yeni genişlik (~160 ms) ve başka bir belgeye geçmek (~140 ms), bu makinede
+  5.000 satırda; telefon daha hızlıdır. Bu yüzden kıstırırken ve art arda yakınlaştırırken önce çizim büyür, yazı
+  boyu parmaklar kalkınca ya da adımlar durunca bir kez değişir; DeX'te pencere kenarı sürüklenirken uzun belge
+  platformun metin alanları gibi her adımda yeniden yerleşir.
 
 ## Geliştirme
 

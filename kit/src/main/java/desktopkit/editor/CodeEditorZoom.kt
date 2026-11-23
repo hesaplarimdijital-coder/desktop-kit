@@ -64,6 +64,12 @@ class CodeEditorZoom @JvmOverloads constructor(
     /** Back to the theme's size. */
     fun reset() = set(1f)
 
+    /** [steps] tenths larger (smaller when negative) at once: zoom steps the editor gathered. */
+    internal fun step(steps: Int) = set(scale + STEP * steps)
+
+    /** The size [steps] tenths from this one, within the limits. */
+    internal fun stepped(steps: Int): Float = snap(scale + STEP * steps)
+
     /** During a pinch: follows the fingers from [start], stored once they let go ([commit]). */
     internal fun follow(start: Float, factor: Float) {
         scale = (start * factor).coerceIn(minScale, maxScale)

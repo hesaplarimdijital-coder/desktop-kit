@@ -229,6 +229,9 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
     /** Ctrl with the wheel or with + and −: 1 larger, -1 smaller, 0 back to the default. */
     var onZoomStep: ((Int) -> Unit)? = null
 
+    /** Zoom steps gathered so far, before they are applied: the composable shows them with [previewScale]. */
+    var onZoomPreview: ((Int) -> Unit)? = null
+
     /** Two fingers: the factor since the pinch began, and whether the fingers have let go. */
     var onPinch: ((factor: Float, done: Boolean) -> Unit)? = null
     var selectionActions: (() -> List<SelectionAction>)? = null
@@ -309,20 +312,28 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
         override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
             if (onPinch == null) return false
             factor = 1f
+            pinched = 1f
             scaling = true
             endDrag(fling = false)
             cancelSuperGesture()
             return true
         }
 
+        // the fingers reach the view through its own scale (the drawing follows the pinch, see previewScale): the
+        // spans the detector sees shrink as the drawing grows, so the pinch's factor is theirs times the scale the
+        // event came through (the one set after the event before)
+        private var pinched = 1f
+
         override fun onScale(detector: ScaleGestureDetector): Boolean {
             factor *= detector.scaleFactor
-            onPinch?.invoke(factor, false)
+            pinched = factor * scaleX
+            onPinch?.invoke(pinched, false)
             return true
         }
 
         override fun onScaleEnd(detector: ScaleGestureDetector) {
-            onPinch?.invoke(factor, true)
+            onPinch?.invoke(pinched, true)
+            pinched = 1f
         }
     })
 
@@ -638,6 +649,8 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
             state.setScrollAnchor(state.scrollAnchor, 0)
             restoreScroll = true
         }
+        // a pinch or quick steps showed the size by scaling the drawing: the laid-out size replaces it in this pass
+        if (metrics?.textSize != next.textSize) endPreview()
         metrics = next
         typeface = next.typeface
         setTextSize(TypedValue.COMPLEX_UNIT_PX, next.textSize)
@@ -683,8 +696,8 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
         zoomLabels = labels
         for (id in zoomActionIds) ViewCompat.removeAccessibilityAction(this, id)
         zoomActionIds = if (labels == null) IntArray(0) else intArrayOf(
-            ViewCompat.addAccessibilityAction(this, labels.first) { _, _ -> zoom(1); true },
-            ViewCompat.addAccessibilityAction(this, labels.second) { _, _ -> zoom(-1); true },
+            ViewCompat.addAccessibilityAction(this, labels.first) { _, _ -> onZoomStep?.invoke(1); true },
+            ViewCompat.addAccessibilityAction(this, labels.second) { _, _ -> onZoomStep?.invoke(-1); true },
         )
     }
 
@@ -1030,7 +1043,7 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
 
     /** Ctrl with + or = (larger), − (smaller) and 0 (the default), by the character the key types as a browser's zoom does. */
     private fun zoomKey(keyCode: Int, event: KeyEvent): Boolean {
-        val zoom = onZoomStep ?: return false
+        if (onZoomStep == null) return false
         val step = when (keyCode) {
             KeyEvent.KEYCODE_NUMPAD_ADD -> 1
             KeyEvent.KEYCODE_NUMPAD_SUBTRACT -> -1
@@ -1281,8 +1294,46 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
         return super.onGenericMotionEvent(event)
     }
 
+    /**
+     * A zoom step from the wheel or the keys. A new text size lays the whole document out again, so steps that come
+     * in quick succession are gathered: the drawing follows each at once ([onZoomPreview]), the size changes once
+     * when they pause ([onZoomStep] with their sum). 0 (Ctrl+0) goes back to the theme's size at once.
+     */
     private fun zoom(step: Int) {
-        onZoomStep?.invoke(step)
+        if (step == 0) {
+            removeCallbacks(settleZoom)
+            gatheredZoomSteps = 0
+            onZoomStep?.invoke(0)
+            return
+        }
+        gatheredZoomSteps += step
+        onZoomPreview?.invoke(gatheredZoomSteps)
+        removeCallbacks(settleZoom)
+        postDelayed(settleZoom, ZOOM_SETTLE_MS)
+    }
+
+    private var gatheredZoomSteps = 0
+    private val settleZoom = Runnable {
+        val steps = gatheredZoomSteps
+        gatheredZoomSteps = 0
+        if (steps != 0) onZoomStep?.invoke(steps)
+    }
+
+    /**
+     * The text drawn [factor] times larger from the top start corner, the layout as it is: what a pinch and quick
+     * zoom steps show until the new size is laid out once. [applyMetrics] ends it with the new size.
+     */
+    fun previewScale(factor: Float) {
+        pivotX = if (layoutDirection == View.LAYOUT_DIRECTION_RTL) width.toFloat() else 0f
+        pivotY = 0f
+        scaleX = factor
+        scaleY = factor
+    }
+
+    /** The preview is over and the size stays as it was. */
+    fun endPreview() {
+        scaleX = 1f
+        scaleY = 1f
     }
 
     override fun onHoverEvent(event: MotionEvent): Boolean {
@@ -1889,6 +1940,9 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
         private const val TOKENIZE_SLICE_NANOS = 4_000_000L
         private const val BOLD_STROKE = 0.035f
         private const val ITALIC_SKEW = -0.2f
+        /** How long zoom steps from the wheel or the keys are gathered before the new size is laid out. */
+        private const val ZOOM_SETTLE_MS = 150L
+
         /** The current match's frame: twice the editor's hairline (2 dp). */
         private const val CURRENT_MATCH_FRAME = 2f
         private const val FIRST_ACTION_ID = 0x00dc0000

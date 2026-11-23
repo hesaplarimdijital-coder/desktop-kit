@@ -109,6 +109,67 @@ class CodeEditorSizeTest {
         assertTrue("the edit itself does not grow with the document: $shortBest, $longBest", longBest.edit < shortBest.edit * 3 + 5.0)
     }
 
+    /**
+     * What is not incremental, for the record (the review of PR #19 measured the same in this harness): a new text
+     * size, a new width and another document each lay out every paragraph. At 5,000 lines that is a fraction of a
+     * second here, so a pinch and quick zoom steps scale the drawing and lay out once (CodeEditorTest), and a
+     * window resized by dragging re-lays out as the platform's text fields do. Bounds are loose; the numbers go to
+     * the API file and the README.
+     */
+    @Test
+    fun aNewSizeANewWidthAndAnotherDocumentAt5000Lines() {
+        compose.runOnUiThread { compose.activity.actionBar?.hide() }
+        compose.setContent {
+            DesktopKitTheme(themeMode = ThemeMode.Dark, inputMode = InputMode.Pointer) {
+                CodeEditor(document, Modifier.fillMaxSize(), tokenizer = sampleTokenizer)
+            }
+        }
+        document = CodeEditorState(DocumentSizeTest.largeScript())
+        compose.waitForIdle()
+        val view = compose.editorView()
+        val window = compose.activity.window.decorView
+        val exactly = android.view.View.MeasureSpec.EXACTLY
+        fun spec(size: Int) = android.view.View.MeasureSpec.makeMeasureSpec(size, exactly)
+        fun layoutWindowAt(width: Int): Double {
+            val start = System.nanoTime()
+            window.measure(spec(width), spec(window.height))
+            window.layout(0, 0, width, window.height)
+            return (System.nanoTime() - start) / 1e6
+        }
+        fun layoutEditor(): Double {
+            val start = System.nanoTime()
+            view.measure(spec(view.width), spec(view.height))
+            view.layout(view.left, view.top, view.right, view.bottom)
+            return (System.nanoTime() - start) / 1e6
+        }
+        val sizes = ArrayList<Double>()
+        val widths = ArrayList<Double>()
+        compose.runOnUiThread {
+            document.revealLine(2500)
+            val width = window.width
+            layoutWindowAt(width)
+            layoutEditor()
+            repeat(10) { round ->
+                val size = view.textSize
+                val start = System.nanoTime()
+                view.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, size * (if (round % 2 == 0) 1.1f else 1f / 1.1f))
+                sizes += (System.nanoTime() - start) / 1e6 + layoutEditor()
+            }
+            repeat(6) { round -> widths += layoutWindowAt(if (round % 2 == 0) width - 16 else width) }
+            layoutWindowAt(width)
+        }
+        compose.waitForIdle()
+        val other = CodeEditorState(DocumentSizeTest.largeScript().replace("dalgalar", "rüzgâr"))
+        val switchStart = System.nanoTime()
+        document = other
+        compose.waitForIdle()
+        val switch = (System.nanoTime() - switchStart) / 1e6
+        fun median(list: List<Double>) = list.sorted()[list.size / 2]
+        println("CodeEditorSizeTest: 5,000 lines (${document.length} characters): a new text size %.0f ms, a new width %.0f ms, another document %.0f ms (medians; the document once)"
+            .format(median(sizes), median(widths), switch))
+        assertTrue(median(sizes) < 2_000.0 && median(widths) < 2_000.0 && switch < 5_000.0)
+    }
+
     private companion object {
         const val WARM_UP = 5
         const val MEASURED = 30

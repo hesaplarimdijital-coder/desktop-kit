@@ -63,7 +63,8 @@ değişmeden derlenir; API'de eklemeler dışında iki küçük değişiklik var
   bağlar; kit tuş bağlamaz, `CommonShortcuts` ile çakışmaz.
 - **Yakınlaştırma.** `CodeEditorZoom`, `rememberCodeEditorZoom(prefs, key)`: Ctrl ile tekerlek, kıstırma, Ctrl ile
   + − 0 ve TalkBack'in "Yazıyı büyüt / küçült" eylemleri; seçim `DeskPreferences`'ta saklanır
-  (`editorTextScale(key)`). Düzenleyici olmayan bir metin aynı hareketleri `Modifier.textZoom(zoom)`, boyunu
+  (`editorTextScale(key)`). Yeni yazı boyu bütün metni yeniden yerleştirdiği için kıstırırken ve art arda gelen
+  adımlarda önce çizim büyür, boy parmaklar kalkınca ya da adımlar durunca bir kez değişir. Düzenleyici olmayan bir metin aynı hareketleri `Modifier.textZoom(zoom)`, boyunu
   `TextStyle.zoomed(zoom)` ile alır.
 - **Telefonda.** `contentPadding = rememberShellContentPadding()` ile metin cam çubukların altından geçer; düzenleyiciye
   dokunmak ya da metnini kaydırmak ekran klavyesini kapatmaz, imleçli satır klavyenin üstünde kalır. Parmakla kaydırmak

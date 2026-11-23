@@ -302,21 +302,32 @@ fun CodeEditor(
                         menu.open(IntOffset(x, y))
                     }
                     view.onLink = { offset -> currentOnLinkClick?.invoke(offset) }
-                    view.onZoomStep = { step ->
-                        when (step) {
-                            1 -> currentZoom?.zoomIn()
-                            -1 -> currentZoom?.zoomOut()
-                            else -> currentZoom?.reset()
+                    // a new size lays the whole text out again: a pinch and quick steps scale the drawing meanwhile,
+                    // and the size changes once, when the fingers lift or the steps pause
+                    view.onZoomStep = { steps ->
+                        val target = currentZoom
+                        if (target != null) {
+                            val before = target.scale
+                            if (steps == 0) target.reset() else target.step(steps)
+                            if (target.scale == before) view.endPreview()
                         }
+                    }
+                    view.onZoomPreview = { steps ->
+                        val target = currentZoom
+                        if (target != null) view.previewScale(target.stepped(steps) / target.scale)
                     }
                     view.onPinch = { factor, done ->
                         val target = currentZoom
                         if (target != null) {
                             if (editor.pinchStart.isNaN()) editor.pinchStart = target.scale
-                            target.follow(editor.pinchStart, factor)
+                            val start = editor.pinchStart
                             if (done) {
-                                target.commit()
                                 editor.pinchStart = Float.NaN
+                                target.follow(start, factor)
+                                target.commit()
+                                if (target.scale == start) view.endPreview()
+                            } else {
+                                view.previewScale((start * factor).coerceIn(target.minScale, target.maxScale) / start)
                             }
                         }
                     }
