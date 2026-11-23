@@ -86,7 +86,7 @@ internal class ShownItem(val item: CodeCompletionItem, val matched: List<IntRang
 /**
  * The completion list of one [CodeEditor] while it is open: where it applies, the items and the one highlighted,
  * and where the cursor is on screen. The list closes when the cursor leaves the word, the typed part matches no
- * item, the editor loses the focus, Esc is pressed or an item is chosen.
+ * item, the word already is the one item left, the editor loses the focus, Esc is pressed or an item is chosen.
  */
 @Stable
 internal class CompletionSession {
@@ -163,13 +163,26 @@ internal class CompletionSession {
         // the best first; items the completer put first stay first among equals
         val next = matches.sortedWith(compareByDescending<Triple<Int, CodeCompletionItem, PaletteMatcher.Match>> { it.third.score }.thenBy { it.first })
             .map { ShownItem(it.second, it.third.ranges) }
-        if (next.isEmpty()) {
+        // nothing to complete when the one item left is the word as it stands (Ace does the same): the list closes,
+        // out of the way of the Enter that ends the line
+        if (next.isEmpty() || (next.size == 1 && isTheWord(state, cursor, next[0].item))) {
             close()
             return
         }
         val previous = shown.getOrNull(highlighted)?.item
         shown = next
         highlighted = next.indexOfFirst { it.item == previous }.coerceAtLeast(0)
+    }
+
+    /** Whether choosing the [index]th item would leave the text as it is: the word already is the item. */
+    fun changesNothing(state: CodeEditorState, index: Int): Boolean {
+        val item = shown.getOrNull(index)?.item ?: return false
+        return isTheWord(state, state.cursor, item)
+    }
+
+    private fun isTheWord(state: CodeEditorState, cursor: Int, item: CodeCompletionItem): Boolean {
+        val to = (cursor + afterCursor).coerceAtMost(state.length)
+        return to - start == item.insertText.length && state.textIn(start, to) == item.insertText
     }
 
     /** Puts the [index]th item in place of the word, as one step of the undo history. */
@@ -190,7 +203,10 @@ internal class CompletionSession {
         highlighted = 0
     }
 
-    /** The list's keys while it is open: arrows and pages move, Enter and Tab choose, Esc closes. */
+    /**
+     * The list's keys while it is open: arrows and pages move, Enter and Tab choose, Esc closes. Enter and Tab on an
+     * item that is already the word are not taken: the list closes and the key goes on to the text.
+     */
     fun key(state: CodeEditorState, event: KeyEvent): Boolean {
         if (!isOpen || event.isCtrlPressed || event.isAltPressed || event.isMetaPressed) return false
         val count = shown.size
@@ -201,6 +217,11 @@ internal class CompletionSession {
             KeyEvent.KEYCODE_PAGE_UP -> highlighted = (highlighted - PAGE).coerceAtLeast(0)
             KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_TAB -> {
                 if (event.isShiftPressed) return false
+                if (changesNothing(state, highlighted)) {
+                    // the word already is the item: the key does what it does without the list (a new line, an indent)
+                    close()
+                    return false
+                }
                 accept(state, highlighted)
             }
             KeyEvent.KEYCODE_ESCAPE -> {

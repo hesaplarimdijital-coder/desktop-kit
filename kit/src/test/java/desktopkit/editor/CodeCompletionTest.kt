@@ -37,6 +37,7 @@ class CodeCompletionTest {
     private var live by mutableStateOf(true)
     private var input by mutableStateOf(InputMode.Pointer)
     private var asked = 0
+    private var moreItems = emptyList<CodeCompletionItem>()
 
     /** The sample language's names: the sections and the words of the language, for the word at the cursor. */
     private val completer = CodeCompleter { state, cursor ->
@@ -51,7 +52,7 @@ class CodeCompletionTest {
             CodeCompletionItem("sahil", "bölüm", DeskIcons.Folder),
             CodeCompletionItem("CONST", "sözcük"),
             CodeCompletionItem("END", "sözcük"),
-        ))
+        ) + moreItems)
     }
 
     private fun show() {
@@ -115,6 +116,44 @@ class CodeCompletionTest {
         rows().assertCountEquals(0)
         compose.runOnIdle { document.undo() }
         assertEquals("Sabah. -> ca", document.lineText(1))
+    }
+
+    @Test
+    fun enterAfterAWordThatIsAlreadyTheOnlyItemBreaksTheLine() {
+        // the device run: "Oak tree" and Enter, with "tree" offered: the list took Enter and the line never broke
+        show()
+        typeAtEndOfLine(1, " -> ", "sahil")
+        rows().assertCountEquals(0)
+        val lines = document.lineCount
+        val view = compose.editorView()
+        compose.runOnUiThread { view.press(KeyEvent.KEYCODE_ENTER) }
+        compose.waitForIdle()
+        assertEquals("Sabah. -> sahil", document.lineText(1))
+        assertEquals("Enter broke the line", lines + 1, document.lineCount)
+        assertEquals(document.lineStart(2), document.cursor)
+    }
+
+    @Test
+    fun enterOrTabOnTheItemThatIsAlreadyTheWordGoOnToTheText() {
+        moreItems = listOf(CodeCompletionItem("bahceler", "bölüm", DeskIcons.Folder))
+        show()
+        typeAtEndOfLine(1, " -> ", "bahce")
+        // "bahce" and "bahceler" fit, the first is what is typed: choosing it would change nothing
+        shown("bahce", "bölüm").assertExists()
+        shown("bahceler", "bölüm").assertExists()
+        val lines = document.lineCount
+        val view = compose.editorView()
+        compose.runOnUiThread { view.press(KeyEvent.KEYCODE_ENTER) }
+        compose.waitForIdle()
+        assertEquals("Sabah. -> bahce", document.lineText(1))
+        assertEquals("Enter broke the line", lines + 1, document.lineCount)
+        rows().assertCountEquals(0)
+        typeAtEndOfLine(2, "bahce")
+        shown("bahceler", "bölüm").assertExists()
+        compose.runOnUiThread { view.press(KeyEvent.KEYCODE_TAB) }
+        compose.waitForIdle()
+        assertEquals("Tab went on to the text", "bahce\t", document.lineText(2))
+        rows().assertCountEquals(0)
     }
 
     @Test
@@ -187,16 +226,17 @@ class CodeCompletionTest {
         val view = compose.editorView()
         compose.runOnUiThread {
             view.requestFocus()
-            // the cursor inside "bahce" of the first line: "ba|hce"
+            // a misspelt name on the first line, the cursor inside it: "ba|hxe" (a word that already is an item has
+            // nothing to complete, and the list stays closed)
+            document.replace(3, 8, "bahxe")
             document.select(5)
             view.press(KeyEvent.KEYCODE_SPACE, KeyEvent.META_CTRL_ON)
         }
         compose.waitForIdle()
         shown("bahce", "bölüm").assertExists()
-        compose.runOnUiThread { view.press(KeyEvent.KEYCODE_DPAD_DOWN) }
-        compose.waitForIdle()
         compose.runOnUiThread { view.press(KeyEvent.KEYCODE_ENTER) }
         compose.waitForIdle()
-        assertTrue("one name in the word's place: ${document.lineText(0)}", document.lineText(0).matches(Regex("== \\w+ ==")))
+        assertEquals("one name in the word's place", "== bahce ==", document.lineText(0))
+        assertEquals(8, document.cursor)
     }
 }

@@ -81,6 +81,36 @@ class CompletionSessionTest {
     }
 
     @Test
+    fun aWordThatIsAlreadyTheOnlyItemClosesTheList() {
+        // the device run: "Oak tree" and Enter, "tree" offered: the list took Enter and the line never broke
+        val state = CodeEditorState("Oak ")
+        val session = CompletionSession()
+        state.select(4)
+        state.insert("tre")
+        session.request(state, completer("tree"), state.cursor, typed = true)
+        assertEquals(listOf("tree"), session.labels())
+        state.insert("e")
+        session.refilter(state, state.cursor, collapsed = true)
+        assertFalse("nothing is left to complete: the list is out of the way of Enter", session.isOpen)
+    }
+
+    @Test
+    fun choosingTheItemThatIsAlreadyTheWordWouldChangeNothing() {
+        val state = CodeEditorState("Oak tree")
+        val session = CompletionSession()
+        state.select(8)
+        session.request(state, completer("tree", "treehouse"), state.cursor, typed = false)
+        assertEquals(listOf("tree", "treehouse"), session.labels())
+        assertTrue(session.changesNothing(state, 0))
+        assertFalse(session.changesNothing(state, 1))
+        // the case differs: choosing it changes the word
+        state.setText("Oak Tree")
+        state.select(8)
+        session.request(state, completer("tree", "treehouse"), state.cursor, typed = false)
+        assertFalse(session.changesNothing(state, 0))
+    }
+
+    @Test
     fun aWordNothingFitsIsNotAskedAboutAgain() {
         val state = CodeEditorState("")
         val session = CompletionSession()
