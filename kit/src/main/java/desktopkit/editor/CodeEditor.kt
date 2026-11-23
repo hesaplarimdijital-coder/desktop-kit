@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -65,6 +64,7 @@ import desktopkit.shell.LocalShellOverlayHost
 import desktopkit.shell.TextFields
 import desktopkit.theme.DeskTheme
 import desktopkit.theme.SyntaxRole
+import desktopkit.theme.SyntaxTints
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -155,7 +155,6 @@ fun CodeEditor(
     val type = DeskTheme.type
     val density = LocalDensity.current
     val layoutDirection = LocalLayoutDirection.current
-    val selectionColors = LocalTextSelectionColors.current
     val fontResolver = LocalFontFamilyResolver.current
     val focusManager = LocalFocusManager.current
     val touch = dimens.minTarget >= 48.dp
@@ -187,14 +186,15 @@ fun CodeEditor(
             )
         }
     }
-    val look = remember(colors, syntax, selectionColors) {
+    val look = remember(colors, syntax) {
         EditorLook(
             text = syntax.plain.toArgb(),
             hint = colors.textTertiary.toArgb(),
             currentLine = syntax.currentLine.toArgb(),
             lineNumber = syntax.lineNumber.toArgb(),
             lineNumberCurrent = syntax.plain.toArgb(),
-            selection = selectionColors.backgroundColor.toArgb(),
+            // lighter than in a text field: under coloured tokens the field's tint would take them below 4.5:1
+            selection = colors.accent.copy(alpha = SyntaxTints.SELECTION).toArgb(),
             cursor = colors.accent.toArgb(),
             bracket = colors.controlBorder.toArgb(),
             tones = IntArray(DecorationTone.entries.size) { index ->

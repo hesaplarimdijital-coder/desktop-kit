@@ -34,7 +34,9 @@ değişmeden derlenir; API'de eklemeler dışında iki küçük değişiklik var
   satırı değiştiren bir düzenleme (ink'te seçenek satırı) tuş başına yalnız görünen yere kadar öder.
 - **Tema.** `DeskTheme.syntax` (`DeskSyntax`): her role bir renk ve isteğe bağlı kalın ya da eğik; temanın renklerinden
   yapılır (griler, metin rengi, vurgu ve dört sakin ton). Her rol açık, koyu ve OLED temada, hazır ve zorlayıcı özel
-  vurgularla sayfada ve geçerli satırda 4,5:1 (`SyntaxContrastTest`). Bir rolü değiştirmek için
+  vurgularla sayfada, geçerli satırda ve düzenleyicinin yazı altına koyduğu her tonda (arama eşleşmesi, işaretli satır,
+  süsleme, seçim) 4,5:1 (`SyntaxContrastTest`); geçerli arama eşleşmesi koyu bir dolguyla değil, ince bir vurgu
+  çerçevesiyle ayrılır, seçim düzenleyicide metin alanlarındakinden açıktır. Bir rolü değiştirmek için
   `DesktopKitRoot(prefs, syntax = { it.with(SyntaxRole.Tag, …) })`. Yeni yazı stili `DeskType.code`: mono, gövde
   boyunda, 1,5 satır aralığı.
 - **Kenar, işaretler, süslemeler.** Satır numaraları (sarılmış satırda ilk sırada, basamak kadar geniş), uygulamanın

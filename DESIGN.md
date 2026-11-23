@@ -156,19 +156,21 @@ Renkler sözdizimi rolüne göre (`SyntaxRole`), temanın renklerinden yapılır
 | Comment | `textTertiary` | eğik |
 | Keyword | vurgu (`accentText`) | kalın |
 | Link | vurgu (`accentText`) | |
-| String | yeşil (koyu `#8FD3A8`, açık `#1B6E47`) | |
-| Number, Constant | kehribar (koyu `#E2BB73`, açık `#85560F`) | |
-| Name, Function | camgöbeği (koyu `#7CCBD6`, açık `#0B6672`) | |
-| Type, Tag | mor (koyu `#C3A9F4`, açık `#6541B8`) | |
+| String | yeşil (koyu `#8FD3A8`, açık `#175E3D`) | |
+| Number, Constant | kehribar (koyu `#E2BB73`, açık `#724A0D`) | |
+| Name, Function | camgöbeği (koyu `#7CCBD6`, açık `#0A5C67`) | |
+| Type, Tag | mor (koyu `#C3A9F4`, açık `#603EAF`) | |
 | Meta | mor | eğik |
 | Operator, Punctuation | `textSecondary` | |
 | Heading, Strong | `text` | kalın |
 | Emphasis | `text` | eğik |
 | Invalid | `danger` | |
 
-Her rol ve satır numaraları sayfanın arka planında ve geçerli satırın tonunda, açık, koyu ve OLED temada, hazır ve
-zorlayıcı özel vurgularla 4,5:1'e ulaşır; ulaşmayan renk `ensureContrast` ile koyulaşır ya da açılır
-(`SyntaxContrastTest`). Kalın daha kalın bir çizgi, eğik bir eğimdir: aynı glif genişlikleri, yazı yer değiştirmez.
+Her rol ve satır numaraları sayfanın arka planında, geçerli satırın tonunda ve düzenleyicinin yazının altına koyduğu
+her tonda (arama eşleşmesi, işaretli ve süslenmiş satır, aralık süslemesi, seçim; tek başına ve üst üste geldikleri
+gibi), açık, koyu ve OLED temada, hazır ve zorlayıcı özel vurgularla 4,5:1'e ulaşır; ulaşmayan renk `ensureContrast`
+ile koyulaşır ya da açılır (`SyntaxContrastTest`). Açık temanın dört rengi hiçbir hazır vurguda kaydırılmayacak
+koyulukta seçildi. Kalın daha kalın bir çizgi, eğik bir eğimdir: aynı glif genişlikleri, yazı yer değiştirmez.
 Düzenleyicinin yazısı ipuçsuz (doğrusal, piksel altı) glif genişlikleriyle ölçülür: satır kıran ölçü ile çizim her
 biçimde aynıdır.
 
@@ -183,9 +185,10 @@ biçimde aynıdır.
 | Tamamlama listesi | en çok 360 dp genişlik, 28 dp satır, 8 satır | 48 dp satır, 5 satır |
 | Arama seçenek düğmeleri | 24 dp (simge 12) | 32 dp (simge 16) |
 
-Tonlar: geçerli satır koyu temada `surfaceRaised`, açıkta `hover`; işaretli satır tonun %10'u, aralık süslemesi ve
-arama eşleşmesi %24'ü, geçerli eşleşme %55'i; seçim vurgunun %35'i; eşleşen parantezin çerçevesi `controlBorder`, 1 dp;
-alt çizgi 1 dp. Tamamlama listesi menülerin düz yüzeyi gibidir: `surfaceRaised`, `borderStrong` kenar, `radiusCard`,
+Tonlar: geçerli satır koyu temada `surfaceRaised`, açıkta `hover`; işaretli satır tonun %8'i, aralık süslemesi ve
+arama eşleşmesi %14'ü; geçerli eşleşme aynı ton ve çevresinde 2 dp'lik vurgu çerçevesi (altını koyulaştırmak
+renkli sözcükleri okunmaz yapardı); seçim vurgunun %20'si (metin alanlarında %35: orada yazı tek renk); eşleşen
+parantezin çerçevesi `controlBorder`, 1 dp; alt çizgi 1 dp. Tamamlama listesi menülerin düz yüzeyi gibidir: `surfaceRaised`, `borderStrong` kenar, `radiusCard`,
 12 dp gölge; vurgulanan satır `selection`. Arama çubuğu `surface` üstünde, altında ince bir çizgi.
 
 ## Yazılı istisnalar

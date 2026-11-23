@@ -57,6 +57,7 @@ import android.widget.OverScroller
 import android.widget.TextView
 import androidx.core.view.NestedScrollingChildHelper
 import androidx.core.view.ViewCompat
+import desktopkit.theme.SyntaxTints
 import java.util.IdentityHashMap
 import java.util.concurrent.Executor
 import java.util.function.IntConsumer
@@ -1699,7 +1700,7 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
             for (i in 0 until markers.size()) {
                 val line = markers.keyAt(i)
                 if (line < firstLine || line > lastLine || line >= lines.count) continue
-                fillPaint.color = withAlpha(look.tones[markerTone(markers.valueAt(i).severity).ordinal], LINE_TINT)
+                fillPaint.color = withAlpha(look.tones[markerTone(markers.valueAt(i).severity).ordinal], SyntaxTints.LINE)
                 canvas.drawRect(left, layout.getLineTop(layout.getLineForOffset(lines.start(line))).toFloat(), right,
                     layout.getLineBottom(layout.getLineForOffset(lines.end(line))).toFloat(), fillPaint)
             }
@@ -1709,7 +1710,7 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
             if (decoration.kind != DecorationKind.Line || decoration.end < visibleStart || decoration.start > visibleEnd) continue
             val from = decoration.start.coerceIn(0, length)
             val to = decoration.end.coerceIn(from, length)
-            fillPaint.color = withAlpha(look.tones[decoration.tone.ordinal], LINE_TINT)
+            fillPaint.color = withAlpha(look.tones[decoration.tone.ordinal], SyntaxTints.LINE)
             canvas.drawRect(left, layout.getLineTop(layout.getLineForOffset(lines.start(lines.lineOf(from)))).toFloat(), right,
                 layout.getLineBottom(layout.getLineForOffset(lines.end(lines.lineOf(to)))).toFloat(), fillPaint)
         }
@@ -1727,7 +1728,7 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
             val from = decoration.start.coerceIn(0, length)
             val to = decoration.end.coerceIn(from, length)
             if (to > from) {
-                fillPaint.color = withAlpha(look.tones[decoration.tone.ordinal], RANGE_TINT)
+                fillPaint.color = withAlpha(look.tones[decoration.tone.ordinal], SyntaxTints.RANGE)
                 drawRange(canvas, layout, from, to, textLeft, fillPaint)
             }
         }
@@ -1741,13 +1742,20 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
                 if (ranges[mid * 2 + 1] < visibleStart) low = mid + 1 else high = mid
             }
             val accent = look.tones[DecorationTone.Accent.ordinal]
+            fillPaint.color = withAlpha(accent, SyntaxTints.MATCH)
             var index = low
             while (index < ranges.size / 2 && ranges[index * 2] <= visibleEnd) {
                 val from = ranges[index * 2].coerceIn(0, length)
                 val to = ranges[index * 2 + 1].coerceIn(from, length)
                 if (to > from) {
-                    fillPaint.color = withAlpha(accent, if (index == searchCurrent) CURRENT_MATCH_TINT else RANGE_TINT)
                     drawRange(canvas, layout, from, to, textLeft, fillPaint)
+                    // the current one: a frame in the accent around the same light tint, so its text keeps its contrast
+                    if (index == searchCurrent) {
+                        strokePaint.color = accent
+                        strokePaint.strokeWidth = metrics.stroke * CURRENT_MATCH_FRAME
+                        drawRange(canvas, layout, from, to, textLeft, strokePaint)
+                        strokePaint.strokeWidth = metrics.stroke
+                    }
                 }
                 index++
             }
@@ -1881,9 +1889,8 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
         private const val TOKENIZE_SLICE_NANOS = 4_000_000L
         private const val BOLD_STROKE = 0.035f
         private const val ITALIC_SKEW = -0.2f
-        private const val LINE_TINT = 0.10f
-        private const val RANGE_TINT = 0.24f
-        private const val CURRENT_MATCH_TINT = 0.55f
+        /** The current match's frame: twice the editor's hairline (2 dp). */
+        private const val CURRENT_MATCH_FRAME = 2f
         private const val FIRST_ACTION_ID = 0x00dc0000
 
         /** Hardware keys type what is pressed: no capitals of the listener's own, no automatic corrections. */
