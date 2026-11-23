@@ -1,12 +1,13 @@
-# 2.9.0'a geçiş
+# 2.10.0'a geçiş
 
-Bu rehber kiti kullanan uygulamaları en güncel sürüme, 2.9.0'a taşımak için. 0.1.3'ten gelenler baştan
+Bu rehber kiti kullanan uygulamaları en güncel sürüme, 2.10.0'a taşımak için. 0.1.3'ten gelenler baştan
 başlar; adımlardan sonra [görünümde fark edecekleri](#013ten-gelince-görünümde-fark-edecekleriniz) ayrıca
 yazılı. 1.0.0'dan geçenler 1. adımdan sonra doğrudan [1.0'dan 2.0'a](#10dan-20a) bölümüne atlayabilir. 2.0.0,
-2.1.0, 2.2.0, 2.3.0, 2.4.0, 2.4.1, 2.5.0 ya da 2.8.0 kullananlar [2.0.0'dan 2.1.0'a](#200dan-210a),
+2.1.0, 2.2.0, 2.3.0, 2.4.0, 2.4.1, 2.5.0, 2.8.0 ya da 2.9.0 kullananlar [2.0.0'dan 2.1.0'a](#200dan-210a),
 [2.1.0'dan 2.2.0'a](#210dan-220a), [2.2.0'dan 2.3.0'a](#220dan-230a), [2.3.0'dan 2.4.0'a](#230dan-240a),
-[2.4.0'dan 2.4.1'e](#240dan-241e), [2.4.1'den 2.5.0'a](#241den-250a), [2.5.0'dan 2.8.0'a](#250den-280a) ve
-[2.8.0'dan 2.9.0'a](#280den-290a) bölümlerinden yalnızca kendi sürümünden sonrakilere bakar.
+[2.4.0'dan 2.4.1'e](#240dan-241e), [2.4.1'den 2.5.0'a](#241den-250a), [2.5.0'dan 2.8.0'a](#250den-280a),
+[2.8.0'dan 2.9.0'a](#280den-290a) ve [2.9.0'dan 2.10.0'a](#290dan-2100a) bölümlerinden yalnızca kendi
+sürümünden sonrakilere bakar.
 
 Sıra şöyle: önce derleme ortamı (kitin kendisi aynı adımları `7845eb5` gönderisinde attı, örnek olarak
 oraya bakılabilir), sonra uygulamanın kendi yazdığı bileşenler kitinkilerle değiştirilir, en son yeni
@@ -14,7 +15,7 @@ oraya bakılabilir), sonra uygulamanın kendi yazdığı bileşenler kitinkilerl
 
 ## 1. Derleme ortamı
 
-| | 0.1.3 uygulamaları | 2.9.0 |
+| | 0.1.3 uygulamaları | 2.10.0 |
 | --- | --- | --- |
 | Android Gradle eklentisi (AGP) | 8.7.3 | 9.4.1 (en az 9.1.1) |
 | Gradle | 8.11.1 | 9.8.2 |
@@ -33,7 +34,7 @@ cihazlar uygulamayı kuramaz. Uygulamalar Play'de olmadığı için başka bir e
 Adımlar:
 
 1. `gradle/wrapper/gradle-wrapper.properties`: `distributionUrl=https\://services.gradle.org/distributions/gradle-9.8.2-bin.zip`
-2. `gradle/libs.versions.toml`: yukarıdaki sürümler ve `desktopKit = "2.9.0"`. En kolayı kitin kendi
+2. `gradle/libs.versions.toml`: yukarıdaki sürümler ve `desktopKit = "2.10.0"`. En kolayı kitin kendi
    `gradle/libs.versions.toml` dosyasındaki sürümleri almak.
 3. AGP 9 Kotlin'i kendisi derler (yerleşik Kotlin). Modüllerden `alias(libs.plugins.kotlin.android)`
    satırını sil, `kotlin.compose` kalsın. Kökteki `build.gradle.kts` dosyasında eklentiyi uygulamadan
