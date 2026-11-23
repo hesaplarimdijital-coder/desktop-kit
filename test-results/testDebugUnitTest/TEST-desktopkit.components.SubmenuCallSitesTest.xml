@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.components.SubmenuCallSitesTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-23T01:42:41.614Z" hostname="runnervm0hi8g" time="0.668">
+  <properties/>
+  <testcase name="theShortcutTablesExtraEntriesMayBeSubmenus" classname="desktopkit.components.SubmenuCallSitesTest" time="0.028"/>
+  <testcase name="aMenuBarMenuOpensItsSubmenuAndRunsAnItemInIt" classname="desktopkit.components.SubmenuCallSitesTest" time="0.1"/>
+  <testcase name="aRowsContextMenuOpensItsSubmenu" classname="desktopkit.components.SubmenuCallSitesTest" time="0.126"/>
+  <testcase name="theMenusBehindTheRailsButtonHaveTheirSubmenus" classname="desktopkit.components.SubmenuCallSitesTest" time="0.164"/>
+  <testcase name="aNavigationEntrysMenuOpensItsSubmenu" classname="desktopkit.components.SubmenuCallSitesTest" time="0.116"/>
+  <testcase name="movingToAnotherTitleOfTheMenuBarClosesTheSubmenusWithTheirMenu" classname="desktopkit.components.SubmenuCallSitesTest" time="0.131"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

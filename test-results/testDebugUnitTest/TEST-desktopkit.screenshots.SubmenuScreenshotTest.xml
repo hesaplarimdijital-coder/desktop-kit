@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.screenshots.SubmenuScreenshotTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-23T01:43:10.825Z" hostname="runnervm0hi8g" time="1.105">
+  <properties/>
+  <testcase name="phoneMenu" classname="desktopkit.screenshots.SubmenuScreenshotTest" time="0.138"/>
+  <testcase name="tabletTouchDark" classname="desktopkit.screenshots.SubmenuScreenshotTest" time="0.18"/>
+  <testcase name="tabletTouchLight" classname="desktopkit.screenshots.SubmenuScreenshotTest" time="0.189"/>
+  <testcase name="menuBarDark" classname="desktopkit.screenshots.SubmenuScreenshotTest" time="0.151"/>
+  <testcase name="phoneSheetPageDark" classname="desktopkit.screenshots.SubmenuScreenshotTest" time="0.138"/>
+  <testcase name="menuBarLight" classname="desktopkit.screenshots.SubmenuScreenshotTest" time="0.143"/>
+  <testcase name="phoneSheetPageLight" classname="desktopkit.screenshots.SubmenuScreenshotTest" time="0.163"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

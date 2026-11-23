@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.components.SubmenuLogicTest" tests="22" skipped="0" failures="0" errors="0" timestamp="2026-11-23T01:42:42.285Z" hostname="runnervm0hi8g" time="0.017">
+  <properties/>
+  <testcase name="theOpenSubmenuFollowsItsEntries" classname="desktopkit.components.SubmenuLogicTest" time="0.009"/>
+  <testcase name="aPointerMovingTowardTheSubmenuIsOnItsWay" classname="desktopkit.components.SubmenuLogicTest" time="0.001"/>
+  <testcase name="onItsWayToTheOpenSubmenuEveryMoveStartsTheWaitAgain" classname="desktopkit.components.SubmenuLogicTest" time="0.0"/>
+  <testcase name="theRestingPointerOpensASubmenuAndClosesItOnAnotherLine" classname="desktopkit.components.SubmenuLogicTest" time="0.0"/>
+  <testcase name="crossingLinesStartsTheWaitAgainOnEachLine" classname="desktopkit.components.SubmenuLogicTest" time="0.001"/>
+  <testcase name="leavingTheMenuForTheSubmenuCancelsTheWait" classname="desktopkit.components.SubmenuLogicTest" time="0.0"/>
+  <testcase name="inARightToLeftLayoutTheEndSideIsTheLeft" classname="desktopkit.components.SubmenuLogicTest" time="0.0"/>
+  <testcase name="onAPhoneItGoesOverItsParentOnTheSideWithMoreRoom" classname="desktopkit.components.SubmenuLogicTest" time="0.0"/>
+  <testcase name="aSubmenuOpensOnTheEndSideLevelWithItsLine" classname="desktopkit.components.SubmenuLogicTest" time="0.0"/>
+  <testcase name="theFocusGoesToTheFirstLineThatCanTakeIt" classname="desktopkit.components.SubmenuLogicTest" time="0.001"/>
+  <testcase name="aLineTakesOverOnceThePointerRestsOnIt" classname="desktopkit.components.SubmenuLogicTest" time="0.0"/>
+  <testcase name="withoutRoomAtTheEndItOpensOnTheStartSide" classname="desktopkit.components.SubmenuLogicTest" time="0.0"/>
+  <testcase name="backOnTheSubmenusOwnLineNothingWaits" classname="desktopkit.components.SubmenuLogicTest" time="0.0"/>
+  <testcase name="aClickOpensAtOnceAndStopsTheWait" classname="desktopkit.components.SubmenuLogicTest" time="0.0"/>
+  <testcase name="theArrowPointingAtTheSubmenuOpensItAndTheOneBackCloses" classname="desktopkit.components.SubmenuLogicTest" time="0.004"/>
+  <testcase name="anEmptyOrDisabledSubmenuDoesNotOpen" classname="desktopkit.components.SubmenuLogicTest" time="0.0"/>
+  <testcase name="itNeverGoesUnderTheBarsOfTheWindow" classname="desktopkit.components.SubmenuLogicTest" time="0.0"/>
+  <testcase name="aSubmenuOnTheLeftIsAimedForToTheLeft" classname="desktopkit.components.SubmenuLogicTest" time="0.001"/>
+  <testcase name="nearTheBottomItMovesUpToStayInTheWindow" classname="desktopkit.components.SubmenuLogicTest" time="0.0"/>
+  <testcase name="aSubmenuIsFoundAgainByItsLabelThenAtItsPlace" classname="desktopkit.components.SubmenuLogicTest" time="0.0"/>
+  <testcase name="rightToLeftSwapsTheArrows" classname="desktopkit.components.SubmenuLogicTest" time="0.0"/>
+  <testcase name="onlyAMoveThatBringsThePointerNearerStartsTheWaitAgain" classname="desktopkit.components.SubmenuLogicTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

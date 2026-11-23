@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.editor.TextZoomTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-23T01:42:56.969Z" hostname="runnervm0hi8g" time="0.362">
+  <properties/>
+  <testcase name="ctrlPlusMinusAndZeroOnTheKeyboard" classname="desktopkit.editor.TextZoomTest" time="0.128"/>
+  <testcase name="aZoomedStyleGrowsWithItsLines" classname="desktopkit.editor.TextZoomTest" time="0.022"/>
+  <testcase name="talkBackOffersLargerAndSmallerText" classname="desktopkit.editor.TextZoomTest" time="0.052"/>
+  <testcase name="twoFingersSpreadTheText" classname="desktopkit.editor.TextZoomTest" time="0.049"/>
+  <testcase name="ctrlAndTheWheelZoomTheTextInsteadOfScrollingIt" classname="desktopkit.editor.TextZoomTest" time="0.072"/>
+  <testcase name="theSizeIsKeptUnderItsKey" classname="desktopkit.editor.TextZoomTest" time="0.036"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

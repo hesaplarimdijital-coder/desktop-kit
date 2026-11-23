@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.screenshots.EditorScreenshotTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-23T01:43:05.322Z" hostname="runnervm0hi8g" time="0.973">
+  <properties/>
+  <testcase name="phoneLight" classname="desktopkit.screenshots.EditorScreenshotTest" time="0.107"/>
+  <testcase name="phoneDark" classname="desktopkit.screenshots.EditorScreenshotTest" time="0.095"/>
+  <testcase name="completionDarkPointer" classname="desktopkit.screenshots.EditorScreenshotTest" time="0.081"/>
+  <testcase name="completionPhoneLight" classname="desktopkit.screenshots.EditorScreenshotTest" time="0.099"/>
+  <testcase name="oledPointer" classname="desktopkit.screenshots.EditorScreenshotTest" time="0.07"/>
+  <testcase name="searchDarkPointer" classname="desktopkit.screenshots.EditorScreenshotTest" time="0.087"/>
+  <testcase name="searchPhoneLight" classname="desktopkit.screenshots.EditorScreenshotTest" time="0.113"/>
+  <testcase name="lightPointer" classname="desktopkit.screenshots.EditorScreenshotTest" time="0.1"/>
+  <testcase name="darkTouchSelection" classname="desktopkit.screenshots.EditorScreenshotTest" time="0.08"/>
+  <testcase name="lightPointerUnwrapped" classname="desktopkit.screenshots.EditorScreenshotTest" time="0.071"/>
+  <testcase name="darkPointer" classname="desktopkit.screenshots.EditorScreenshotTest" time="0.064"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

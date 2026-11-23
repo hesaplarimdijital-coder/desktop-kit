@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.shell.NavIconBadgeTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-23T01:43:18.255Z" hostname="runnervm0hi8g" time="0.129">
+  <properties/>
+  <testcase name="theRailShowsIt" classname="desktopkit.shell.NavIconBadgeTest" time="0.046"/>
+  <testcase name="theCollapsedSidebarShowsItTheOpenOneDoesNot" classname="desktopkit.shell.NavIconBadgeTest" time="0.052"/>
+  <testcase name="theBottomBarShowsTheCountAndSaysIt" classname="desktopkit.shell.NavIconBadgeTest" time="0.028"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

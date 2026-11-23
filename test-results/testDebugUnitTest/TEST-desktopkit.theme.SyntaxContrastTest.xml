@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.theme.SyntaxContrastTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-23T01:43:22.481Z" hostname="runnervm0hi8g" time="0.129">
+  <properties/>
+  <testcase name="keywordsAndLinksTakeTheAccent" classname="desktopkit.theme.SyntaxContrastTest" time="0.055"/>
+  <testcase name="theCurrentMatchsFrameCanBeSeen" classname="desktopkit.theme.SyntaxContrastTest" time="0.012"/>
+  <testcase name="theCodeStyleIsMonoAtTheBodySizeOnTallerLines" classname="desktopkit.theme.SyntaxContrastTest" time="0.012"/>
+  <testcase name="everyRoleReadsOnThePageAndOnTheCurrentLine" classname="desktopkit.theme.SyntaxContrastTest" time="0.011"/>
+  <testcase name="gutterMarksCanBeSeen" classname="desktopkit.theme.SyntaxContrastTest" time="0.009"/>
+  <testcase name="thePresetThemesKeepTheChosenHues" classname="desktopkit.theme.SyntaxContrastTest" time="0.002"/>
+  <testcase name="anAppChangesSingleRoles" classname="desktopkit.theme.SyntaxContrastTest" time="0.0"/>
+  <testcase name="everyRoleReadsOnEveryTintUnderIt" classname="desktopkit.theme.SyntaxContrastTest" time="0.028"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

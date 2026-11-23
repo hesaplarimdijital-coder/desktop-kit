@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.editor.CodeCompletionTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-11-23T01:42:46.476Z" hostname="runnervm0hi8g" time="1.088">
+  <properties/>
+  <testcase name="aTapChoosesOnTouch" classname="desktopkit.editor.CodeCompletionTest" time="0.402"/>
+  <testcase name="theArrowsMoveAndTabChooses" classname="desktopkit.editor.CodeCompletionTest" time="0.099"/>
+  <testcase name="enterAfterAWordThatIsAlreadyTheOnlyItemBreaksTheLine" classname="desktopkit.editor.CodeCompletionTest" time="0.087"/>
+  <testcase name="typingAWordOpensTheListAndTheLettersNarrowIt" classname="desktopkit.editor.CodeCompletionTest" time="0.13"/>
+  <testcase name="theWordAfterTheCursorIsReplacedToo" classname="desktopkit.editor.CodeCompletionTest" time="0.057"/>
+  <testcase name="enterChoosesTheHighlightedItemAsOneUndoStep" classname="desktopkit.editor.CodeCompletionTest" time="0.069"/>
+  <testcase name="withoutLiveCompletionOnlyCtrlSpaceOrTheAppOpensIt" classname="desktopkit.editor.CodeCompletionTest" time="0.078"/>
+  <testcase name="enterOrTabOnTheItemThatIsAlreadyTheWordGoOnToTheText" classname="desktopkit.editor.CodeCompletionTest" time="0.079"/>
+  <testcase name="escapeClosesTheListForTheRestOfTheWord" classname="desktopkit.editor.CodeCompletionTest" time="0.081"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

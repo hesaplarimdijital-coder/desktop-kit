@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.editor.CodeSearchBarTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-23T01:42:55.870Z" hostname="runnervm0hi8g" time="0.592">
+  <properties/>
+  <testcase name="anInvalidExpressionSaysSo" classname="desktopkit.editor.CodeSearchBarTest" time="0.068"/>
+  <testcase name="replacingWaitsForTheSearchOfTheQueryAsItIsNow" classname="desktopkit.editor.CodeSearchBarTest" time="0.063"/>
+  <testcase name="typingFindsFromTheCursorAndTheKeysStep" classname="desktopkit.editor.CodeSearchBarTest" time="0.065"/>
+  <testcase name="openingWithASelectionSeedsTheQueryAndMarksEveryMatch" classname="desktopkit.editor.CodeSearchBarTest" time="0.048"/>
+  <testcase name="theEditorsKeysOpenStepAndClose" classname="desktopkit.editor.CodeSearchBarTest" time="0.062"/>
+  <testcase name="escapeClosesAndTheEditorHasTheFocusAtTheMatch" classname="desktopkit.editor.CodeSearchBarTest" time="0.065"/>
+  <testcase name="replaceStepsOnAndReplaceAllIsOneUndoStep" classname="desktopkit.editor.CodeSearchBarTest" time="0.083"/>
+  <testcase name="theMarksMoveWithTheTextAtOnce" classname="desktopkit.editor.CodeSearchBarTest" time="0.134"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

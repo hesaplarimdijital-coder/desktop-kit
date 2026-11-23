@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.components.FocusStopsTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-23T01:42:29.937Z" hostname="runnervm0hi8g" time="0.522">
+  <properties/>
+  <testcase name="aSheetKeepsTheFocus" classname="desktopkit.components.FocusStopsTest" time="0.175"/>
+  <testcase name="rightToLeftHomeIsTheFirstTab" classname="desktopkit.components.FocusStopsTest" time="0.105"/>
+  <testcase name="aTabStripIsOneStopAndTheArrowsMoveInIt" classname="desktopkit.components.FocusStopsTest" time="0.089"/>
+  <testcase name="aCoverGridIsOneStop" classname="desktopkit.components.FocusStopsTest" time="0.148"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

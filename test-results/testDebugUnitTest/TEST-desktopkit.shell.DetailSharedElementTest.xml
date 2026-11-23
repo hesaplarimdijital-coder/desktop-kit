@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.shell.DetailSharedElementTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-23T01:43:16.166Z" hostname="runnervm0hi8g" time="0.3">
+  <properties/>
+  <testcase name="coverFliesFromTheRowToTheDetail" classname="desktopkit.shell.DetailSharedElementTest" time="0.047"/>
+  <testcase name="closingWhileOpeningTurnsAroundWhereItIs" classname="desktopkit.shell.DetailSharedElementTest" time="0.087"/>
+  <testcase name="theCardGrowsIntoTheHeaderAndBack" classname="desktopkit.shell.DetailSharedElementTest" time="0.05"/>
+  <testcase name="theCardIsDrawnAgainOnceTheDetailIsGone" classname="desktopkit.shell.DetailSharedElementTest" time="0.037"/>
+  <testcase name="coverKeepsItsRoundedCornersFlyingBack" classname="desktopkit.shell.DetailSharedElementTest" time="0.075"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

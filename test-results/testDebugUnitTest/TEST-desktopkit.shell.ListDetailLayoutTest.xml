@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.shell.ListDetailLayoutTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-23T01:43:17.846Z" hostname="runnervm0hi8g" time="0.175">
+  <properties/>
+  <testcase name="narrowOneAtATimeAndTheDetailKeepsItsStateAcross" classname="desktopkit.shell.ListDetailLayoutTest" time="0.048"/>
+  <testcase name="aWideWindowWithoutRoomForBothShowsOneAtATime" classname="desktopkit.shell.ListDetailLayoutTest" time="0.03"/>
+  <testcase name="wideTheListAndTheDetailAreSideBySide" classname="desktopkit.shell.ListDetailLayoutTest" time="0.052"/>
+  <testcase name="theListKeepsItsStateWhileItIsOutOfSight" classname="desktopkit.shell.ListDetailLayoutTest" time="0.041"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

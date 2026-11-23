@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.editor.DocumentModelTest" tests="17" skipped="0" failures="0" errors="0" timestamp="2026-11-23T01:42:56.521Z" hostname="runnervm0hi8g" time="0.181">
+  <properties/>
+  <testcase name="onlyTheLinesLookedAtAreTokenized" classname="desktopkit.editor.DocumentModelTest" time="0.004"/>
+  <testcase name="theCacheMatchesAFreshTokenizerAfterRandomEdits" classname="desktopkit.editor.DocumentModelTest" time="0.129"/>
+  <testcase name="tokensComeOutAsTriplesRelativeToTheLine" classname="desktopkit.editor.DocumentModelTest" time="0.0"/>
+  <testcase name="theKeyboardsCorrectionsOfAComposedWordFoldIntoIt" classname="desktopkit.editor.DocumentModelTest" time="0.001"/>
+  <testcase name="aKeystrokeTokenizesOneLine" classname="desktopkit.editor.DocumentModelTest" time="0.004"/>
+  <testcase name="aPauseOrALineBreakStartsANewStep" classname="desktopkit.editor.DocumentModelTest" time="0.0"/>
+  <testcase name="aRemovedLineThatOpenedACommentUncolorsWhatFollowed" classname="desktopkit.editor.DocumentModelTest" time="0.001"/>
+  <testcase name="lineIndexFollowsRandomEdits" classname="desktopkit.editor.DocumentModelTest" time="0.02"/>
+  <testcase name="anOpenedCommentRunsOnUntilItSettles" classname="desktopkit.editor.DocumentModelTest" time="0.003"/>
+  <testcase name="aSinkCutsTokensToTheLineAndDropsOverlaps" classname="desktopkit.editor.DocumentModelTest" time="0.0"/>
+  <testcase name="typingAWordIsOneStepAndTheNextWordAnother" classname="desktopkit.editor.DocumentModelTest" time="0.001"/>
+  <testcase name="aTokenWithoutARoleIsPlainText" classname="desktopkit.editor.DocumentModelTest" time="0.002"/>
+  <testcase name="lineIndexCountsLines" classname="desktopkit.editor.DocumentModelTest" time="0.0"/>
+  <testcase name="programmaticEditsStandAloneAndAGroupIsOneStep" classname="desktopkit.editor.DocumentModelTest" time="0.0"/>
+  <testcase name="anUnchangedLineKeepsItsTokensObject" classname="desktopkit.editor.DocumentModelTest" time="0.001"/>
+  <testcase name="anEditThatChangesEveryLaterStateStopsAtTheViewAndIsCarriedOnInSlices" classname="desktopkit.editor.DocumentModelTest" time="0.012"/>
+  <testcase name="backspacesAndDeletesGather" classname="desktopkit.editor.DocumentModelTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

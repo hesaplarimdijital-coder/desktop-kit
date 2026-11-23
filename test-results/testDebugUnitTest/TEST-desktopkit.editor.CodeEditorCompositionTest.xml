@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.editor.CodeEditorCompositionTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-11-23T01:42:47.812Z" hostname="runnervm0hi8g" time="0.912">
+  <properties/>
+  <testcase name="theSearchGoingToAMatchEndsTheWordTheKeyboardHolds" classname="desktopkit.editor.CodeEditorCompositionTest" time="0.073"/>
+  <testcase name="aHardwareKeyboardTypesTheCaseThatIsPressed" classname="desktopkit.editor.CodeEditorCompositionTest" time="0.069"/>
+  <testcase name="theKeyboardsOwnMovesKeepItsWord" classname="desktopkit.editor.CodeEditorCompositionTest" time="0.068"/>
+  <testcase name="theEndKeyEndsTheWordTheKeyboardHolds" classname="desktopkit.editor.CodeEditorCompositionTest" time="0.064"/>
+  <testcase name="aTapInTheGutterEndsTheWordTheKeyboardHolds" classname="desktopkit.editor.CodeEditorCompositionTest" time="0.138"/>
+  <testcase name="controlHomeEndsTheWordTheKeyboardHolds" classname="desktopkit.editor.CodeEditorCompositionTest" time="0.091"/>
+  <testcase name="aLineRevealedForAnIssueEndsTheWordTheKeyboardHolds" classname="desktopkit.editor.CodeEditorCompositionTest" time="0.054"/>
+  <testcase name="theAppSelectingEndsTheWordTheKeyboardHolds" classname="desktopkit.editor.CodeEditorCompositionTest" time="0.059"/>
+  <testcase name="anArrowKeyEndsTheWordTheKeyboardHolds" classname="desktopkit.editor.CodeEditorCompositionTest" time="0.059"/>
+  <testcase name="goingToALineEndsTheWordTheKeyboardHolds" classname="desktopkit.editor.CodeEditorCompositionTest" time="0.059"/>
+  <testcase name="aLetterFromAHardwareKeyboardEndsTheWordTheKeyboardHolds" classname="desktopkit.editor.CodeEditorCompositionTest" time="0.057"/>
+  <testcase name="aClickEndsTheWordTheKeyboardHolds" classname="desktopkit.editor.CodeEditorCompositionTest" time="0.053"/>
+  <testcase name="aTapEndsTheWordTheKeyboardHolds" classname="desktopkit.editor.CodeEditorCompositionTest" time="0.06"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

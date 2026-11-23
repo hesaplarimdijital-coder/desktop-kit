@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.editor.CodeEditorStateTest" tests="18" skipped="0" failures="0" errors="0" timestamp="2026-11-23T01:42:53.782Z" hostname="runnervm0hi8g" time="0.011">
+  <properties/>
+  <testcase name="setTextForgetsTheHistory" classname="desktopkit.editor.CodeEditorStateTest" time="0.003"/>
+  <testcase name="aLineCommentIsPutAtTheLeastIndentationAndTakenAwayAgain" classname="desktopkit.editor.CodeEditorStateTest" time="0.001"/>
+  <testcase name="selectLinesGrowsLineByLine" classname="desktopkit.editor.CodeEditorStateTest" time="0.0"/>
+  <testcase name="anEditBlockIsOneStep" classname="desktopkit.editor.CodeEditorStateTest" time="0.001"/>
+  <testcase name="deletingLinesKeepsTheColumn" classname="desktopkit.editor.CodeEditorStateTest" time="0.0"/>
+  <testcase name="aLineIsDuplicatedUnderItselfAndTheCursorGoesAlong" classname="desktopkit.editor.CodeEditorStateTest" time="0.002"/>
+  <testcase name="lineBreaksBecomeLineFeeds" classname="desktopkit.editor.CodeEditorStateTest" time="0.0"/>
+  <testcase name="outdentTakesATabOrUpToTheIndentsSpaces" classname="desktopkit.editor.CodeEditorStateTest" time="0.0"/>
+  <testcase name="revealAndFocusWaitForAnEditor" classname="desktopkit.editor.CodeEditorStateTest" time="0.001"/>
+  <testcase name="aSelectionEndingAtALinesStartDoesNotTouchThatLine" classname="desktopkit.editor.CodeEditorStateTest" time="0.0"/>
+  <testcase name="goToLinePutsTheCursorThereForAnEditorToShow" classname="desktopkit.editor.CodeEditorStateTest" time="0.0"/>
+  <testcase name="linesMoveUpAndDownWithTheSelection" classname="desktopkit.editor.CodeEditorStateTest" time="0.001"/>
+  <testcase name="undoAndRedoGoThroughEveryEdit" classname="desktopkit.editor.CodeEditorStateTest" time="0.0"/>
+  <testcase name="scrollToLineOnADocumentNoEditorShowsIsItsFirstVisibleLine" classname="desktopkit.editor.CodeEditorStateTest" time="0.001"/>
+  <testcase name="replaceKeepsTheCursorWithItsText" classname="desktopkit.editor.CodeEditorStateTest" time="0.0"/>
+  <testcase name="insertReplacesTheSelectionAndLeavesTheCursorAfter" classname="desktopkit.editor.CodeEditorStateTest" time="0.0"/>
+  <testcase name="readsTextLinesAndPositions" classname="desktopkit.editor.CodeEditorStateTest" time="0.0"/>
+  <testcase name="indentAndOutdentMoveTheSelectedLines" classname="desktopkit.editor.CodeEditorStateTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

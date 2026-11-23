@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.editor.CodeEditorTest" tests="33" skipped="0" failures="0" errors="0" timestamp="2026-11-23T01:42:53.801Z" hostname="runnervm0hi8g" time="2.065">
+  <properties/>
+  <testcase name="controlKeysUndoRedoAndSelectAll" classname="desktopkit.editor.CodeEditorTest" time="0.059"/>
+  <testcase name="pastedTextComesWithoutItsStyles" classname="desktopkit.editor.CodeEditorTest" time="0.042"/>
+  <testcase name="theTextScrollsThroughTheContentPadding" classname="desktopkit.editor.CodeEditorTest" time="0.057"/>
+  <testcase name="aFingerScrollsTheTextAndLeavesTheCursorWhereItWas" classname="desktopkit.editor.CodeEditorTest" time="0.073"/>
+  <testcase name="aDocumentShowsInOneEditorAtATimeAndTheOtherTakesNoInput" classname="desktopkit.editor.CodeEditorTest" time="0.059"/>
+  <testcase name="aComposedWordIsOneUndoStep" classname="desktopkit.editor.CodeEditorTest" time="0.11"/>
+  <testcase name="theLineCommandsWorkThroughTheEditor" classname="desktopkit.editor.CodeEditorTest" time="0.061"/>
+  <testcase name="theGutterGrowsWithTheDigitsAndGoesWithoutNumbers" classname="desktopkit.editor.CodeEditorTest" time="0.061"/>
+  <testcase name="theWheelScrollsAndWithControlItZooms" classname="desktopkit.editor.CodeEditorTest" time="0.092"/>
+  <testcase name="typingThroughAnInputMethodReachesTheDocument" classname="desktopkit.editor.CodeEditorTest" time="0.043"/>
+  <testcase name="tabMovesTheSelectedLinesAndShiftTabMovesThemBack" classname="desktopkit.editor.CodeEditorTest" time="0.044"/>
+  <testcase name="theFirstVisibleLineFollowsTheScrollAndScrollToLineSetsIt" classname="desktopkit.editor.CodeEditorTest" time="0.043"/>
+  <testcase name="aWrappedRowNeverReachesPastTheEdge" classname="desktopkit.editor.CodeEditorTest" time="0.06"/>
+  <testcase name="theDesktopKeysWorkByWordsLinesAndTheDocument" classname="desktopkit.editor.CodeEditorTest" time="0.075"/>
+  <testcase name="theAppsKeyHandlerSeesAKeyBeforeTheEditor" classname="desktopkit.editor.CodeEditorTest" time="0.052"/>
+  <testcase name="setTextShowsTheNewDocument" classname="desktopkit.editor.CodeEditorTest" time="0.035"/>
+  <testcase name="eachDocumentComesBackAsItWasLeft" classname="desktopkit.editor.CodeEditorTest" time="0.067"/>
+  <testcase name="aPinchScalesTheDrawingAndLaysTheTextOutOnceTheFingersLift" classname="desktopkit.editor.CodeEditorTest" time="0.067"/>
+  <testcase name="onlyTheMarkersInViewAreElements" classname="desktopkit.editor.CodeEditorTest" time="0.055"/>
+  <testcase name="aMouseSelectsAWordWithTwoClicksAndALineWithThree" classname="desktopkit.editor.CodeEditorTest" time="0.09"/>
+  <testcase name="talkBackNamesTheEditorAndAnEmptyOneByItsPlaceholder" classname="desktopkit.editor.CodeEditorTest" time="0.041"/>
+  <testcase name="quickZoomStepsAreOneNewSize" classname="desktopkit.editor.CodeEditorTest" time="0.038"/>
+  <testcase name="aMarkerIsAnElementWithItsMessage" classname="desktopkit.editor.CodeEditorTest" time="0.054"/>
+  <testcase name="aReadOnlyEditorRefusesEveryEditOfTheUsersButNotTheApps" classname="desktopkit.editor.CodeEditorTest" time="0.053"/>
+  <testcase name="aDocumentOpensAtTheLineTheAppScrolledItTo" classname="desktopkit.editor.CodeEditorTest" time="0.045"/>
+  <testcase name="aRightClickOpensTheKitsMenuWithTheAppsEntries" classname="desktopkit.editor.CodeEditorTest" time="0.14"/>
+  <testcase name="enterKeepsTheIndentationAndTabIndents" classname="desktopkit.editor.CodeEditorTest" time="0.049"/>
+  <testcase name="aControlClickOnALinkTellsTheApp" classname="desktopkit.editor.CodeEditorTest" time="0.051"/>
+  <testcase name="anEditFromTheAppWhileAWordIsComposedLosesNothing" classname="desktopkit.editor.CodeEditorTest" time="0.123"/>
+  <testcase name="aDocumentEditedWhileNotShownShowsTheEdit" classname="desktopkit.editor.CodeEditorTest" time="0.056"/>
+  <testcase name="theZoomIsKeptInThePreferences" classname="desktopkit.editor.CodeEditorTest" time="0.033"/>
+  <testcase name="anotherWidthKeepsTheLineAtTheTop" classname="desktopkit.editor.CodeEditorTest" time="0.082"/>
+  <testcase name="theSpansAreTheTokensInTheSamePassThatChangesTheText" classname="desktopkit.editor.CodeEditorTest" time="0.044"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

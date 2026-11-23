@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.editor.DocumentSizeTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-11-23T01:42:56.704Z" hostname="runnervm0hi8g" time="0.262">
+  <properties/>
+  <testcase name="anEditThatChangesEveryLaterStatePaysForTheViewOnly" classname="desktopkit.editor.DocumentSizeTest" time="0.151"/>
+  <testcase name="aKeystrokeCostsTheSameInALongDocument" classname="desktopkit.editor.DocumentSizeTest" time="0.111"/>
+  <system-out><![CDATA[DocumentSizeTest: state-changing edit: lines 0-100 at once (median)               108.4 µs
+DocumentSizeTest: state-changing edit: lines 0-100 at once (fastest)               69.2 µs
+DocumentSizeTest: state-changing edit: slices for the other ~4,900 lines (median)        2.0 
+DocumentSizeTest: state-changing edit: the longest slice (budget 4 ms)              4.1 ms
+DocumentSizeTest: line index of the whole document                                  0.4 ms
+DocumentSizeTest: tokenizing all 5,000 lines (cold)                                 3.6 ms
+DocumentSizeTest: one keystroke in the middle (index, tokens, history)             34.8 µs
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.components.SheetSubmenuTest" tests="18" skipped="0" failures="0" errors="0" timestamp="2026-11-23T01:42:39.413Z" hostname="runnervm0hi8g" time="1.92">
+  <properties/>
+  <testcase name="backOnTheFirstPageClosesTheSheetWhenThePagesSubmenuWentAway" classname="desktopkit.components.SheetSubmenuTest" time="0.102"/>
+  <testcase name="outsideAShellBackInTheSheetsOwnWindowGoesUpOnePage" classname="desktopkit.components.SheetSubmenuTest" time="0.086"/>
+  <testcase name="onAWiderWindowTheSameEntriesAreAMenuWithASubmenu" classname="desktopkit.components.SheetSubmenuTest" time="0.128"/>
+  <testcase name="aPageStaysItsSubmenusWhenAnEntryComesInAboveIt" classname="desktopkit.components.SheetSubmenuTest" time="0.094"/>
+  <testcase name="anEmptySubmenuIsShownDisabled" classname="desktopkit.components.SheetSubmenuTest" time="0.063"/>
+  <testcase name="thePredictiveBackGestureGoesUpOnePageAndOneGivenUpStaysOnIt" classname="desktopkit.components.SheetSubmenuTest" time="0.116"/>
+  <testcase name="theShellsMoreSheetTurnsPagesToo" classname="desktopkit.components.SheetSubmenuTest" time="0.136"/>
+  <testcase name="aSheetOpenedAgainShowsItsFirstPageFromItsFirstFrame" classname="desktopkit.components.SheetSubmenuTest" time="0.089"/>
+  <testcase name="aPageGoneBackToIsWhereItWasScrolled" classname="desktopkit.components.SheetSubmenuTest" time="0.144"/>
+  <testcase name="backGoesUpOnePageBeforeItClosesTheSheet" classname="desktopkit.components.SheetSubmenuTest" time="0.111"/>
+  <testcase name="aSubmenuOpensAsAPageOfTheSameSheet" classname="desktopkit.components.SheetSubmenuTest" time="0.083"/>
+  <testcase name="theSheetIsAsHighAsItsPage" classname="desktopkit.components.SheetSubmenuTest" time="0.098"/>
+  <testcase name="outsideAShellASheetOpenedAgainShowsItsFirstPageFromItsFirstFrame" classname="desktopkit.components.SheetSubmenuTest" time="0.098"/>
+  <testcase name="withAKeyboardTheFocusGoesWithThePages" classname="desktopkit.components.SheetSubmenuTest" time="0.088"/>
+  <testcase name="aSheetOpenedAgainStartsOnItsFirstPage" classname="desktopkit.components.SheetSubmenuTest" time="0.089"/>
+  <testcase name="anActionOnAPageClosesTheSheetAndASwitchStaysOnItsPage" classname="desktopkit.components.SheetSubmenuTest" time="0.129"/>
+  <testcase name="aPagesTitleStartsWhereItsLinesLabelsDoInEitherDensity" classname="desktopkit.components.SheetSubmenuTest" time="0.101"/>
+  <testcase name="theBackButtonAndEscGoUpOnePage" classname="desktopkit.components.SheetSubmenuTest" time="0.158"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

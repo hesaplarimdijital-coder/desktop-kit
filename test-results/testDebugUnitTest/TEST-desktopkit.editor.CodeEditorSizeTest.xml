@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.editor.CodeEditorSizeTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-11-23T01:42:50.145Z" hostname="runnervm0hi8g" time="3.635">
+  <properties/>
+  <testcase name="typingInALongDocumentCostsWhatItCostsInAShortOne" classname="desktopkit.editor.CodeEditorSizeTest" time="1.225"/>
+  <testcase name="aNewSizeANewWidthAndAnotherDocumentAt5000Lines" classname="desktopkit.editor.CodeEditorSizeTest" time="2.407"/>
+  <system-out><![CDATA[CodeEditorSizeTest: keystroke and frame, 50 lines: median 5,9 ms (edit 1,5, layout 0,0, draw 4,3), fastest 5,0 ms (edit 1,6, layout 0,0, draw 3,4)
+CodeEditorSizeTest: keystroke and frame, 5,000 lines (351629 characters): median 12,5 ms (edit 1,4, layout 0,0, draw 11,0), fastest 11,3 ms (edit 0,9, layout 0,0, draw 10,4)
+CodeEditorSizeTest: 5,000 lines (349094 characters): a new text size 131 ms, a new width 117 ms, another document 117 ms (medians; the document once)
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

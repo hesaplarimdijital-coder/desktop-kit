@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="desktopkit.components.GridZoomTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-23T01:42:31.935Z" hostname="runnervm0hi8g" time="0.972">
+  <properties/>
+  <testcase name="ctrlPlusMinusAndZeroOnTheKeyboard" classname="desktopkit.components.GridZoomTest" time="0.219"/>
+  <testcase name="ctrlAndTheWheelMakeTheCoversLargerAndSmaller" classname="desktopkit.components.GridZoomTest" time="0.322"/>
+  <testcase name="aChosenSizeOutlivesANewDefault" classname="desktopkit.components.GridZoomTest" time="0.058"/>
+  <testcase name="theKeysGoByTheCharacterTheyType" classname="desktopkit.components.GridZoomTest" time="0.146"/>
+  <testcase name="theChosenSizeIsKept" classname="desktopkit.components.GridZoomTest" time="0.103"/>
+  <testcase name="twoFingersSpreadTheCovers" classname="desktopkit.components.GridZoomTest" time="0.119"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
