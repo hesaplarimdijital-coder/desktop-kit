@@ -319,6 +319,8 @@ class CodeEditorState(initialText: String = "") {
 
     /** The one place the text changes: the buffer, the line index, the tokens, the history, the scroll anchor. */
     private fun commit(start: Int, removed: String, inserted: String, typed: Boolean, selectionBefore: Long) {
+        // text put back as it was (an edit a read-only editor refused, a keyboard marking its word again) is no change
+        if (removed == inserted) return
         val end = start + removed.length
         buffer.replace(start, end, inserted)
         val packed = lines.replace(start, end, inserted)

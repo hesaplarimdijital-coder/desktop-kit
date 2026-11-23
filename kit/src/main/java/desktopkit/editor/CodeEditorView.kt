@@ -874,8 +874,9 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
     }
 
     override fun onTextContextMenuItem(id: Int): Boolean = when (id) {
-        android.R.id.undo -> document?.undo() == true
-        android.R.id.redo -> document?.redo() == true
+        // also what a keyboard's undo asks for: refused while read-only, as typing is
+        android.R.id.undo -> !readOnly && document?.undo() == true
+        android.R.id.redo -> !readOnly && document?.redo() == true
         // pasted text comes without its styles
         android.R.id.paste -> super.onTextContextMenuItem(android.R.id.pasteAsPlainText)
         else -> super.onTextContextMenuItem(id)

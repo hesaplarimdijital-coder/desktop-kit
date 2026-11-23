@@ -316,6 +316,7 @@ class CodeEditorTest {
     fun aReadOnlyEditorRefusesEveryEditOfTheUsersButNotTheApps() {
         readOnly = true
         show()
+        val version = document.version
         onUi { view ->
             view.requestFocus()
             document.select(4)
@@ -323,10 +324,29 @@ class CodeEditorTest {
             view.press(KeyEvent.KEYCODE_DEL)
             view.press(KeyEvent.KEYCODE_ENTER)
             view.press(KeyEvent.KEYCODE_X, KeyEvent.META_CTRL_ON)
+            // a selection deleted with Backspace and with Delete
+            document.select(4, 5)
+            view.press(KeyEvent.KEYCODE_DEL)
+            document.select(4, 5)
+            view.press(KeyEvent.KEYCODE_FORWARD_DEL)
         }
         assertEquals(sampleScript, document.text)
+        // a refused edit is no change: an app's "unsaved" signal and its Undo entry stay as they were
+        assertEquals("the version did not move", version, document.version)
+        assertFalse("nothing to undo", document.canUndo)
         onUi { document.replace(0, 2, "##") }
         assertEquals("## Çay bahçesi: ilk sahne", document.lineText(0))
+        // the app's edit can be undone by the app, not by the user: the keyboard's undo and the menu's are refused
+        onUi { view ->
+            view.inputConnection().performContextMenuAction(android.R.id.undo)
+            view.onTextContextMenuItem(android.R.id.undo)
+        }
+        assertEquals("## Çay bahçesi: ilk sahne", document.lineText(0))
+        assertTrue(document.canUndo)
+        onUi { document.undo() }
+        assertEquals(sampleScript, document.text)
+        onUi { view -> view.onTextContextMenuItem(android.R.id.redo) }
+        assertEquals(sampleScript, document.text)
         assertInStep()
     }
 
