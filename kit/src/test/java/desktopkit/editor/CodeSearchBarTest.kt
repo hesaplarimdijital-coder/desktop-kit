@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -166,6 +167,33 @@ class CodeSearchBarTest {
         assertEquals("one step takes every replacement back", once, document.text)
         compose.runOnIdle { assertTrue(document.undo()) }
         assertEquals(sampleScript, document.text)
+    }
+
+    @Test
+    fun replacingWaitsForTheSearchOfTheQueryAsItIsNow() {
+        // the review: while a new expression was still being searched, the old matches kept Replace all enabled, and
+        // replacing ran the new expression over the whole text on the main thread
+        show()
+        compose.runOnUiThread {
+            search.open(replace = true)
+            search.query = "cay"
+            search.replacement = "çay"
+        }
+        awaitMatches(7)
+        assertTrue(search.canReplace)
+        compose.runOnUiThread {
+            // a new query: until its search is done, the matches are the old query's
+            search.query = "sahil"
+            assertFalse("the search of the new query has not finished", search.canReplace)
+            search.replaceAll()
+            search.replaceCurrent()
+        }
+        assertEquals("nothing was replaced meanwhile", sampleScript, document.text)
+        awaitMatches(2)
+        assertTrue(search.canReplace)
+        compose.onNodeWithText("Tümünü değiştir").assertIsEnabled()
+        compose.runOnUiThread { search.replaceAll() }
+        assertFalse(document.text.contains("sahil"))
     }
 
     @Test

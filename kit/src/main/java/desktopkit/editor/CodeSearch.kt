@@ -83,7 +83,17 @@ class CodeSearchState {
 
     /** Where incremental search starts: typing finds the first match from here. */
     private var origin = 0
-    private var searchedQuery: Any? = null
+
+    /** The query and options whose search finished last: [matches] are theirs. */
+    private var searchedQuery: Any? by mutableStateOf(null)
+
+    /**
+     * Whether there is something to replace: the bar is open and the search of the query and options as they are
+     * now has finished with matches. While a new query is still searched the matches are the old one's, and
+     * [replaceCurrent] and [replaceAll] do nothing (the bar's buttons show it).
+     */
+    val canReplace: Boolean
+        get() = isOpen && !invalidPattern && matches.isNotEmpty() && searchedQuery == Inputs(query, matchCase, wholeWord, regex, true, 0)
     private val moveWithEdits: (Int, Int, Int) -> Unit = { start, removed, inserted -> shift(start, removed, inserted) }
 
     /**
@@ -142,10 +152,12 @@ class CodeSearchState {
 
     /**
      * Replaces the current match and selects the next one. Without a current match it selects the next
-     * match first, as desktop editors do: the user sees what will be replaced.
+     * match first, as desktop editors do: the user sees what will be replaced. Nothing while the query's
+     * search has not finished ([canReplace]).
      */
     fun replaceCurrent() {
         val document = document ?: return
+        if (!canReplace) return
         val index = currentMatch
         if (index < 0) {
             next()
@@ -161,9 +173,10 @@ class CodeSearchState {
         if (matches.isNotEmpty()) select(document, if (after == matchCount) 0 else after) else document.select(start + replaced.length)
     }
 
-    /** Replaces every match, as one step of the undo history. */
+    /** Replaces every match, as one step of the undo history; nothing while the query's search has not finished ([canReplace]). */
     fun replaceAll() {
         val document = document ?: return
+        if (!canReplace) return
         val pattern = compile() ?: return
         val text = document.text
         // null: no match, or an expression too complex for this text (the bar already says so)

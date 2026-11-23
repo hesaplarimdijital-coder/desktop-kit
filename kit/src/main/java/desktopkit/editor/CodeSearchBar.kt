@@ -273,7 +273,7 @@ private fun OptionButton(icon: ImageVector, label: String, on: Boolean, shortcut
 
 @Composable
 private fun ReplaceButtons(search: CodeSearchState) {
-    val anyMatch = search.matchCount > 0
-    DeskButton(stringResource(R.string.dk_search_replace), search::replaceCurrent, enabled = anyMatch)
-    DeskButton(stringResource(R.string.dk_search_replace_all), search::replaceAll, enabled = anyMatch)
+    // not while the query as it is now is still searched: the matches would be the old query's
+    DeskButton(stringResource(R.string.dk_search_replace), search::replaceCurrent, enabled = search.canReplace)
+    DeskButton(stringResource(R.string.dk_search_replace_all), search::replaceAll, enabled = search.canReplace)
 }

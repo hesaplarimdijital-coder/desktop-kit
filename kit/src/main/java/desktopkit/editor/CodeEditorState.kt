@@ -674,9 +674,13 @@ internal interface EditorHost {
 }
 
 /**
- * A [CodeEditorState] remembered in the composition, for a screen with a single document. It is not
- * saved with the instance state (a document can be far larger than that allows): an app that must
- * survive its process being stopped keeps its documents itself.
+ * A [CodeEditorState] remembered in the composition, for a sample or a short-lived screen with a
+ * single document. It lives only as long as the composition: when the activity is created again (a
+ * configuration change the manifest does not list, such as the system language or bold text) the
+ * document, unsaved edits included, starts again from [initialText]. It is not saved with the instance
+ * state either (a document can be far larger than that allows). An app's documents belong in a
+ * `ViewModel` (or the app's own document model), one [CodeEditorState] each, given to the editor from
+ * there; an app that must survive its process being stopped keeps their text itself.
  */
 @Composable
 fun rememberCodeEditorState(initialText: String = ""): CodeEditorState = remember { CodeEditorState(initialText) }
