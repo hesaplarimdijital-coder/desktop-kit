@@ -273,6 +273,7 @@ class MainActivity : ComponentActivity() {
                 ) { route, _ ->
                     when (route) {
                         "catalog" -> CatalogScreen(prefs, toasts, onDialog = { about = true }, accentLabel = accentLabel)
+                        "editor" -> EditorScreen(prefs)
                         "albums" -> AlbumsScreen(openAlbum, onOpen = { openAlbum = it }, onPlay = { track = it })
                         "tracks" -> TracksScreen(playing = track, onPlay = { track = it })
                         "playlists" -> PlaylistsScreen(library, onPlay = { track = it })
@@ -332,7 +333,7 @@ private fun spec(startRoute: String? = null) = remember {
     ShellSpec(
         appTitle = "Desktop Kit",
         sections = listOf(
-            NavSection("Kit", listOf(NavItem("catalog", "Components", DeskIcons.Grid))),
+            NavSection("Kit", listOf(NavItem("catalog", "Components", DeskIcons.Grid), NavItem("editor", "Editor", DeskIcons.Lyrics))),
             NavSection(
                 "Library",
                 listOf(

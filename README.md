@@ -65,7 +65,7 @@ Uygulama modülünün `build.gradle.kts` dosyası:
 
 ```kotlin
 dependencies {
-    implementation("com.github.hesaplarimdijital-coder:desktop-kit:2.9.0")
+    implementation("com.github.hesaplarimdijital-coder:desktop-kit:2.10.0")
     implementation("androidx.activity:activity-compose:1.13.0")
 }
 ```
@@ -229,6 +229,10 @@ Değerlere doğrudan erişim için `DeskTheme.colors.text`, `DeskTheme.type.body
 | `DeskWindows`, `rememberNewWindow` | Uygulamayı yeni pencerede açmak (aşağıya bak) |
 | `hasHardwareKeyboard`, `showShortcutHints` | Donanım klavyesi bağlı ve açık mı (klavye kapağı, Bluetooth, DeX); kısayollar gösterilsin mi (fare ya da donanım klavyesi) |
 | `Modifier.keepsKeyboardOpen` | Dokununca ekran klavyesini kapatmayan denetim (aşağıya bak: Ekran klavyesi) |
+| `CodeEditor`, `CodeEditorState` | Kod ve betik düzenleyici: sözdizimi renkleri, satır numaraları ve işaretler, süslemeler, bağlantılar, sağ tık menüsü, yakınlaştırma, satır komutları (aşağıya bak: Kod düzenleyici) |
+| `CodeSearchBar`, `CodeSearchState` | Düzenleyicide bul ve değiştir: büyük/küçük harf, tam sözcük, düzenli ifade, tümünü değiştir |
+| `CodeCompleter` | Düzenleyicide imlecin yanında tamamlama listesi |
+| `CodeEditorZoom`, `Modifier.textZoom` | Düzenleyicinin yazı büyüklüğü (Ctrl ile tekerlek, kıstırma, Ctrl ile + − 0); aynısı başka metinler için |
 
 ### Buzlu cam
 
@@ -878,6 +882,73 @@ taşır. Liste–ayrıntı geçişinde kapak ve başlık uçar: listede ve ayrı
 uçarken de yuvarlak kalsın diye biçimini ver: `detailSharedElement("kapak-$id", shape = RoundedCornerShape(12.dp))`
 (`CoverCell` içinde hücrenin biçimi zaten varsayılan).
 
+### Kod düzenleyici
+
+```kotlin
+val belge = remember { CodeEditorState(metin) }            // her açık dosya için bir tane; uygulama tutar
+val arama = rememberCodeSearchState()
+val yakinlik = rememberCodeEditorZoom(prefs, key = "betik")
+val bosluk = rememberShellContentPadding()
+Column(Modifier.fillMaxSize()) {
+    CodeSearchBar(arama, Modifier.padding(top = bosluk.calculateTopPadding()))   // açıkken görünür
+    CodeEditor(
+        state = belge,
+        modifier = Modifier.weight(1f),
+        tokenizer = dilim,                                   // LineTokenizer: satır başındaki durum → jetonlar
+        markers = hatalar.map { LineMarker(it.satir, MarkerSeverity.Error, it.ileti) },
+        links = CodeLinks { b, konum -> hedefAraligi(b, konum) },
+        onLinkClick = { konum -> tanimaGit(konum) },
+        contextMenu = { konum -> listOf(MenuEntry.Item("Tanıma git", { tanimaGit(konum) })) },
+        zoom = yakinlik,
+        proportional = true,                                  // düzyazı ağırlıklı diller için
+        contentPadding = if (arama.isOpen) PaddingValues(bottom = bosluk.calculateBottomPadding()) else bosluk,
+        search = arama,
+        completer = tamamlayici,
+    )
+}
+```
+
+- **Belge** `CodeEditorState`: metin, seçim, kaydırma yeri ve geri alma geçmişi belgeyle birlikte durur; başka
+  belgeyi göstermek düzenleyiciye başka durum vermektir, her biri bırakıldığı gibi döner. `version` metnin değiştiğini
+  kopyalamadan söyler; `insert`, `replace`, `replaceSelection` ve `edit { }` geçmişe girer (ekran klavyesi bir sözcük
+  yazarken de güvenle); diskten yeniden okunan belge için `setText`. `firstVisibleLine` ve `scrollToLine` yeniden
+  açılışta yeri geri getirir. Satır komutları: `moveLinesUp`, `moveLinesDown`, `duplicateLines`, `deleteLines`,
+  `toggleLineComment("//")`, `selectLines`, `goToLine`, `indentSelection`, `outdentSelection`; kit bunlara tuş bağlamaz,
+  uygulama kendi `ShortcutRegistry`'sine bağlar (Ctrl+/ kitin kısayol listesidir).
+- **Renkler** dili uygulama verir: `LineTokenizer` her satırı, önceki satırın bitiş durumuyla jetonlar ve satır sonundaki
+  durumu döner; jeton renk değil rol taşır (`SyntaxRole`). Düzenleyici satırları saklar, bir düzenlemeden sonra yalnızca
+  değişen satırdan durum eskisini tutana kadar, en çok görünen yere kadar yeniden jetonlar; gerisini çerçeveler arasında
+  dilimlerle bitirir. Renkler metni değiştiren geçişte konur: hiçbir karede yeni metin eski renkle görünmez. Rollerin
+  renkleri temadadır (`DeskTheme.syntax`), açık, koyu ve OLED'de her vurguyla 4,5:1; bir uygulama tek bir rolü
+  `DesktopKitRoot(syntax = { it.with(SyntaxRole.Tag, …) })` ile değiştirir.
+- **Kenar**: satır numaraları (sarılmış satırda ilk sırada), uygulamanın işaretleri (hata, uyarı, not: fareyle ve
+  dokununca ileti, TalkBack'e adı), geçerli satır, imlecin yanındaki parantezin eşi. Süslemeler (`CodeDecoration`): arka
+  plan, alt çizgi, tüm satır.
+- **Klavye ve fare**: Tab girintiler, Shift+Tab geri alır, Enter girintiyi korur; Tab yazdığı için düzenleyiciden Esc ve
+  ardından Tab ile çıkılır. Ctrl+Z/Y, Ctrl+Shift+Z, Ctrl+A/C/X/V; sözcük ve satır hareketleri platformun. Sağ tık, iki
+  parmak dokunma, Menü tuşu ve Shift+F10 kitin menüsünü uygulamanın girişleriyle açar; dokunmatikte seçim araç çubuğu
+  aynı girişleri taşır. Ctrl ya da Alt basılıyken bağlantının altı çizilir, tıklamak uygulamaya söyler.
+- **Bul ve değiştir** (`search`): Ctrl+F (seçim aranan olur), Ctrl+H, F3 ve Shift+F3, Esc; çubukta Enter ve Shift+Enter,
+  Alt+C/W/R seçenekleri. Arama ana iş parçacığının dışında çalışır; eşleşmeler düzenlemeyle birlikte kayar, tümünü
+  değiştirmek tek geri alma adımıdır.
+- **Tamamlama** (`completer`): sözcük yazılırken (`liveCompletion = false` ile kapanır), Ctrl+Space ya da
+  `belge.showCompletion()` ile imlecin altında liste; yazdıkça daralır (komut paletinin eşleşmesi), ↑/↓, Enter ya da Tab
+  seçer, Esc kapatır, dokunmak seçer. Liste düzenleyicinin içinde kalır, ekran klavyesinin üstünde.
+- **Yakınlaştırma** (`zoom`): Ctrl ile tekerlek, kıstırma, Ctrl ile + − 0; seçim `DeskPreferences`'ta anahtarıyla
+  saklanır. Düzenleyici olmayan bir metin (önizleme, kılavuz) aynı hareketleri `Modifier.textZoom(yakinlik)` ile, boyunu
+  `DeskTheme.type.body.zoomed(yakinlik)` ile alır.
+- **Telefonda** metin cam çubukların altından geçer (`contentPadding`); düzenleyiciye dokunmak ya da metnini kaydırmak
+  ekran klavyesini kapatmaz, imleçli satır klavyenin üstünde kalır. Seçenekler: `softWrap`, `readOnly`, `lineNumbers`,
+  `autoCorrect` ve `capitalizeSentences` (düzyazı için), `indent` (`CodeIndent.Tab`, `CodeIndent.spaces(4)`),
+  `placeholder`.
+- **Boyut**: çekirdek platformun `EditText`'idir; bir düzenleme yalnızca düzenlenen paragrafı yeniden yerleştirir. 5.000
+  satırlık, 350.000 karakterlik belgede bir tuşun düzenleyicideki işi 50 satırlık belgedekiyle aynı (bu makinede 3–8 ms).
+  Compose'un metin alanı aynı belgede her tuşta bütün metni yerleştiriyordu (~600 ms). Bütün metni yeniden yerleştiren
+  üç şey var: yeni yazı boyu (~180 ms), yeni genişlik (~160 ms) ve başka bir belgeye geçmek (~140 ms), bu makinede
+  5.000 satırda; telefon daha hızlıdır. Bu yüzden kıstırırken ve art arda yakınlaştırırken önce çizim büyür, yazı
+  boyu parmaklar kalkınca ya da adımlar durunca bir kez değişir; DeX'te pencere kenarı sürüklenirken uzun belge
+  platformun metin alanları gibi her adımda yeniden yerleşir.
+
 ## Geliştirme
 
 - `./gradlew :kit:testDebugUnitTest`: kontrast, boyut, kabuk durumu, kısayol ve erişilebilirlik testleri ile
@@ -895,9 +966,9 @@ uçarken de yuvarlak kalsın diye biçimini ver: `detailSharedElement("kapak-$id
 ## Sürüm yayınlamak
 
 1. `CHANGELOG.md` dosyasına ne değiştiğini yaz, `gradle.properties` içindeki `VERSION_NAME`'i güncelle.
-2. Önce PR'ı birleştir, sonra GitHub'da **Releases → Draft a new release** ile etiketi (`2.9.0`) `main` üzerinde
-   oluştur; ya da `git tag 2.9.0 && git push origin 2.9.0`. Etiket birleştirmeden önce açılırsa eski kodu gösterir.
-3. JitPack ilk istekte derler (`jitpack.yml`, Java 17). Uygulamada sürümü `2.9.0` yapman yeterli.
+2. Önce PR'ı birleştir, sonra GitHub'da **Releases → Draft a new release** ile etiketi (`2.10.0`) `main` üzerinde
+   oluştur; ya da `git tag 2.10.0 && git push origin 2.10.0`. Etiket birleştirmeden önce açılırsa eski kodu gösterir.
+3. JitPack ilk istekte derler (`jitpack.yml`, Java 17). Uygulamada sürümü `2.10.0` yapman yeterli.
 
 Sürüm numaraları [SemVer](https://semver.org/lang/tr/) kuralına uyar: uyumu bozan değişiklik
 ana sürümü, yeni özellik ikinci sayıyı, düzeltme üçüncüyü artırır.

@@ -70,8 +70,12 @@ IBM Plex Sans ve IBM Plex Mono (kitle gelir). Satır yüksekliği yazı boyunun 
 | labelSmall | 11,5 | 13 |
 | caption | 11 | 12 |
 | mono | 11 | 12 |
+| code (kod düzenleyici) | 13 | 15 |
 
 Sayfa başlığı ile gövde arasında en az 1,25 kat fark vardır; alt düzeyler ağırlık ve renkle ayrılır.
+
+`code` mono yazının gövde boyundadır, satır yüksekliği yazı boyunun 1,5 katıdır: kod ve betik satır satır okunur.
+Düzenleyici düzyazı ağırlıklı bir dil için (`proportional`) gövdenin yazı tipini aynı boy ve aralıkla kullanır.
 
 ## Renk rolleri
 
@@ -93,6 +97,9 @@ Renkler her zaman `DeskTheme.colors` üzerinden alınır; bileşen içinde `Colo
 | `success`, `warning`, `danger` | durumlar |
 | `scrim` | katmanların arkası |
 | `overlayScrim`, `onOverlay` | resmin (kapağın) üstüne çizilen düğmenin altı ve kendisi |
+
+Kod düzenleyicinin renkleri `DeskTheme.syntax`'tadır (aşağıda "Kod düzenleyici"): tema renklerinden yapılır,
+sözdizimi rolüne göre verilir.
 
 Vurgu rengi uygulamanın seçimidir ya da duvar kâğıdından gelir; `ensureContrast` her vurguyu yazı
 için 4,5:1'e, büyük öğeler için 3:1'e getirir. Odak ve seçim göstergeleri ekranın tek vurgusuna
@@ -140,6 +147,50 @@ satırın yanındaki köşesinden.
 Tıklama, dokunma ve klavye (→, Enter) beklemeden açar. Alt menü bitiş yanında açılır; pencerede yer yoksa başlangıç
 yanında, ikisinde de yoksa (telefon) daha çok yer olan yanda menüsünün üstüne.
 
+## Kod düzenleyici
+
+Renkler sözdizimi rolüne göre (`SyntaxRole`), temanın renklerinden yapılır; ton doygunluktan önce gelir, az renk:
+
+| Rol | Renk | Biçim |
+|---|---|---|
+| Comment | `textTertiary` | eğik |
+| Keyword | vurgu (`accentText`) | kalın |
+| Link | vurgu (`accentText`) | |
+| String | yeşil (koyu `#8FD3A8`, açık `#175E3D`) | |
+| Number, Constant | kehribar (koyu `#E2BB73`, açık `#724A0D`) | |
+| Name, Function | camgöbeği (koyu `#7CCBD6`, açık `#0A5C67`) | |
+| Type, Tag | mor (koyu `#C3A9F4`, açık `#603EAF`) | |
+| Meta | mor | eğik |
+| Operator, Punctuation | `textSecondary` | |
+| Heading, Strong | `text` | kalın |
+| Emphasis | `text` | eğik |
+| Invalid | `danger` | |
+
+Her rol ve satır numaraları sayfanın arka planında, geçerli satırın tonunda ve düzenleyicinin yazının altına koyduğu
+her tonda (arama eşleşmesi, işaretli ve süslenmiş satır, aralık süslemesi, seçim; tek başına ve üst üste geldikleri
+gibi), açık, koyu ve OLED temada, hazır ve zorlayıcı özel vurgularla 4,5:1'e ulaşır; ulaşmayan renk `ensureContrast`
+ile koyulaşır ya da açılır (`SyntaxContrastTest`). Açık temanın dört rengi hiçbir hazır vurguda kaydırılmayacak
+koyulukta seçildi. Kalın daha kalın bir çizgi, eğik bir eğimdir: aynı glif genişlikleri, yazı yer değiştirmez.
+Düzenleyicinin yazısı ipuçsuz (doğrusal, piksel altı) glif genişlikleriyle ölçülür: satır kıran ölçü ile çizim her
+biçimde aynıdır.
+
+| Değer | Pointer | Touch |
+|---|---|---|
+| Kenarda işaret simgesi | 12 | 16 |
+| Kenarın başı, işaret ile numara arası, numara ile yazı arası | 8 · 4 · 12 (`gapS` · `gapXs` · `gapM`) | aynı |
+| Yazının sonu | 12 (`gapM`) | 16 (`gapL`) |
+| İlk satırın üstü, son satırın altı | 8 (`gapS`) | aynı |
+| Satır numarası | yazının 0,85'i, mono, en az iki basamak | aynı |
+| İmleç | 2 dp, vurgu rengi | aynı |
+| Tamamlama listesi | en çok 360 dp genişlik, 28 dp satır, 8 satır | 48 dp satır, 5 satır |
+| Arama seçenek düğmeleri | 24 dp (simge 12) | 32 dp (simge 16) |
+
+Tonlar: geçerli satır koyu temada `surfaceRaised`, açıkta `hover`; işaretli satır tonun %8'i, aralık süslemesi ve
+arama eşleşmesi %14'ü; geçerli eşleşme aynı ton ve çevresinde 2 dp'lik vurgu çerçevesi (altını koyulaştırmak
+renkli sözcükleri okunmaz yapardı); seçim vurgunun %20'si (metin alanlarında %35: orada yazı tek renk); eşleşen
+parantezin çerçevesi `controlBorder`, 1 dp; alt çizgi 1 dp. Tamamlama listesi menülerin düz yüzeyi gibidir: `surfaceRaised`, `borderStrong` kenar, `radiusCard`,
+12 dp gölge; vurgulanan satır `selection`. Arama çubuğu `surface` üstünde, altında ince bir çizgi.
+
 ## Yazılı istisnalar
 
 Bileşenlerde ölçüler 4 dp'lik ızgaradadır (1 ve 2 dp'lik çizgiler hariç). Kitte bugün ızgaranın
@@ -180,3 +231,4 @@ köşesi, sistemin değeri) sabit kalır.
 | Alt sayfa | `GlassBottomSheet` |
 | İç içe menü | `MenuEntry.Submenu` (menüde yanında açılır, telefonun "⋯" sayfasında sayfa olarak) |
 | İletişim kutusu | `DeskDialog` |
+| Kod ya da betik düzenleme | `CodeEditor` + `CodeSearchBar` (yakınlaştırma `rememberCodeEditorZoom`) |

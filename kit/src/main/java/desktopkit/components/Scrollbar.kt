@@ -167,8 +167,9 @@ fun Modifier.verticalScrollbar(state: ScrollState): Modifier = scrollbar(remembe
 /** How long the scrollbar stays after the list stopped and the pointer left. */
 private const val LINGER_MS = 900L
 
+/** [verticalScrollbar] for whatever an [adapter] describes; the code editor scrolls a view of its own. */
 @Composable
-private fun Modifier.scrollbar(adapter: ScrollbarAdapter): Modifier {
+internal fun Modifier.scrollbar(adapter: ScrollbarAdapter): Modifier {
     if (DeskTheme.inputMode != InputMode.Pointer) return this
     val colors = DeskTheme.colors
     val tier = LocalMotionTier.current

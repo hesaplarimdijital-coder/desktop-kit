@@ -84,6 +84,15 @@ object DeskIcons {
     val DragHandle: ImageVector by lazy { icon("DragHandle", fill("M5.3,4a1.1,1.1 0 1 0 2.2,0a1.1,1.1 0 1 0 -2.2,0Z"), fill("M8.5,4a1.1,1.1 0 1 0 2.2,0a1.1,1.1 0 1 0 -2.2,0Z"), fill("M5.3,8a1.1,1.1 0 1 0 2.2,0a1.1,1.1 0 1 0 -2.2,0Z"), fill("M8.5,8a1.1,1.1 0 1 0 2.2,0a1.1,1.1 0 1 0 -2.2,0Z"), fill("M5.3,12a1.1,1.1 0 1 0 2.2,0a1.1,1.1 0 1 0 -2.2,0Z"), fill("M8.5,12a1.1,1.1 0 1 0 2.2,0a1.1,1.1 0 1 0 -2.2,0Z")) }
     val NewWindow: ImageVector by lazy { icon("NewWindow", stroke("M3.5,3H12.5A1.5,1.5 0 0 1 14,4.5V11.5A1.5,1.5 0 0 1 12.5,13H3.5A1.5,1.5 0 0 1 2,11.5V4.5A1.5,1.5 0 0 1 3.5,3Z"), stroke("M2 6h12M8 8.5v3M6.5 10h3")) }
 
+    /** Search options: upper and lower case told apart ("Aa"). */
+    val MatchCase: ImageVector by lazy { icon("MatchCase", stroke("M1.5 12.5 4.75 3.5 8 12.5M2.7 9.3h4.1"), stroke("M9,10.25a2.25,2.25 0 1 0 4.5,0a2.25,2.25 0 1 0 -4.5,0Z"), stroke("M13.5 7.5v5")) }
+
+    /** Search options: whole words only ("ab" over a bracket). */
+    val WholeWord: ImageVector by lazy { icon("WholeWord", stroke("M2 11.5v2h12v-2"), stroke("M3.25,7.75a1.75,1.75 0 1 0 3.5,0a1.75,1.75 0 1 0 -3.5,0Z"), stroke("M6.75 5.75v4M9.5 3v6.5"), stroke("M9.5,7.75a1.75,1.75 0 1 0 3.5,0a1.75,1.75 0 1 0 -3.5,0Z")) }
+
+    /** Search options: a regular expression (".*"). */
+    val Regex: ImageVector by lazy { icon("Regex", fill("M2.8,12a1.2,1.2 0 1 0 2.4,0a1.2,1.2 0 1 0 -2.4,0Z"), stroke("M11 2.5v6M8.4 4l5.2 3M13.6 4 8.4 7")) }
+
     /** Builds an icon in the kit's style from SVG path data on a 16 x 16 grid. */
     fun build(name: String, vararg parts: IconPart): ImageVector = icon(name, *parts)
 

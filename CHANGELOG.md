@@ -1,10 +1,83 @@
 # Değişiklikler
 
-## Yayımlanmamış
+## 2.10.0 (2026-11-23)
 
-### Yeni
+İki iş: kitin kod düzenleyicisi (`CodeEditor`) ve alt menüler (`MenuEntry.Submenu`). Düzenleyicinin ilk kullanıcısı
+Inky'nin Android uyarlaması (ink betikleri: uzun düzyazı paragrafları ve aralarında işaretler); dil uygulamanındır,
+kit düzenleyiciyi, görünüşünü ve davranışını verir. Alt menüler bir `MenuEntry` listesinin gösterildiği her yerde
+var, telefonun "⋯" sayfasında da. Var olan bileşenlerin görünüşü ve zamanlaması değişmedi: alt menüsü olmayan menü
+ve sayfa eskisi gibi çizilir, var olan ekran görüntüsü referanslarının hepsi tutuyor. Uygulamalar çoğunlukla kod
+değişmeden derlenir; API'de eklemeler dışında iki küçük değişiklik var (aşağıda "Dikkat"; ne yapılacağı
+[MIGRATION.md](MIGRATION.md#290dan-2100a)'de).
 
-- **Alt menüler: `MenuEntry.Submenu(label, entries, icon = null, enabled = true)`.** Kitin menüleri yalnızca öğe ve
+### Kod düzenleyici
+
+- **`CodeEditor` ve belgesi `CodeEditorState`.** Belge uygulamanındır, her açık dosya için bir tane: metin, seçim,
+  kaydırma yeri ve geri alma geçmişi onunla durur, başka belgeyi göstermek düzenleyiciye başka durum vermektir.
+  `version` metnin değiştiğini kopyalamadan söyler; satır ↔ konum çevirileri; geçmişe giren düzenlemeler (`insert`,
+  `replace`, `replaceSelection`, tek adım için `edit { }`), diskten yeniden okunan belge için `setText`, `undo` ve
+  `redo`, `reveal` ve `revealLine` (isteğe bağlı seçip odaklayarak), `firstVisibleLine` ve `scrollToLine` (süreç
+  durduktan sonra yer geri gelir; pencere daralıp genişleyince, yazı büyüyünce en üstteki satır yerinde kalır).
+  Ekran klavyesi bir sözcük yazarken gelen düzenleme önce sözcüğü bitirir: hiçbir şey kaybolmaz. Klavyenin
+  yapmadığı her imleç hareketi de (tuşlar, dokunuş, tıklama, uygulamanın seçimi, satıra gitme, arama) klavyenin
+  tuttuğu sözcüğü olduğu yerde bitirir; klavye yeni yerde baştan başlar, uzaktaki bir sözcüğün üstüne yazmaz.
+- **Çekirdek platformun `EditText`'i.** Ölçüldü: 5.000 satırlık, 337.000 karakterlik belgenin ortasına bir harf
+  yazmak Compose'un `BasicTextField`'ında her tuşta bütün metni yeniden yerleştiriyordu (~600 ms, sözdizimi renkleriyle
+  5 s); `EditText` yalnız düzenlenen paragrafı yerleştirir. Yazmanın kendisi (giriş yöntemi, otomatik düzeltme,
+  tutamaçlar, büyüteç, pano, donanım tuşları, TalkBack) platformun; herkese açık API Compose'dur. 5.000 satırda bir tuşun
+  düzenleyicideki işi 50 satırdakiyle aynı (bu makinede 3–8 ms; `CodeEditorSizeTest`, `DocumentSizeTest`).
+- **Sözdizimi renkleri.** Uygulamanın `LineTokenizer`'ı satırı, önceki satırın bitiş durumuyla jetonlar; jeton renk
+  değil rol taşır (`SyntaxRole`: yorum, anahtar sözcük, dize, sayı, sabit, ad, işlev, tür, işleç, noktalama, etiket,
+  bağlantı, başlık, vurgu, koyu, yönerge, geçersiz). Düzenleyici satırları saklar; bir düzenlemeden sonra değişen
+  satırdan durum eskisini tutana kadar, en çok görünen yer ve 40 satır daha, aynı geçişte yeniden jetonlar; gerisi
+  çerçeveler arasında 4 ms'lik dilimlerle biter. Hiçbir karede yeni metin eski renkle görünmez. Durumu her sonraki
+  satırı değiştiren bir düzenleme (ink'te seçenek satırı) tuş başına yalnız görünen yere kadar öder.
+- **Tema.** `DeskTheme.syntax` (`DeskSyntax`): her role bir renk ve isteğe bağlı kalın ya da eğik; temanın renklerinden
+  yapılır (griler, metin rengi, vurgu ve dört sakin ton). Her rol açık, koyu ve OLED temada, hazır ve zorlayıcı özel
+  vurgularla sayfada, geçerli satırda ve düzenleyicinin yazı altına koyduğu her tonda (arama eşleşmesi, işaretli satır,
+  süsleme, seçim) 4,5:1 (`SyntaxContrastTest`); geçerli arama eşleşmesi koyu bir dolguyla değil, ince bir vurgu
+  çerçevesiyle ayrılır, seçim düzenleyicide metin alanlarındakinden açıktır. Bir rolü değiştirmek için
+  `DesktopKitRoot(prefs, syntax = { it.with(SyntaxRole.Tag, …) })`. Yeni yazı stili `DeskType.code`: mono, gövde
+  boyunda, 1,5 satır aralığı.
+- **Kenar, işaretler, süslemeler.** Satır numaraları (sarılmış satırda ilk sırada, basamak kadar geniş), uygulamanın
+  işaretleri (`LineMarker`: hata, uyarı, not; kitin simgeleri, satırda ince ton, fareyle ve dokununca ileti, TalkBack'e
+  "7. satırda hata: …", tıklanınca uygulamaya haber), geçerli satır, imlecin yanındaki parantezin eşi (yorum ve dize
+  içindekiler sayılmaz), süslemeler (`CodeDecoration`: arka plan, alt çizgi, tüm satır).
+- **Bağlantılar, menü, tuşlar.** Ctrl ya da Alt basılıyken bağlantının altı çizilir ve imleç el olur, tıklamak
+  uygulamaya konumu söyler (`CodeLinks`, `onLinkClick`). Sağ tık, iki parmak dokunma, Menü tuşu ve Shift+F10 kitin
+  menüsünü açar: Geri al, Yinele, Kes, Kopyala, Yapıştır, Tümünü seç ve uygulamanın tıklanan yer için girişleri;
+  dokunmatikte platformun seçim araç çubuğu (tutamaçlar ve büyüteç onundur) aynı girişleri taşır. Tab girintiler
+  (çok satırlı seçimde satırları), Shift+Tab geri alır, Enter girintiyi korur; Tab yazdığı için düzenleyiciden Esc ve
+  ardından Tab ile çıkılır. Yapıştırılan metin biçimsiz gelir. `onPreviewKeyEvent` uygulamaya tuşu önce verir.
+- **Bul ve değiştir.** `CodeSearchState` ve `CodeSearchBar`: büyük/küçük harf, tam sözcük, düzenli ifade (Alt+C, W,
+  R), "3 / 17", önceki ve sonraki (Enter, Shift+Enter, F3, Shift+F3), değiştir ve tek geri alma adımı olarak tümünü
+  değiştir, geçersiz ifade uyarısı; düzenleyicide Ctrl+F (seçim aranan olur), Ctrl+H, Esc. Arama ana iş parçacığının
+  dışında çalışır ve yeni bir sorgu ya da düzenleme onu keser; eşleşmeler düzenlemeyle birlikte hemen kayar.
+  Değiştirmek, sorgunun o anki aramasının bitmesini bekler (`canReplace`). Telefonda seçenekler ve değiştirme
+  düğmeleri kendi satırlarında.
+- **Tamamlama.** Uygulamanın `CodeCompleter`'ı imlecin yerine uyan öğeleri verir; düzenleyici onları sözcük yazılırken
+  (`liveCompletion`), Ctrl+Space'te ya da `showCompletion()`'da imlecin altında bir listede gösterir, yazdıkça komut
+  paletinin eşleşmesiyle daraltır; ↑/↓, Enter ya da Tab, Esc, dokunuş. Liste düzenleyicinin içinde, ekran klavyesinin
+  üstünde kalır ve odağı metinden almaz.
+- **Satır komutları.** `moveLinesUp`, `moveLinesDown`, `duplicateLines`, `deleteLines`, `toggleLineComment`,
+  `selectLines`, `goToLine`, `indentSelection`, `outdentSelection`: uygulama bunları kendi kısayollarına ve menülerine
+  bağlar; kit tuş bağlamaz, `CommonShortcuts` ile çakışmaz.
+- **Yakınlaştırma.** `CodeEditorZoom`, `rememberCodeEditorZoom(prefs, key)`: Ctrl ile tekerlek, kıstırma, Ctrl ile
+  + − 0 ve TalkBack'in "Yazıyı büyüt / küçült" eylemleri; seçim `DeskPreferences`'ta saklanır
+  (`editorTextScale(key)`). Yeni yazı boyu bütün metni yeniden yerleştirdiği için kıstırırken ve art arda gelen
+  adımlarda önce çizim büyür, boy parmaklar kalkınca ya da adımlar durunca bir kez değişir. Düzenleyici olmayan bir metin aynı hareketleri `Modifier.textZoom(zoom)`, boyunu
+  `TextStyle.zoomed(zoom)` ile alır.
+- **Telefonda.** `contentPadding = rememberShellContentPadding()` ile metin cam çubukların altından geçer; düzenleyiciye
+  dokunmak ya da metnini kaydırmak ekran klavyesini kapatmaz, imleçli satır klavyenin üstünde kalır. Parmakla kaydırmak
+  imleci yerinden oynatmaz.
+- **Simgeler.** `DeskIcons.MatchCase`, `WholeWord`, `Regex`.
+- **Örnek uygulama.** "Editor" sayfası: uydurma bir hikâye dili, renkleri, bir "derleyicinin" kenardaki bulguları,
+  bağlantılar, tamamlama, arama, yakınlaştırma ve satır komutları; CI'ın örnek APK'sında telefonda ve tablette
+  denenebilir.
+
+### Alt menüler
+
+- **`MenuEntry.Submenu(label, entries, icon = null, enabled = true)`.** Kitin menüleri yalnızca öğe ve
   ayırıcı biliyordu; iç içe menü (Dosya ▸ Son açılanlar, kategorilere ayrılmış parça menüleri) isteyen uygulama
   yapamıyordu. Artık bir `MenuEntry` listesinin gösterildiği her yerde alt menü var: menü çubuğu (rayda "≡"in
   arkasındaki menüler de), `MenuPopup`, `MenuButton`, `IconMenuButton`, `ContextMenuArea`, tablo, ızgara ve liste
@@ -66,28 +139,18 @@ Ayrıca:
   sütun menüsünü kit kurar, uygulama ona giriş vermez.
 - Home ve End tuşları menülerde eskiden de yoktu; eklenmedi.
 
-### MIGRATION.md için (sürüm PR'ı taşır, sonra bu bölüm silinir)
+### Testler
 
-MIGRATION.md'nin sürüm bölümü sürüm PR'ının (#19) işi. "2.9.0'dan 2.10.0'a" bölümüne alt menülerden şu metin girer
-(üst bilgiler, sürümün öbür değişiklikleriyle birlikte):
-
-```markdown
-## 2.9.0'dan 2.10.0'a
-
-Çoğunlukla kod değişmeden derlenir; sürümü `2.10.0` yapmak yeter. 2.9.0'a karşı derlenmiş başka bir modül
-(kitaplık) yeniden derlenmelidir. Ne değiştiği [CHANGELOG](CHANGELOG.md)'da; uygulamanın bakması gerekenler:
-
-- **`MenuEntry.Submenu` (yeni tür):** `MenuEntry` mühürlü bir arayüz ve yeni bir türü var. Bir `MenuEntry` üzerinde
-  `else`'siz `when` yazan kod artık derlenmez; `is MenuEntry.Submenu ->` dalını ya da `else` ekle. Menüyü yalnızca
-  kuran (listeyi kite veren) kod değişmez.
-- **`ActionGroup.actions`:** artık `List<MenuEntry>` (önceden `List<MenuEntry.Item>`). Grup kuran kod aynen derlenir.
-  Eylemleri geri okuyup öğe alanlarına (`label`, `onClick`) erişen kod öğeleri `filterIsInstance<MenuEntry.Item>()`
-  ile alır. 2.9.0'a karşı derlenmiş ve eylemleri öğe diye okuyan bir modül, alt menü ya da ayırıcı içeren bir grupta
-  `ClassCastException` verir: yeniden derlenmeli.
-- **Alt menüler (isteğe bağlı):** iç içe menü kuran uygulama (kendi "▸" satırları, telefonda kendi alt sayfası)
-  bunları `MenuEntry.Submenu` ile değiştirebilir: menü çubuğunda, açılır ve sağ tık menülerinde yanında açılır,
-  telefonun "⋯" sayfasında sayfa olarak. README'nin "Alt menüler" bölümüne bak.
-```
+Kod düzenleyicinin testleri (alt menülerinkiler yukarıda). JVM'de: satır dizini, jeton önbelleği (rastgele
+düzenlemelerden sonra sıfırdan jetonlamayla aynı, tuş başına bir satır, durumu değiştiren düzenleme görünene kadar ve
+dilimlerle), geçmiş, arama ve değiştirme, tamamlama listesinin daralması, kapanması ve seçimi, satır komutları, ölçüler.
+Robolectric'te: giriş yöntemiyle yazma ve sözcük oluşturma, sözcük yazılırken uygulamanın düzenlemesi, klavyenin
+tuttuğu sözcük ve klavyenin yapmadığı her imleç hareketi (tuş, dokunuş, tıklama, seçim, arama), tuşlar, fare ve
+parmak, belge değiştirme, renklerin metinle aynı geçişte gelmesi ve bir değiştirmeden sonra yerinde kalması (satır
+taşıma, tümünü değiştirme, yapıştırma, geri alma), işaretler, bağlantılar, menü, kaydırma yeri,
+yakınlaştırma, arama çubuğu, tamamlama listesi, odak (Esc ve Tab), telefonda kabuğun ekran klavyesiyle birlikte,
+sarılmış satırın kenarı geçmemesi; açık, koyu ve OLED temada, fare ve parmakla, geniş pencerede ve telefonda 11 ekran
+görüntüsü.
 
 ## 2.9.0 (2026-11-13)
 
