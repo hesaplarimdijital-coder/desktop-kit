@@ -142,7 +142,8 @@ düzenlemelerden sonra sıfırdan jetonlamayla aynı, tuş başına bir satır, 
 dilimlerle), geçmiş, arama ve değiştirme, tamamlama listesinin daralması, kapanması ve seçimi, satır komutları, ölçüler.
 Robolectric'te: giriş yöntemiyle yazma ve sözcük oluşturma, sözcük yazılırken uygulamanın düzenlemesi, klavyenin
 tuttuğu sözcük ve klavyenin yapmadığı her imleç hareketi (tuş, dokunuş, tıklama, seçim, arama), tuşlar, fare ve
-parmak, belge değiştirme, renklerin metinle aynı geçişte gelmesi, işaretler, bağlantılar, menü, kaydırma yeri,
+parmak, belge değiştirme, renklerin metinle aynı geçişte gelmesi ve bir değiştirmeden sonra yerinde kalması (satır
+taşıma, tümünü değiştirme, yapıştırma, geri alma), işaretler, bağlantılar, menü, kaydırma yeri,
 yakınlaştırma, arama çubuğu, tamamlama listesi, odak (Esc ve Tab), telefonda kabuğun ekran klavyesiyle birlikte,
 sarılmış satırın kenarı geçmemesi; açık, koyu ve OLED temada, fare ve parmakla, geniş pencerede ve telefonda 11 ekran
 görüntüsü.

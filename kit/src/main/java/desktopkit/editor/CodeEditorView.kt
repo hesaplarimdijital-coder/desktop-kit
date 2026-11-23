@@ -763,12 +763,16 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
         for (line in first..last) {
             val tokens = state.tokens.tokensOf(line)
             if (tokens.isEmpty()) continue
+            val lineStart = lines.start(line)
             val known = applied[tokens]
             if (known != null) {
-                known.pass = pass
-                continue
+                if (inPlace(editable, known.spans, tokens, lineStart, length)) {
+                    known.pass = pass
+                    continue
+                }
+                // the line tokenized as before, but a replacement took spans off it or moved their ends: set them again
+                for (span in known.spans) editable.removeSpan(span)
             }
-            val lineStart = lines.start(line)
             val spans = Array(tokens.size / 3) { index ->
                 val span = RoleSpan(syntaxLook, tokens[index * 3 + 2])
                 val from = (lineStart + tokens[index * 3]).coerceAtMost(length)
@@ -790,6 +794,21 @@ internal class CodeEditorView(context: Context) : EditText(context), EditorHost 
         // the lines beyond the view are done between frames, starting once the typing pauses
         removeCallbacks(tokenizeMore)
         if (state.tokens.pending) postDelayed(tokenizeMore, TOKENIZE_IDLE_MS)
+    }
+
+    /**
+     * Whether every span of a line is still where its token says. The platform's text drops the spans that lie
+     * inside a replaced range and pulls back the ends of those it cuts, so a line can tokenize to the very same
+     * tokens (the cache gives back the same array) while some of its spans are gone.
+     */
+    private fun inPlace(editable: Editable, spans: Array<RoleSpan>, tokens: IntArray, lineStart: Int, length: Int): Boolean {
+        for (index in spans.indices) {
+            val from = (lineStart + tokens[index * 3]).coerceAtMost(length)
+            val to = (lineStart + tokens[index * 3 + 1]).coerceIn(from, length)
+            if (from == to) continue
+            if (editable.getSpanStart(spans[index]) != from || editable.getSpanEnd(spans[index]) != to) return false
+        }
+        return true
     }
 
     /**
